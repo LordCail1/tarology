@@ -18,11 +18,17 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Reading state must be durable and restorable.
 - Reading Studio side panels must support smooth expand/collapse animation and desktop drag-resize, with persisted user width preferences.
 - Reading canvas must be mode-capable with `freeform` and `grid` modes under one shared state/command model.
-- User default tarot deck must be captured at first-run onboarding, saved in preferences, and usable as default for new readings with per-reading override.
+- User default tarot deck must be captured at first-run onboarding, saved in preferences, and used as default for new readings with per-reading override.
 - Interpretation flow supports large card sets, warning users for high-card runs and allowing explicit cancellation.
 - Model provider access must support both credential modes behind one interface:
   - `api_key`
   - `oauth` (capability-driven per provider)
+- Symbolic expansion is sequenced after core reliability:
+  - Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
+- Persona/card voice framing is archetypal and interpretive (non-literal); outputs must never present certainty claims.
+- Dual register mode (`plain`, `esoteric`) must preserve semantic parity.
+- Wellness lens naming is required; no diagnosis/treatment framing.
+- Engagement must be reflective progression, not addictive-by-design mechanics.
 
 ## 3) Architecture Constraints
 - Keep a modular monolith:
@@ -35,9 +41,10 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 ## 4) Current Implementation Snapshot
 - Monorepo scaffold is in place.
 - API has a bootstrap `POST /v1/readings` path with seeded shuffle assignment and response contract.
-- UI has a minimal Reading Studio shell with collapsible sidebars and a center-first layout.
+- UI has a minimal Reading Studio shell with collapsible sidebars and center-first layout.
 - Drag-resize sidebars, multi-mode canvas interactions, and deck preference flows are documented requirements but not fully implemented yet.
 - Persistence is currently in-memory for readings (not production-safe yet).
+- Product docs now include strategic post-core PRDs (`prd-11` through `prd-15`) and updated API/safety/roadmap guidance.
 - GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.
 - Required checks on `main`: `ci-checks`, `request-codex-review`.
 - See `PLAN.md` for exact next backlog.

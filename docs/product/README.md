@@ -26,6 +26,30 @@ Migration note:
 - [PRD 08 - Safety, Profile, and Quality](./prd-08-safety-profile-and-quality.md)
 - [PRD 09 - Roadmap, Risks, and Open Decisions](./prd-09-roadmap-risks-and-open-decisions.md)
 - [PRD 10 - Future Growth and Delivery Governance](./prd-10-future-growth-and-delivery-governance.md)
+- [PRD 11 - Visual Storytelling Mode](./prd-11-visual-storytelling.md)
+- [PRD 12 - Fusion Lab](./prd-12-fusion-lab.md)
+- [PRD 13 - Dialogue Mode](./prd-13-dialogue-mode.md)
+- [PRD 14 - Deck Creation and Moderation](./prd-14-deck-creation-and-moderation.md)
+- [PRD 15 - Sharing, Engagement, and Monetization](./prd-15-sharing-engagement-and-monetization.md)
+
+## Symbolic Expansion
+Symbolic expansion modules are staged after reliability gates to protect trust and shipping focus.
+
+Gate sequence:
+1. Gate -1: Auth + profile + preferences baseline (Google sign-in, profile shell, deck preference capture).
+2. Gate 0: Core reading reliability (durable state, restore, command envelope, high-card warning/cancel, canvas mode baseline).
+3. Release A (V1.5): Visual Storytelling.
+4. Release B (V1.6): Fusion Lab.
+5. Release C (V1.7): Dialogue Mode.
+6. Release D (V2): Deck Creation + Moderation.
+7. Release E (V2): Private Sharing + Monetization.
+
+Dependency graph:
+- `Visual Storytelling` depends on frozen interpretation context, provenance, and safety boundary checks.
+- `Fusion Lab` depends on interpretation synthesis and reuses storytelling renderers.
+- `Dialogue Mode` depends on provider-agnostic `PersonaSpec` and dialogue boundary/safety pass.
+- `Deck Creation + Moderation` depends on template policy, rights attestation, and moderation workflow.
+- `Private Sharing + Monetization` depends on stable artifact schemas and entitlement enforcement.
 
 ## Editing Rule
 - Keep section intent unchanged unless requirements are intentionally being revised.

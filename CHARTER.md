@@ -31,6 +31,14 @@ This version merges:
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
 15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
 16. Users choose a default tarot deck during first-time onboarding; new readings use this default unless the user explicitly overrides deck selection before creation.
+17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
+18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
+19. Symbolic outputs support dual register (`plain` default, `esoteric` optional) with semantic parity.
+20. Engagement model is reflective progression; manipulative/addictive loop design is explicitly rejected.
+21. Sharing rollout is private-first (tokenized unlisted links) before any public social feed.
+22. Custom deck creation is template-moderated and requires rights attestation before publish/share.
+23. Monetization direction is subscription plus optional usage packs.
+24. Persona implementation remains provider-agnostic; no OpenClaw lock-in.
 
 ## 1) Product Vision
 Tarology helps beginners receive and explore tarot readings through high-quality AI symbolic synthesis.
@@ -538,7 +546,21 @@ Maintain 200-300 benchmark cases:
 - citation schema validation,
 - latency and cost drift checks.
 
-## 16) 12-Week Roadmap
+## 16) Delivery Sequence
+### 16.1 Gate -1 (Foundation)
+- Google auth baseline.
+- Profile shell baseline.
+- Default deck preference onboarding.
+
+### 16.2 Gate 0 (Core Reliability)
+- deterministic reading creation,
+- command envelope + idempotency,
+- event log + snapshots + restore path,
+- question/groups persistence,
+- interpretation warning + cancellation,
+- canvas mode baseline (`freeform` + `grid`).
+
+### 16.3 Core 12-Week Build Window
 Weeks 1-2:
 - monorepo bootstrap,
 - Google auth,
@@ -580,6 +602,13 @@ Weeks 11-12:
 - latency/cost tuning,
 - beta launch readiness.
 
+### 16.4 Post-Core Releases
+- Release A (V1.5): Visual Storytelling Mode.
+- Release B (V1.6): Fusion Lab.
+- Release C (V1.7): Dialogue Mode.
+- Release D (V2): Deck Creation (Template + Moderation).
+- Release E (V2): Private Sharing + Monetization.
+
 ## 17) Risk Register and Kill Tests
 - Beginner confusion remains high.
   - Mitigation: progressive disclosure and clearer summaries.
@@ -609,6 +638,22 @@ Weeks 11-12:
   - Mitigation: capability flags + API-key fallback + clear UX messaging.
   - Kill test: OAuth connection success rate < 95% for enabled providers.
 
+- Post-core generation cost growth (storyboard/fusion/dialogue) outpaces retention.
+  - Mitigation: cost estimate confirmation, quotas, entitlement controls.
+  - Kill test: generation cost grows for 2 release cycles without measurable retention gain.
+
+- Provenance quality decays in generated artifacts.
+  - Mitigation: mandatory provenance map, contract tests, reviewer audits.
+  - Kill test: provenance completeness < 99% on benchmark artifacts.
+
+- Anthropomorphic confusion from persona features.
+  - Mitigation: explicit interpretive framing + boundary copy.
+  - Kill test: user misunderstanding signal exceeds defined threshold in usability studies.
+
+- Deck creation introduces moderation/legal risk.
+  - Mitigation: template constraints + rights attestation + moderation review.
+  - Kill test: blocked-content leakage above policy threshold.
+
 ## 18) Contributor Protocol
 1. The modular PRD set in `docs/product/` is the primary editing surface for requirements.
 2. During migration, this charter is the tie-breaker source of truth if wording conflicts appear across PRDs.
@@ -621,12 +666,14 @@ Weeks 11-12:
 
 ## 19) Open Decisions (Reduced)
 1. Durable workflow engine choice for V1 deployment target.
-2. V1 brand posture language: secular-only, spiritual-only, or both.
+2. V1 onboarding posture default (`plain` only vs optional `esoteric` chooser).
 3. Public randomness verification timing (V1.1 vs V2).
 4. Initial deck/art package licensing strategy.
-5. Data retention windows for sensitive reading text.
+5. Data retention windows for sensitive reading text and generated artifacts.
 6. Provider-by-provider launch order for OAuth connections.
 7. Default high-card warning threshold and initial token/runtime budget limits.
+8. Storyboard model/provider routing strategy per abstraction level.
+9. Subscription packaging details (plan tiers and usage-pack denominations).
 
 ## 20) Future Growth Blueprint (Pre-wired Now)
 This section defines how V1 must be built so a bigger product can be added without rewrites.
@@ -644,12 +691,15 @@ Each studio has:
 - clear event contracts to communicate with other studios.
 
 ### 20.2 Notes Studio Readiness Requirements
-Even though Notes Studio is not in V1, V1 must preserve these interfaces:
+Even though Notes Studio is not in V1, V1+ must preserve these interfaces:
 - Ability to attach notes to reading entities by stable IDs:
   - `readingId`
   - `questionId`
   - `cardGroupId`
   - `interpretationId`
+  - `storyboardId` (post-core)
+  - `fusionId` (post-core)
+  - `dialogueSessionId` (post-core)
 - Bidirectional linking model (reading object <-> note object).
 - Deferred indexer port for full-text and graph relationships.
 
@@ -659,13 +709,25 @@ Suggested future endpoints (reserved):
 - `PATCH /v1/notes/{id}`
 - `POST /v1/notes/links`
 
-### 20.3 UX Transition Pattern (Future)
-Support a “shifted canvas” mode transition between studios (reading -> notes) without state loss:
+### 20.3 Private Share Artifact Flow (Pre-Social)
+Private share is the first sharing stage and the bridge into Social Studio.
+
+Flow:
+1. Artifact is created in Reading Studio (`storyboard`, `fusion`, `dialogue summary`).
+2. Artifact is stored with provenance and safety flags.
+3. User creates tokenized private share link (`unlisted`, expiry, revocation).
+4. Social Studio (future) ingests shared artifacts through stable `ShareArtifactRef` contracts.
+
+Design rule:
+- Sharing contracts must not require direct database coupling between studios.
+
+### 20.4 UX Transition Pattern (Future)
+Support a “shifted canvas” mode transition between studios (reading -> notes/social) without state loss:
 - Preserve reading context in URL/state token.
-- Open notes workspace with contextual backlinks to current reading/thread/group.
+- Open destination studio with contextual backlinks to current reading/thread/group.
 - Return path restores exact reading workspace state.
 
-### 20.4 Containerization and External Integration
+### 20.5 Containerization and External Integration
 Reading Studio must remain embeddable as a containerized feature:
 - no global mutable singletons across studios,
 - no direct dependency on social or notes modules,

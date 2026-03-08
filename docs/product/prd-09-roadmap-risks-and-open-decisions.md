@@ -1,57 +1,36 @@
 # PRD 09 - Roadmap, Risks, and Open Decisions
 
-Source: `CHARTER.md` (v0.3 extraction)
+Source: `CHARTER.md` (v0.3 extraction + strategic expansion updates)
 Coverage: sections 16 through 19
 
-## 16) 12-Week Roadmap
-Weeks 1-2:
-- monorepo bootstrap,
-- Google auth,
-- provider connection framework (API key mode),
-- onboarding default deck preference capture,
+## 16) Delivery Sequence
+### 16.1 Gate -1 (Foundation)
+- Google auth baseline.
+- Profile shell baseline.
+- Default deck preference onboarding.
+
+### 16.2 Gate 0 (Core Reliability)
 - deterministic reading creation,
-- base schema.
+- command envelope + idempotency,
+- event log + snapshots + restore path,
+- question/groups persistence,
+- interpretation warning + cancellation,
+- canvas mode baseline (`freeform` + `grid`).
 
-Weeks 3-4:
-- chat shell motion + panel resize persistence,
-- canvas mode abstraction (`freeform` + `grid` contract),
-- command API,
-- event log + snapshots,
-- restore reliability,
-- card canvas interactions.
-
-Weeks 5-6:
-- question tree,
-- card groups,
-- frozen interpretation targets.
-
-Weeks 7-8:
-- interpretation workflow MVP,
-- web-first research,
-- citation persistence,
-- uncertainty rendering,
-- high-card estimate + warning UX,
-- stop/cancel control and workflow cancellation path.
-
-Weeks 9-10:
-- safety interruption pipeline,
-- tracing/observability,
-- retry and dedupe hardening,
-- first OAuth-capable provider integration (if provider support is available).
-
-Weeks 11-12:
-- benchmark harness,
-- profile stats,
-- latency/cost tuning,
-- beta launch readiness.
+### 16.3 Post-Core Releases
+- Release A (V1.5): Visual Storytelling Mode.
+- Release B (V1.6): Fusion Lab.
+- Release C (V1.7): Dialogue Mode.
+- Release D (V2): Deck Creation (Template + Moderation).
+- Release E (V2): Private Sharing + Monetization.
 
 ## 17) Risk Register and Kill Tests
 - Beginner confusion remains high.
-  - Mitigation: progressive disclosure and clearer summaries.
+  - Mitigation: progressive disclosure, plain-register default, clearer summaries.
   - Kill test: clarity < 4.0 after 3 iterations.
 
 - Overclaiming or unsafe outputs.
-  - Mitigation: strict safety pass + uncertainty templates.
+  - Mitigation: strict safety pass + uncertainty templates + dialogue boundary pass.
   - Kill test: overclaim rate > 0.5%.
 
 - Data loss after crashes.
@@ -66,17 +45,25 @@ Weeks 11-12:
   - Mitigation: retrieval caching, model tiering, async deep mode.
   - Kill test: cost per active user rises without retention lift.
 
-- Large-card interpretation requests create runaway token/time costs.
-  - Mitigation: threshold warnings, planner modes, chunked execution, explicit cancellation.
-  - Kill test: high-card runs exceed budget guardrails without warning in production telemetry.
+- Post-core generation cost growth (storyboard/fusion/dialogue) outpaces retention.
+  - Mitigation: cost estimate confirmation, quotas, entitlement controls.
+  - Kill test: generation cost grows for 2 release cycles without measurable retention gain.
 
-- Provider OAuth delegation unavailable or unstable.
-  - Mitigation: capability flags + API-key fallback + clear UX messaging.
-  - Kill test: OAuth connection success rate < 95% for enabled providers.
+- Provenance quality decays in generated artifacts.
+  - Mitigation: mandatory provenance map, contract tests, reviewer audits.
+  - Kill test: provenance completeness < 99% on benchmark artifacts.
+
+- Anthropomorphic confusion from persona features.
+  - Mitigation: explicit interpretive framing + boundary copy.
+  - Kill test: user misunderstanding signal exceeds defined threshold in usability studies.
+
+- Deck creation introduces moderation/legal risk.
+  - Mitigation: template constraints + rights attestation + moderation review.
+  - Kill test: blocked-content leakage above policy threshold.
 
 ## 18) Contributor Protocol
 1. The modular PRD set in `docs/product/` is the primary editing surface for requirements.
-2. During migration, this charter is the tie-breaker source of truth if wording conflicts appear across PRDs.
+2. During migration, charter is the tie-breaker source of truth if wording conflicts appear across PRDs.
 3. Every feature PR must include:
   - mapped charter sections,
   - acceptance criteria evidence,
@@ -84,12 +71,13 @@ Weeks 11-12:
 4. Keep architecture decision records current.
 5. No production debug endpoints exposing user/session/account internals.
 
-## 19) Open Decisions (Reduced)
+## 19) Open Decisions
 1. Durable workflow engine choice for V1 deployment target.
-2. V1 brand posture language: secular-only, spiritual-only, or both.
+2. V1 brand posture language default in onboarding (`plain` only vs optional `esoteric`).
 3. Public randomness verification timing (V1.1 vs V2).
 4. Initial deck/art package licensing strategy.
-5. Data retention windows for sensitive reading text.
+5. Data retention windows for sensitive reading text and generated artifacts.
 6. Provider-by-provider launch order for OAuth connections.
 7. Default high-card warning threshold and initial token/runtime budget limits.
-
+8. Storyboard model/provider routing strategy per abstraction level.
+9. Subscription packaging details (plan tiers and usage pack denominations).
