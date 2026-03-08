@@ -59,35 +59,44 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Engagement model is reflective progression, not manipulative loops.
 
 ## Immediate Queue (Gate -1 and Gate 0)
-1. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
+1. Implement Google auth baseline.
+- Acceptance: Google sign-in/session flow works end-to-end for web and API protected routes.
+
+2. Implement profile shell baseline.
+- Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
+
+3. Add default deck preference onboarding baseline.
+- Acceptance: first authenticated session captures and persists a default deck preference.
+
+4. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
 - Acceptance: readings survive API restart; in-memory map removed from canonical path.
 
-2. Introduce command mutation envelope for reading changes.
+5. Introduce command mutation envelope for reading changes.
 - Acceptance: command ID, idempotency key, expected version checks, append-only event write, projection update.
 
-3. Build read-model restore path.
+6. Build read-model restore path.
 - Acceptance: `GET /v1/readings/:id` returns current projection; snapshots/events replay strategy is in place.
 
-4. Implement question tree and saved card groups.
+7. Implement question tree and saved card groups.
 - Acceptance: root/sub-questions and named groups persist with relationships.
 
-5. Start provider-connections domain with capability model.
+8. Start provider-connections domain with capability model.
 - Acceptance: schema/API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
 
-6. Add interpretation request job model with cancellable state machine.
-- Acceptance: queued/running/completed/failed/cancelled states with idempotent cancellation.
+9. Add interpretation request job model with cancellable state machine.
+- Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
 
-7. Implement high-card warning plumbing.
+10. Implement high-card warning plumbing.
 - Acceptance: server returns estimate metadata and warning threshold signal for large card sets.
 
-8. Implement desktop sidebar resize handles + smooth motion polish.
+11. Implement desktop sidebar resize handles + smooth motion polish.
 - Acceptance: left/right panels resize by drag on desktop and persist per user widths.
 
-9. Introduce multi-mode canvas architecture.
+12. Introduce multi-mode canvas architecture.
 - Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
 
-10. Add deck preference onboarding + per-reading deck override.
-- Acceptance: first login captures default deck in preferences; reading creation can override before assignment.
+13. Extend deck preference flow with per-reading deck override.
+- Acceptance: reading creation can override persisted default deck before assignment.
 
 ## Post-Core Strategic Queue (Unlock after Gate 0)
 1. Release A (V1.5): Visual Storytelling.
