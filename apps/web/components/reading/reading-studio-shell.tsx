@@ -7,6 +7,7 @@ import { ThreadsPanel } from "./threads-panel";
 import {
   interpretationHistoryMock,
   questionThreadsMock,
+  type ReadingHistoryFilter,
   readingHistoryMock,
 } from "../../lib/reading-studio-mock";
 
@@ -28,7 +29,23 @@ function panelVisibilityClass(activeTab: MobileTabId, panelId: MobileTabId): str
 
 export function ReadingStudioShell() {
   const [activeTab, setActiveTab] = useState<MobileTabId>("canvas");
-  const activeReading = readingHistoryMock[0];
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<ReadingHistoryFilter>("all");
+
+  const normalizedQuery = historySearchQuery.trim().toLowerCase();
+  const filteredReadings = readingHistoryMock.filter((reading) => {
+    if (historyStatusFilter !== "all" && reading.status !== historyStatusFilter) {
+      return false;
+    }
+
+    if (normalizedQuery.length === 0) {
+      return true;
+    }
+
+    return reading.title.toLowerCase().includes(normalizedQuery);
+  });
+
+  const activeReading = filteredReadings[0] ?? readingHistoryMock[0];
 
   return (
     <div className="pb-8 pt-6 lg:pt-8">
@@ -38,7 +55,7 @@ export function ReadingStudioShell() {
           Tarology Workspace Shell
         </h1>
         <p className="mt-2 max-w-3xl text-sm text-[var(--color-muted)]">
-          Scaffold layout for deterministic readings, card canvas interactions, and threaded interpretation history.
+          Dark workspace theme with search/filter controls in reading history and responsive studio panel navigation.
         </p>
       </header>
 
@@ -59,8 +76,8 @@ export function ReadingStudioShell() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`rounded-xl px-2 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] ${
                     isActive
-                      ? "tab-active bg-[var(--color-accent)] text-white"
-                      : "bg-white/70 text-[var(--color-ink)] hover:bg-white"
+                      ? "tab-active bg-[var(--color-accent)] text-black"
+                      : "bg-white/[0.05] text-[var(--color-ink)] hover:bg-white/[0.1]"
                   }`}
                 >
                   {tab.label}
@@ -77,7 +94,15 @@ export function ReadingStudioShell() {
             aria-labelledby="tab-history"
             className={`${panelVisibilityClass(activeTab, "history")} surface stagger-enter rounded-2xl p-4`}
           >
-            <HistoryRail readings={readingHistoryMock} activeReadingId={activeReading.id} />
+            <HistoryRail
+              readings={filteredReadings}
+              activeReadingId={activeReading.id}
+              searchQuery={historySearchQuery}
+              statusFilter={historyStatusFilter}
+              totalCount={readingHistoryMock.length}
+              onSearchQueryChange={setHistorySearchQuery}
+              onStatusFilterChange={setHistoryStatusFilter}
+            />
           </aside>
 
           <main

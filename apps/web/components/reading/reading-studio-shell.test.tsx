@@ -31,4 +31,24 @@ describe("ReadingStudioShell", () => {
     expect(threadsTab).toHaveAttribute("aria-selected", "true");
     expect(historyTab).toHaveAttribute("aria-selected", "false");
   });
+
+  it("filters reading history with search and status controls", () => {
+    render(<ReadingStudioShell />);
+
+    const searchInput = screen.getByLabelText("Search readings");
+    fireEvent.change(searchInput, { target: { value: "Creative" } });
+
+    expect(screen.getByText("Creative project momentum")).toBeInTheDocument();
+    expect(screen.queryByText("Career realignment and confidence")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Paused/i }));
+    expect(screen.getByText("No readings match current filters.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /All/i }));
+    fireEvent.change(searchInput, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /Complete/i }));
+
+    expect(screen.getByText("Spring direction spread")).toBeInTheDocument();
+    expect(screen.queryByText("Relationship clarity check-in")).not.toBeInTheDocument();
+  });
 });

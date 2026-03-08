@@ -9,9 +9,9 @@ interface ThreadsPanelProps {
 }
 
 const interpretationStatusTone: Record<InterpretationHistoryItem["status"], string> = {
-  ready: "bg-emerald-100 text-emerald-800",
-  running: "bg-sky-100 text-sky-800",
-  queued: "bg-amber-100 text-amber-800",
+  ready: "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/35",
+  running: "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/35",
+  queued: "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/35",
 };
 
 export function ThreadsPanel({ threads, interpretations }: ThreadsPanelProps) {
@@ -29,7 +29,7 @@ export function ThreadsPanel({ threads, interpretations }: ThreadsPanelProps) {
           {threads.map((thread) => (
             <li key={thread.id}>
               <article
-                className="rounded-xl border border-[var(--color-border)] bg-white/60 px-3 py-2"
+                className="rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 py-2"
                 style={{ marginLeft: `${thread.depth * 0.8}rem` }}
               >
                 <h3 className="text-sm font-semibold text-[var(--color-ink)]">{thread.label}</h3>
@@ -51,7 +51,7 @@ export function ThreadsPanel({ threads, interpretations }: ThreadsPanelProps) {
         <ul className="mt-4 space-y-2">
           {interpretations.map((item) => (
             <li key={item.id}>
-              <article className="rounded-xl border border-[var(--color-border)] bg-white/60 px-3 py-3">
+              <article className="rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 py-3">
                 <header className="flex items-start justify-between gap-3">
                   <h3 className="text-sm font-semibold text-[var(--color-ink)]">{item.groupName}</h3>
                   <span

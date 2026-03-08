@@ -1,4 +1,5 @@
 export type ReadingStatus = "active" | "paused" | "complete";
+export type ReadingHistoryFilter = "all" | ReadingStatus;
 export type InterpretationStatus = "ready" | "running" | "queued";
 
 export interface ReadingHistoryItem {

@@ -15,7 +15,8 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
   - left history rail,
   - center card fan/canvas placeholder,
   - right question thread + interpretation panel,
-  - mobile tab switching for `Canvas`, `History`, `Threads`.
+  - mobile tab switching for `Canvas`, `History`, `Threads`,
+  - dark workspace styling and reading-history search/status filters.
 - Reading persistence is currently in-memory and must be replaced with database-backed state.
 - Repository is live on GitHub: `https://github.com/LordCail1/tarology`.
 - `main` branch protection is active:
@@ -54,6 +55,8 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Implemented Reading Studio shell route and component scaffold in `apps/web`.
 - Added static typed placeholder data model for history, threads, and interpretation panels.
 - Added web test tooling (Vitest + Testing Library) with initial tests for root redirect and shell tab behavior.
+- Added Reading History filtering controls (search + status chips) and corresponding web test coverage.
+- Refreshed Reading Studio visual language to a dark mode shell for current web UI direction.
 
 ## Key Product Decisions Already Locked
 - Card identity is random but fixed at reading creation; never sampled on click.
