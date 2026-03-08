@@ -5,6 +5,7 @@ export type InterpretationStatus = "ready" | "running" | "queued";
 export interface ReadingHistoryItem {
   id: string;
   title: string;
+  createdAtIso: string;
   createdAtLabel: string;
   cardCount: number;
   status: ReadingStatus;
@@ -32,6 +33,7 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
   {
     id: "rdg_001",
     title: "Career realignment and confidence",
+    createdAtIso: "2026-03-08T09:42:00.000-05:00",
     createdAtLabel: "Today, 09:42",
     cardCount: 5,
     status: "active",
@@ -39,6 +41,7 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
   {
     id: "rdg_002",
     title: "Relationship clarity check-in",
+    createdAtIso: "2026-03-07T20:14:00.000-05:00",
     createdAtLabel: "Yesterday, 20:14",
     cardCount: 3,
     status: "paused",
@@ -46,16 +49,26 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
   {
     id: "rdg_003",
     title: "Spring direction spread",
+    createdAtIso: "2026-03-05T13:30:00.000-05:00",
     createdAtLabel: "Mar 05, 2026",
     cardCount: 7,
     status: "complete",
   },
   {
     id: "rdg_004",
-    title: "Creative project momentum",
-    createdAtLabel: "Mar 01, 2026",
+    title: "Creative project momentum sprint",
+    createdAtIso: "2026-03-03T18:10:00.000-05:00",
+    createdAtLabel: "Mar 03, 2026",
     cardCount: 4,
     status: "complete",
+  },
+  {
+    id: "rdg_005",
+    title: "Crossroads spread review",
+    createdAtIso: "2026-02-24T08:25:00.000-05:00",
+    createdAtLabel: "Feb 24, 2026",
+    cardCount: 6,
+    status: "paused",
   },
 ];
 

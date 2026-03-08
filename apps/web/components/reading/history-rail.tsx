@@ -2,15 +2,17 @@ import type {
   ReadingHistoryFilter,
   ReadingHistoryItem,
 } from "../../lib/reading-studio-mock";
+import type { HistoryGroup } from "../../lib/group-readings-by-recency";
 
 interface HistoryRailProps {
-  readings: ReadingHistoryItem[];
+  groups: HistoryGroup[];
   activeReadingId: string;
   searchQuery: string;
   statusFilter: ReadingHistoryFilter;
   totalCount: number;
   onSearchQueryChange: (nextQuery: string) => void;
   onStatusFilterChange: (nextFilter: ReadingHistoryFilter) => void;
+  onNewReading: () => void;
 }
 
 const statusBadgeTone: Record<ReadingHistoryItem["status"], string> = {
@@ -27,27 +29,44 @@ const filterLabels: Record<ReadingHistoryFilter, string> = {
 };
 
 export function HistoryRail({
-  readings,
+  groups,
   activeReadingId,
   searchQuery,
   statusFilter,
   totalCount,
   onSearchQueryChange,
   onStatusFilterChange,
+  onNewReading,
 }: HistoryRailProps) {
   const filterOrder: ReadingHistoryFilter[] = ["all", "active", "paused", "complete"];
+  const visibleCount = groups.reduce((sum, group) => sum + group.items.length, 0);
 
   return (
-    <section aria-labelledby="reading-history-title">
-      <h2 id="reading-history-title" className="text-xl text-[var(--color-ink)]">
-        Reading History
-      </h2>
-      <p className="mt-1 text-sm text-[var(--color-muted)]">
-        Search and status filters for reading restore and quick switching.
-      </p>
+    <section aria-labelledby="reading-history-title" className="space-y-4">
+      <header className="space-y-3">
+        <div>
+          <h2 id="reading-history-title" className="text-xl text-[var(--color-ink)]">
+            Reading History
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            Search, filter, and reopen previous reading sessions.
+          </p>
+        </div>
 
-      <div className="mt-4 space-y-3">
-        <label htmlFor="history-search-input" className="block text-xs font-semibold uppercase tracking-[0.15em] text-[var(--color-muted)]">
+        <button
+          type="button"
+          onClick={onNewReading}
+          className="w-full rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)] px-3 py-2 text-sm font-semibold text-black transition hover:brightness-110"
+        >
+          New Reading
+        </button>
+      </header>
+
+      <div className="space-y-3">
+        <label
+          htmlFor="history-search-input"
+          className="block text-xs font-semibold uppercase tracking-[0.15em] text-[var(--color-muted)]"
+        >
           Search readings
         </label>
         <input
@@ -82,47 +101,65 @@ export function HistoryRail({
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-[var(--color-muted)]">
-        Showing {readings.length} of {totalCount} readings
+      <p className="text-xs text-[var(--color-muted)]">
+        Showing {visibleCount} of {totalCount} readings
       </p>
 
-      {readings.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-dashed border-[var(--color-border)] bg-black/25 px-3 py-4 text-sm text-[var(--color-muted)]">
+      {groups.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-[var(--color-border)] bg-black/25 px-3 py-4 text-sm text-[var(--color-muted)]">
           No readings match current filters.
         </p>
       ) : (
-        <ul className="mt-4 space-y-2">
-          {readings.map((reading) => {
-            const isActive = reading.id === activeReadingId;
-
-            return (
-              <li key={reading.id}>
-                <article
-                  className={`rounded-xl border px-3 py-3 transition ${
-                    isActive
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
-                      : "border-[var(--color-border)] bg-white/[0.03]"
-                  }`}
-                  aria-current={isActive ? "page" : undefined}
+        <div className="space-y-4">
+          {groups.map((group) => (
+            <section key={group.label} aria-labelledby={`group-${group.label.replace(/\s+/g, "-")}`}>
+              <header className="mb-2 flex items-center justify-between">
+                <h3
+                  id={`group-${group.label.replace(/\s+/g, "-")}`}
+                  className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]"
                 >
-                  <header className="flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-semibold leading-snug text-[var(--color-ink)]">
-                      {reading.title}
-                    </h3>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.03em] ${statusBadgeTone[reading.status]}`}
-                    >
-                      {reading.status}
-                    </span>
-                  </header>
-                  <p className="mt-2 text-xs text-[var(--color-muted)]">
-                    {reading.createdAtLabel} · {reading.cardCount} cards
-                  </p>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
+                  {group.label}
+                </h3>
+                <span className="rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[0.68rem] font-semibold text-[var(--color-muted)]">
+                  {group.items.length}
+                </span>
+              </header>
+
+              <ul className="space-y-2">
+                {group.items.map((reading) => {
+                  const isActive = reading.id === activeReadingId;
+
+                  return (
+                    <li key={reading.id}>
+                      <article
+                        className={`rounded-xl border px-3 py-3 transition ${
+                          isActive
+                            ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+                            : "border-[var(--color-border)] bg-white/[0.03]"
+                        }`}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <header className="flex items-start justify-between gap-3">
+                          <h4 className="text-sm font-semibold leading-snug text-[var(--color-ink)]">
+                            {reading.title}
+                          </h4>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.03em] ${statusBadgeTone[reading.status]}`}
+                          >
+                            {reading.status}
+                          </span>
+                        </header>
+                        <p className="mt-2 text-xs text-[var(--color-muted)]">
+                          {reading.createdAtLabel} · {reading.cardCount} cards
+                        </p>
+                      </article>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </section>
   );
