@@ -32,6 +32,8 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - API has a bootstrap `POST /v1/readings` path with seeded shuffle assignment and response contract.
 - UI is still a shell page.
 - Persistence is currently in-memory for readings (not production-safe yet).
+- GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.
+- Required checks on `main`: `ci-checks`, `request-codex-review`.
 - See `PLAN.md` for exact next backlog.
 
 ## 5) Engineering Rules
