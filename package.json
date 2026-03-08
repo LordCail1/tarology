@@ -1,0 +1,19 @@
+{
+  "name": "tarology",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @tarology/web",
+    "dev:api": "npm run start:dev --workspace @tarology/api",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "ci:checks": "npm run typecheck && npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
