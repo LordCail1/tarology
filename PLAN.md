@@ -11,7 +11,12 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Monorepo scaffold exists with `apps/web`, `apps/api`, `packages/shared`.
 - API includes `POST /v1/readings` with seeded Fisher-Yates assignment + reversal bits.
 - Shared contracts exist for reading creation.
-- UI is still minimal placeholder.
+- Web now has a Tailwind-based Reading Studio scaffold at `/reading` with:
+  - left history rail,
+  - center card fan/canvas placeholder,
+  - right question thread + interpretation panel,
+  - mobile tab switching for `Canvas`, `History`, `Threads`,
+  - dark workspace styling and reading-history search/status filters.
 - Reading persistence is currently in-memory and must be replaced with database-backed state.
 - Repository is live on GitHub: `https://github.com/LordCail1/tarology`.
 - `main` branch protection is active:
@@ -47,6 +52,11 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Fixed CI workflow parse issue (removed invalid `secrets.*` usage in job-level `if` expressions).
 - Fixed Vercel preview build path issue by making `apps/web/tsconfig.json` self-contained.
 - Verified production deployment on `main` succeeded.
+- Implemented Reading Studio shell route and component scaffold in `apps/web`.
+- Added static typed placeholder data model for history, threads, and interpretation panels.
+- Added web test tooling (Vitest + Testing Library) with initial tests for root redirect and shell tab behavior.
+- Added Reading History filtering controls (search + status chips) and corresponding web test coverage.
+- Refreshed Reading Studio visual language to a dark mode shell for current web UI direction.
 
 ## Key Product Decisions Already Locked
 - Card identity is random but fixed at reading creation; never sampled on click.
@@ -76,9 +86,6 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 
 7. Implement high-card warning policy plumbing.
 - Acceptance: server returns estimated cost/runtime metadata and warning threshold signal for large card sets.
-
-8. Build UI shell matching product IA.
-- Acceptance: left history rail, center canvas, right thread/interpretation panel scaffold with placeholder data.
 
 ## Deferred Until Core Is Stable
 - Full social feed.

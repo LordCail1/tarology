@@ -34,6 +34,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test web
+        run: npm run test --workspace @tarology/web
+
       - name: Build
         run: npm run build
 
