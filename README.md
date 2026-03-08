@@ -3,6 +3,7 @@
 Greenfield rewrite with a modular monorepo foundation.
 
 Start here:
+- [docs/product/README.md](./docs/product/README.md) - modular product requirements index (PRD set)
 - [CHARTER.md](./CHARTER.md) - canonical product and engineering spec
 - [PLAN.md](./PLAN.md) - current implementation status and next queue
 - [AGENTS.md](./AGENTS.md) - Codex/new-session bootstrap instructions

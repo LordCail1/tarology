@@ -7,22 +7,24 @@ Owner: Product + Engineering
 Ship a reliable V1 foundation for Tarology v2 that matches the charter: deterministic-at-creation card assignment, durable reading state, modular NestJS architecture, and AI interpretation pipeline that can scale from small card groups to high-card runs with warning and cancel controls.
 
 ## Current State
-- Charter is defined in `CHARTER.md` (v0.2).
+- Charter is defined in `CHARTER.md` (v0.3).
+- Modular PRD index and split requirements docs now exist under `docs/product/`.
 - Monorepo scaffold exists with `apps/web`, `apps/api`, `packages/shared`.
 - API includes `POST /v1/readings` with seeded Fisher-Yates assignment + reversal bits.
 - Shared contracts exist for reading creation.
-- Web now has a Tailwind-based Reading Studio scaffold at `/reading` with:
-  - left history rail,
-  - center card fan/canvas placeholder,
-  - right question thread + interpretation panel,
-  - mobile tab switching for `Canvas`, `History`, `Threads`,
-  - dark workspace styling and reading-history search/status filters.
-- Web shell now also includes ChatGPT-style structural interactions:
-  - sticky workspace top bar,
-  - desktop left/right panel collapse controls,
-  - mobile history/analysis drawers,
-  - right-panel tabs (`Threads`, `Interpretations`),
-  - grouped reading history buckets (`Today`, `Yesterday`, `Previous 7 Days`, `Older`).
+- Web now has a minimal Reading Studio shell at `/reading` with:
+  - ChatGPT-like center-first layout,
+  - left and right sidebars that both expand/collapse (desktop rails at collapsed width),
+  - mobile slide-over drawers for left/right panels,
+  - per-user sidebar open/closed persistence via localStorage keys:
+    - `tarology.ui.leftPanelOpen`
+    - `tarology.ui.rightPanelOpen`
+  - branded empty center state using `apps/web/public/magician-logo.png`,
+  - bottom composer and reduced-contrast dark neutral visual system.
+- Product documentation now explicitly requires:
+  - desktop sidebar drag-resize with smooth motion for expand/collapse,
+  - multi-mode reading canvas architecture (`freeform` + `grid`),
+  - first-run default tarot deck selection and per-reading deck override before creation.
 - Reading persistence is currently in-memory and must be replaced with database-backed state.
 - Repository is live on GitHub: `https://github.com/LordCail1/tarology`.
 - `main` branch protection is active:
@@ -62,9 +64,14 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Added static typed placeholder data model for history, threads, and interpretation panels.
 - Added web test tooling (Vitest + Testing Library) with initial tests for root redirect and shell tab behavior.
 - Added Reading History filtering controls (search + status chips) and corresponding web test coverage.
-- Refreshed Reading Studio visual language to a dark mode shell for current web UI direction.
-- Added grouped history utility with deterministic tests for recency buckets.
-- Added shell interaction tests for panel collapse, right-panel tab switching, and mobile drawer open/close.
+- Replaced the prior dense Reading Studio scaffold with a minimalist ChatGPT-like shell direction.
+- Added shared UI shell state helper (`apps/web/lib/ui-shell-state.ts`) for persisted left/right panel state.
+- Updated web tests for default sidebar state, persistence restore, expand/collapse parity, and drawer close behavior (backdrop + Escape).
+- Confirmed redesigned shell passes `npm run ci:checks`.
+- Introduced modular product documentation structure:
+  - `docs/product/README.md` as primary PRD index.
+  - domain-split PRDs (`docs/product/prd-*.md`) extracted from charter sections.
+  - updated `AGENTS.md` first-read order to route through the PRD index.
 
 ## Key Product Decisions Already Locked
 - Card identity is random but fixed at reading creation; never sampled on click.
@@ -72,6 +79,9 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - App auth remains Google-first for V1.
 - LLM provider connectivity must support both `api_key` and `oauth` modes where provider capability exists.
 - Interpretation requests on very large card selections must show warning and permit user cancellation.
+- Reading sidebars must support animated collapse/expand and desktop drag-resize with persisted widths.
+- Reading canvas must be mode-capable (`freeform` and `grid`) behind one state/command model.
+- User default tarot deck is captured at first-run onboarding and can be overridden when creating any new reading.
 
 ## High-Priority Next Implementation Queue
 1. Add persistent storage baseline (PostgreSQL + migration tooling + local dev setup).
@@ -95,6 +105,15 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 7. Implement high-card warning policy plumbing.
 - Acceptance: server returns estimated cost/runtime metadata and warning threshold signal for large card sets.
 
+8. Implement desktop sidebar resize handles + smooth motion polish.
+- Acceptance: left/right panels resize by drag on desktop, widths persist per user, and expand/collapse motion is smooth.
+
+9. Introduce multi-mode canvas architecture.
+- Acceptance: reading state tracks `canvasMode`; card placement model supports both freeform and grid snap without schema redesign.
+
+10. Add deck preference onboarding + per-reading deck override.
+- Acceptance: first login prompts for default deck saved in preferences; `POST /v1/readings` can override deck selection before assignment.
+
 ## Deferred Until Core Is Stable
 - Full social feed.
 - Obsidian-like full notes mode implementation.
@@ -111,17 +130,21 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Provider OAuth delegation for consumer subscriptions is capability-dependent and may vary by provider.
 - Large-card interpretation can become expensive without staged retrieval and cancellation working correctly.
 - Event-sourcing complexity can overrun timeline if implemented too broadly too early.
+- Multi-mode canvas interactions (freeform + grid) can introduce UX/state complexity if mode boundaries are not explicit.
+- Deck onboarding and override flows can increase reading-start friction if deck selection UX is not streamlined.
 
 ## Repo/Environment Notes
 - Current directory is a Git repository with synced `main` (`origin/main`).
 - Node dependencies are installed.
 - Current local Codex config (`~/.codex/config.toml`) only sets model and reasoning effort.
 - Git identity is configured and commits are working.
+- Ensure `apps/web/public/magician-logo.png` is committed in the working branch (UI now references the logo file directly).
 
 ## Next Agent Start Commands
 ```bash
-cd /home/rami/Gitclones/tarology
+cd /home/ram2c/gitclones/tarology
 npm run ci:checks
+sed -n '1,220p' docs/product/README.md
 git checkout -b feature/persistence-postgres-baseline
 npm run dev:api
 npm run dev:web

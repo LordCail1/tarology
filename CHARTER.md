@@ -1,9 +1,13 @@
 # Tarology v2 Charter and Execution Spec
 
-Status: Draft v0.2  
+Status: Draft v0.3  
 Last updated: 2026-03-08  
 Owner: Product + Engineering  
 Purpose: Canonical map for all contributors (human and AI) building Tarology v2.
+
+Modular companion PRDs now live under `docs/product/`:
+- index: `docs/product/README.md`
+- domain PRDs: `docs/product/prd-*.md`
 
 This version merges:
 - founder comments added to `v0.1`,
@@ -24,6 +28,9 @@ This version merges:
 11. Model access supports user-managed provider connections in two modes: `api_key` and `oauth` (where provider delegation is available).
 12. Git workflow is branch + PR based; direct pushes to `main` are disallowed.
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
+14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
+15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
+16. Users choose a default tarot deck during first-time onboarding; new readings use this default unless the user explicitly overrides deck selection before creation.
 
 ## 1) Product Vision
 Tarology helps beginners receive and explore tarot readings through high-quality AI symbolic synthesis.
@@ -65,11 +72,16 @@ Primary JTBD:
   - user can connect OAuth provider accounts where supported,
   - user can keep one or both configured.
 - ChatGPT-like shell:
-  - left: reading history,
-  - center: card fan + canvas,
-  - right: question threads + interpretation history.
+  - left: reading history (collapsible, animated, desktop-resizable),
+  - center: card fan + canvas with mode selection,
+  - right: question threads + interpretation history (collapsible, animated, desktop-resizable).
+- First-run preference capture for default tarot deck.
 - New reading creation with deterministic deck order and reversal assignment.
-- Card interactions: draw, flip, drag, rotate, select, group, rename group.
+- New reading preflight supports deck override before shuffle/assignment.
+- Card interactions: draw, flip, drag, rotate, select, group, rename group, and grid-snap placement in grid mode.
+- Canvas modes:
+  - `freeform` mode for unconstrained positioning.
+  - `grid` mode for snap-to-cell placement.
 - Question tree:
   - 1 root question,
   - unlimited child questions.
@@ -114,27 +126,32 @@ V1 support policy:
 - Main Workspace:
   - reading title + status bar,
   - fan of face-down cards,
-  - freeform card canvas.
+  - mode-aware card canvas (`freeform` / `grid`).
 - Right Panel:
   - question thread tree,
   - card groups,
   - interpretation outputs with citations and uncertainty note.
+- Panel behavior:
+  - left and right panels can collapse/expand with motion.
+  - left and right panels are desktop-resizable by drag handle.
+  - panel width preference is persisted per user.
 
 ### 5.2 Core Journey
 1. User logs in with Google.
-2. User creates reading and writes root question.
-3. Backend creates deterministic deck assignment and persists commitment metadata.
-4. User draws cards; each draw reveals the pre-assigned card.
-5. User arranges cards, groups selected cards, asks sub-questions.
-6. User requests interpretation for selected group under selected thread.
-7. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
-8. User can stop/cancel interpretation at any time from a visible control.
-9. System returns:
+2. On first login, user selects a default tarot deck; preference is persisted.
+3. User starts a new reading, can override deck selection, and writes root question.
+4. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
+5. User draws cards; each draw reveals the pre-assigned card.
+6. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
+7. User requests interpretation for selected group under selected thread.
+8. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
+9. User can stop/cancel interpretation at any time from a visible control.
+10. System returns:
   - beginner summary,
   - “why” layer with card/symbol evidence,
   - optional deep layer with citations.
-10. All meaningful actions persist continuously.
-11. User returns later and sees exact reading state restored.
+11. All meaningful actions persist continuously.
+12. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
 
 ## 6) Deterministic Deck and Randomness
 ### 6.1 Hard Rule
@@ -142,17 +159,19 @@ Card identity and reversal meaning are assigned at reading creation. They are ne
 
 ### 6.2 Required Metadata
 Store at reading creation:
+- `deckId`
 - `deckSpecVersion`
 - `shuffleAlgorithmVersion`
 - `seedCommitment`
 - `orderHash`
 - `assignedReversalBits`
+- `canvasMode`
 - `createdAt`
 
 ### 6.3 Algorithm
 1. Generate secure random seed/nonce (CSPRNG).
-2. Run seeded Fisher-Yates over the 78-card deck.
-3. Persist ordered mapping (`deckIndex -> cardId`).
+2. Run seeded Fisher-Yates over the selected deck card list.
+3. Persist ordered mapping (`deckIndex -> cardId`) for that deck.
 4. Persist reversal assignment bits.
 5. Render face-down fan from persisted mapping.
 
@@ -294,6 +313,7 @@ Core entities:
 - `users`
 - `auth_identities`
 - `profiles`
+- `user_preferences`
 - `provider_connections`
 - `provider_credentials`
 - `decks`
@@ -315,6 +335,8 @@ Core entities:
 Data invariants:
 - `reading_cards` assignment is immutable for `cardId` and `assignedReversal` after creation.
 - visual `rotationDeg` is mutable and independent from reversal meaning.
+- each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
+- each reading stores active `canvasMode` and mode-switch history as semantic events.
 - each interpretation request stores frozen target context.
 - provider credentials are never returned in raw form after initial save.
 - OAuth refresh/access tokens are encrypted and rotated per provider policy.
@@ -331,10 +353,13 @@ Command-oriented mutation API with idempotency.
 - `POST /v1/readings/{id}/commands`
 - `GET /v1/readings/{id}/events?afterVersion=`
 - `GET /v1/readings/{id}/stream`
+- `GET /v1/decks`
 - `POST /v1/interpretations`
 - `GET /v1/interpretations/{id}`
 - `POST /v1/interpretations/estimate`
 - `POST /v1/interpretations/{id}/cancel`
+- `GET /v1/preferences`
+- `PATCH /v1/preferences`
 - `GET /v1/profile`
 - `GET /v1/profile/stats`
 - `GET /v1/provider-connections`
@@ -352,6 +377,8 @@ Command-oriented mutation API with idempotency.
   - `payload`.
 - Every mutation request must include `Idempotency-Key` header.
 - Duplicate command IDs for same reading must be no-op and return prior result.
+- `POST /v1/readings` accepts optional `deckId`; if omitted, server uses user default deck preference.
+- `POST /v1/readings` accepts optional initial `canvasMode` (`freeform` or `grid`), default `freeform`.
 
 ### 10.4 Provider Connection Rules
 - Connections are scoped per user account.
@@ -382,6 +409,8 @@ Interpretation execution rules:
 
 Rules:
 - Persist drag/rotate end events, not every movement tick.
+- Persist grid-snap placement events as semantic updates (not per-pointer tick).
+- Persist panel width preference updates on drag-end (not continuously) as user preference changes.
 - Snapshot every 25-50 semantic events or milestone actions.
 - Restore path: latest snapshot + tail events.
 - Use optimistic concurrency for semantic edits.
@@ -501,6 +530,9 @@ Maintain 200-300 benchmark cases:
 - deterministic deck replay tests,
 - command idempotency tests,
 - snapshot restore tests,
+- deck preference default/override tests,
+- canvas mode switch and grid-snap behavior tests,
+- sidebar resize persistence tests,
 - JSON contract tests,
 - safety phrase policy tests,
 - citation schema validation,
@@ -511,10 +543,13 @@ Weeks 1-2:
 - monorepo bootstrap,
 - Google auth,
 - provider connection framework (API key mode),
+- onboarding default deck preference capture,
 - deterministic reading creation,
 - base schema.
 
 Weeks 3-4:
+- chat shell motion + panel resize persistence,
+- canvas mode abstraction (`freeform` + `grid` contract),
 - command API,
 - event log + snapshots,
 - restore reliability,
@@ -575,8 +610,8 @@ Weeks 11-12:
   - Kill test: OAuth connection success rate < 95% for enabled providers.
 
 ## 18) Contributor Protocol
-1. This charter is the source of truth.
-2. If implementation conflicts with charter, update charter first in PR.
+1. The modular PRD set in `docs/product/` is the primary editing surface for requirements.
+2. During migration, this charter is the tie-breaker source of truth if wording conflicts appear across PRDs.
 3. Every feature PR must include:
   - mapped charter sections,
   - acceptance criteria evidence,
