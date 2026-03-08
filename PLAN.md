@@ -13,8 +13,19 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Shared contracts exist for reading creation.
 - UI is still minimal placeholder.
 - Reading persistence is currently in-memory and must be replaced with database-backed state.
-- Git is initialized in this repository (`main` branch).
-- CI/CD workflow is defined in `.github/workflows/ci-cd.yml` for CI checks and Vercel deploy lanes.
+- Repository is live on GitHub: `https://github.com/LordCail1/tarology`.
+- `main` branch protection is active:
+  - pull request required,
+  - required checks: `ci-checks`, `request-codex-review`,
+  - conversation resolution required,
+  - force-push and delete disabled.
+- CI/CD workflow is active in `.github/workflows/ci-cd.yml`:
+  - PR: `ci-checks` + preview deployment,
+  - `main`: `ci-checks` + production deployment.
+- Vercel repository secrets are configured in GitHub:
+  - `VERCEL_TOKEN`,
+  - `VERCEL_ORG_ID`,
+  - `VERCEL_PROJECT_ID_WEB`.
 
 ## Completed So Far
 - Created greenfield repo structure and workspace scripts.
@@ -32,6 +43,10 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Added delivery documentation (`docs/engineering-workflow.md`, `docs/ci-cd-vercel.md`).
 - Added Codex continuity research notes (`docs/codex-continuity-research.md`).
 - Added Codex review automation and documentation (`.github/workflows/codex-review-trigger.yml`, `docs/codex-code-review.md`).
+- Completed end-to-end pipeline smoke test via PR #1.
+- Fixed CI workflow parse issue (removed invalid `secrets.*` usage in job-level `if` expressions).
+- Fixed Vercel preview build path issue by making `apps/web/tsconfig.json` self-contained.
+- Verified production deployment on `main` succeeded.
 
 ## Key Product Decisions Already Locked
 - Card identity is random but fixed at reading creation; never sampled on click.
@@ -41,32 +56,28 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Interpretation requests on very large card selections must show warning and permit user cancellation.
 
 ## High-Priority Next Implementation Queue
-1. Configure GitHub repository protections and Vercel secrets.
-- Acceptance: `main` requires PR + `ci-checks`; secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID_WEB` are set.
-- Acceptance extension: Codex review trigger workflow is enabled and validated on a test PR.
-
-2. Add persistent storage baseline (PostgreSQL + migration tooling + local dev setup).
+1. Add persistent storage baseline (PostgreSQL + migration tooling + local dev setup).
 - Acceptance: readings survive API restart; in-memory map removed for canonical state.
 
-3. Introduce command mutation envelope for reading changes.
+2. Introduce command mutation envelope for reading changes.
 - Acceptance: command ID, idempotency key, expected version checks, append-only event write, projection update.
 
-4. Build read model restore path.
+3. Build read model restore path.
 - Acceptance: `GET /v1/readings/:id` returns current projection; snapshots/events schema exists for replay strategy.
 
-5. Implement question tree and saved card groups.
+4. Implement question tree and saved card groups.
 - Acceptance: create root/sub-questions, save named group with member cards, persist relationship.
 
-6. Start provider-connections domain with capability model.
+5. Start provider-connections domain with capability model.
 - Acceptance: schema and API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
 
-7. Add interpretation request job model with cancellable state machine.
+6. Add interpretation request job model with cancellable state machine.
 - Acceptance: request can be queued/running/completed/failed/cancelled_by_user; cancel endpoint stops active run.
 
-8. Implement high-card warning policy plumbing.
+7. Implement high-card warning policy plumbing.
 - Acceptance: server returns estimated cost/runtime metadata and warning threshold signal for large card sets.
 
-9. Build UI shell matching product IA.
+8. Build UI shell matching product IA.
 - Acceptance: left history rail, center canvas, right thread/interpretation panel scaffold with placeholder data.
 
 ## Deferred Until Core Is Stable
@@ -87,15 +98,16 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Event-sourcing complexity can overrun timeline if implemented too broadly too early.
 
 ## Repo/Environment Notes
-- Current directory is now a Git repository with branch `main`.
+- Current directory is a Git repository with synced `main` (`origin/main`).
 - Node dependencies are installed.
 - Current local Codex config (`~/.codex/config.toml`) only sets model and reasoning effort.
-- Initial checkpoint commit is blocked until Git identity is configured (`git config user.name` and `git config user.email`).
+- Git identity is configured and commits are working.
 
 ## Next Agent Start Commands
 ```bash
 cd /home/rami/Gitclones/tarology
 npm run ci:checks
+git checkout -b feature/persistence-postgres-baseline
 npm run dev:api
 npm run dev:web
 ```
