@@ -4,128 +4,142 @@ Last updated: 2026-03-08 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
-Ship a reliable V1 foundation for Tarology v2 that matches the charter: deterministic-at-creation card assignment, durable reading state, modular NestJS architecture, and AI interpretation pipeline that can scale from small card groups to high-card runs with warning and cancel controls.
+Ship a reliable V1 foundation for Tarology v2 that matches the charter: deterministic-at-creation card assignment, durable reading state, modular NestJS architecture, and an interpretation pipeline that can scale from small card groups to high-card runs with warning and cancellation controls.
 
 ## Current State
-- Charter is defined in `CHARTER.md` (v0.2).
-- Monorepo scaffold exists with `apps/web`, `apps/api`, `packages/shared`.
-- API includes `POST /v1/readings` with seeded Fisher-Yates assignment + reversal bits.
-- Shared contracts exist for reading creation.
-- Web now has a Tailwind-based Reading Studio scaffold at `/reading` with:
-  - left history rail,
-  - center card fan/canvas placeholder,
-  - right question thread + interpretation panel,
-  - mobile tab switching for `Canvas`, `History`, `Threads`,
-  - dark workspace styling and reading-history search/status filters.
-- Web shell now also includes ChatGPT-style structural interactions:
-  - sticky workspace top bar,
-  - desktop left/right panel collapse controls,
-  - mobile history/analysis drawers,
-  - right-panel tabs (`Threads`, `Interpretations`),
-  - grouped reading history buckets (`Today`, `Yesterday`, `Previous 7 Days`, `Older`).
-- Reading persistence is currently in-memory and must be replaced with database-backed state.
-- Repository is live on GitHub: `https://github.com/LordCail1/tarology`.
-- `main` branch protection is active:
-  - pull request required,
-  - required checks: `ci-checks`, `request-codex-review`,
-  - conversation resolution required,
-  - force-push and delete disabled.
-- CI/CD workflow is active in `.github/workflows/ci-cd.yml`:
-  - PR: `ci-checks` + preview deployment,
-  - `main`: `ci-checks` + production deployment.
-- Vercel repository secrets are configured in GitHub:
-  - `VERCEL_TOKEN`,
-  - `VERCEL_ORG_ID`,
-  - `VERCEL_PROJECT_ID_WEB`.
+- Charter is defined in `CHARTER.md` (v0.3).
+- Modular PRD index and domain docs exist under `docs/product/`.
+- Strategic expansion docs are now integrated:
+  - `prd-11-visual-storytelling.md`
+  - `prd-12-fusion-lab.md`
+  - `prd-13-dialogue-mode.md`
+  - `prd-14-deck-creation-and-moderation.md`
+  - `prd-15-sharing-engagement-and-monetization.md`
+- Existing PRDs now include expansion contract/safety/roadmap requirements:
+  - `prd-04`, `prd-06`, `prd-08`, `prd-09`, `prd-10`.
+- Web has minimal Reading Studio shell at `/reading` with:
+  - center-first layout,
+  - collapsible sidebars with desktop rails,
+  - mobile slide-over drawers,
+  - per-user panel open/closed persistence,
+  - branded empty state + bottom composer.
+- Product docs explicitly require:
+  - desktop sidebar drag-resize with smooth motion,
+  - multi-mode canvas architecture (`freeform`, `grid`),
+  - first-run default deck selection + per-reading override.
+- API still uses in-memory reading persistence and must move to DB-backed durability.
 
 ## Completed So Far
-- Created greenfield repo structure and workspace scripts.
-- Added NestJS app module skeleton with domain modules:
+- Monorepo structure and workspace scripts.
+- NestJS module skeleton:
   - `identity`
   - `provider-connections`
   - `reading-studio`
-- Implemented deterministic deck assignment at reading creation (random seed + fixed order mapping).
-- Added request validation for reading creation DTO.
-- Added shared `CreateReading` contracts package.
-- Confirmed workspace compiles with `npm run typecheck`.
-- Added repository handoff docs (`AGENTS.md`, this file).
-- Initialized Git repository in `tarology`.
-- Added CI/CD automation skeleton (GitHub Actions + Vercel deploy jobs).
-- Added delivery documentation (`docs/engineering-workflow.md`, `docs/ci-cd-vercel.md`).
-- Added Codex continuity research notes (`docs/codex-continuity-research.md`).
-- Added Codex review automation and documentation (`.github/workflows/codex-review-trigger.yml`, `docs/codex-code-review.md`).
-- Completed end-to-end pipeline smoke test via PR #1.
-- Fixed CI workflow parse issue (removed invalid `secrets.*` usage in job-level `if` expressions).
-- Fixed Vercel preview build path issue by making `apps/web/tsconfig.json` self-contained.
-- Verified production deployment on `main` succeeded.
-- Implemented Reading Studio shell route and component scaffold in `apps/web`.
-- Added static typed placeholder data model for history, threads, and interpretation panels.
-- Added web test tooling (Vitest + Testing Library) with initial tests for root redirect and shell tab behavior.
-- Added Reading History filtering controls (search + status chips) and corresponding web test coverage.
-- Refreshed Reading Studio visual language to a dark mode shell for current web UI direction.
-- Added grouped history utility with deterministic tests for recency buckets.
-- Added shell interaction tests for panel collapse, right-panel tab switching, and mobile drawer open/close.
+- Deterministic deck assignment on reading creation.
+- Shared `CreateReading` contract package.
+- CI/CD baseline and Vercel preview/production pipeline.
+- Reading Studio shell redesign with persisted panel state and mobile drawers.
+- Documentation modularization into PRD set with `docs/product/README.md` index.
+- Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 
-## Key Product Decisions Already Locked
-- Card identity is random but fixed at reading creation; never sampled on click.
-- Reversal meaning is fixed at reading creation and separate from visual rotation.
-- App auth remains Google-first for V1.
-- LLM provider connectivity must support both `api_key` and `oauth` modes where provider capability exists.
-- Interpretation requests on very large card selections must show warning and permit user cancellation.
+## Locked Product Decisions (Execution)
+- Card identity and reversal are fixed at reading creation; never sampled on click.
+- App auth is Google-first for V1.
+- Provider connectivity supports both `api_key` and `oauth` modes where capability exists.
+- Reading sidebars must support animation + desktop drag-resize with persisted widths.
+- Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
+- User default deck is captured during onboarding and can be overridden per reading.
+- Post-core expansion order is locked:
+  1. Visual Storytelling
+  2. Fusion Lab
+  3. Dialogue Mode
+  4. Deck Creation + Moderation
+  5. Private Sharing + Monetization
+- Card voice posture is archetypal persona (interpretive, non-literal).
+- Engagement model is reflective progression, not manipulative loops.
 
-## High-Priority Next Implementation Queue
-1. Add persistent storage baseline (PostgreSQL + migration tooling + local dev setup).
-- Acceptance: readings survive API restart; in-memory map removed for canonical state.
+## Immediate Queue (Gate -1 and Gate 0)
+1. Implement Google auth baseline.
+- Acceptance: Google sign-in/session flow works end-to-end for web and API protected routes.
 
-2. Introduce command mutation envelope for reading changes.
+2. Implement profile shell baseline.
+- Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
+
+3. Add default deck preference onboarding baseline.
+- Acceptance: first authenticated session captures and persists a default deck preference.
+
+4. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
+- Acceptance: readings survive API restart; in-memory map removed from canonical path.
+
+5. Introduce command mutation envelope for reading changes.
 - Acceptance: command ID, idempotency key, expected version checks, append-only event write, projection update.
 
-3. Build read model restore path.
-- Acceptance: `GET /v1/readings/:id` returns current projection; snapshots/events schema exists for replay strategy.
+6. Build read-model restore path.
+- Acceptance: `GET /v1/readings/:id` returns current projection; snapshots/events replay strategy is in place.
 
-4. Implement question tree and saved card groups.
-- Acceptance: create root/sub-questions, save named group with member cards, persist relationship.
+7. Implement question tree and saved card groups.
+- Acceptance: root/sub-questions and named groups persist with relationships.
 
-5. Start provider-connections domain with capability model.
-- Acceptance: schema and API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
+8. Start provider-connections domain with capability model.
+- Acceptance: schema/API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
 
-6. Add interpretation request job model with cancellable state machine.
-- Acceptance: request can be queued/running/completed/failed/cancelled_by_user; cancel endpoint stops active run.
+9. Add interpretation request job model with cancellable state machine.
+- Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
 
-7. Implement high-card warning policy plumbing.
-- Acceptance: server returns estimated cost/runtime metadata and warning threshold signal for large card sets.
+10. Implement high-card warning plumbing.
+- Acceptance: server returns estimate metadata and warning threshold signal for large card sets.
+
+11. Implement desktop sidebar resize handles + smooth motion polish.
+- Acceptance: left/right panels resize by drag on desktop and persist per user widths.
+
+12. Introduce multi-mode canvas architecture.
+- Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
+
+13. Extend deck preference flow with per-reading deck override.
+- Acceptance: reading creation can override persisted default deck before assignment.
+
+## Post-Core Strategic Queue (Unlock after Gate 0)
+1. Release A (V1.5): Visual Storytelling.
+- Acceptance: 3-4 panel storyboard with abstraction levels, provenance map, cancellation.
+
+2. Release B (V1.6): Fusion Lab.
+- Acceptance: stable two-card fusion persona with context lenses and evidence-backed tabs.
+
+3. Release C (V1.7): Dialogue Mode.
+- Acceptance: provider-agnostic persona dialogue with boundary pass and dual-register parity.
+
+4. Release D (V2): Deck Creation + Moderation.
+- Acceptance: template-led custom deck drafts, rights attestation, moderation-gated publish/share.
+
+5. Release E (V2): Private Sharing + Monetization.
+- Acceptance: revocable expiring private share links + subscription/usage-pack entitlement enforcement.
 
 ## Deferred Until Core Is Stable
-- Full social feed.
-- Obsidian-like full notes mode implementation.
-- Public randomness proof page.
-- Deep multi-agent experimentation beyond bounded specialist passes.
+- Public social feed and open creator marketplace.
+- Realtime collaborative readings.
+- Open-ended agentic roleplay modes.
 
-## Open Product Questions For Founder
-- Secular vs spiritual brand posture, or explicit mixed posture.
-- V1 web-enrichment defaults vs staged rollout.
-- Data retention and deletion guarantees for sensitive readings/notes.
-- Launch deck/art licensing strategy.
+## Open Product Questions
+- Durable workflow engine selection for V1 infrastructure.
+- Onboarding register choice (`plain` only vs optional `esoteric` picker).
+- Pricing/package shape for subscription and usage packs.
+- Data retention windows for generated artifacts and dialogue logs.
 
 ## Known Risks
-- Provider OAuth delegation for consumer subscriptions is capability-dependent and may vary by provider.
-- Large-card interpretation can become expensive without staged retrieval and cancellation working correctly.
-- Event-sourcing complexity can overrun timeline if implemented too broadly too early.
-
-## Repo/Environment Notes
-- Current directory is a Git repository with synced `main` (`origin/main`).
-- Node dependencies are installed.
-- Current local Codex config (`~/.codex/config.toml`) only sets model and reasoning effort.
-- Git identity is configured and commits are working.
+- Provider OAuth delegation capability varies by provider.
+- High-card and visual generation flows can cause cost drift.
+- Provenance quality can regress if not contract-tested.
+- Persona features can create anthropomorphic misunderstanding without clear framing.
+- Deck creation introduces moderation/IP policy burden.
 
 ## Next Agent Start Commands
 ```bash
-cd /home/rami/Gitclones/tarology
+cd /home/ram2c/gitclones/tarology
+git status --short
 npm run ci:checks
-git checkout -b feature/persistence-postgres-baseline
-npm run dev:api
-npm run dev:web
+sed -n '1,220p' docs/product/README.md
+sed -n '1,260p' PLAN.md
 ```
 
 ## Codex Continuity Note
-Codex officially uses `AGENTS.md` as project instructions. `PLAN.md` is a repo convention for handoff state. Keep both updated at session end.
+`AGENTS.md` is the bootstrap file for session behavior. `PLAN.md` tracks execution state and queue. Keep both updated before handoff.
