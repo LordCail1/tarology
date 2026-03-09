@@ -1,6 +1,6 @@
 # Tarology v2 Plan
 
-Last updated: 2026-03-08 (America/Toronto)
+Last updated: 2026-03-09 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
@@ -41,6 +41,13 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Reading Studio shell redesign with persisted panel state and mobile drawers.
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
+- Google auth baseline:
+  - API-owned Google OAuth endpoints (`/v1/auth/google/start`, `/v1/auth/google/callback`, `/v1/auth/session`, `/v1/auth/logout`)
+  - server-side session cookies + credentialed CORS in API bootstrap
+  - `/reading` auth gate with dynamic server-side session check and `/login` entry route
+  - `POST /v1/readings` protected by session guard
+  - API auth tests + web auth route tests
+  - `ci:checks` now runs API tests and web tests before build
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -59,43 +66,40 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Engagement model is reflective progression, not manipulative loops.
 
 ## Immediate Queue (Gate -1 and Gate 0)
-1. Implement Google auth baseline.
-- Acceptance: Google sign-in/session flow works end-to-end for web and API protected routes.
-
-2. Implement profile shell baseline.
+1. Implement profile shell baseline.
 - Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
 
-3. Add default deck preference onboarding baseline.
+2. Add default deck preference onboarding baseline.
 - Acceptance: first authenticated session captures and persists a default deck preference.
 
-4. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
+3. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
 - Acceptance: readings survive API restart; in-memory map removed from canonical path.
 
-5. Introduce command mutation envelope for reading changes.
+4. Introduce command mutation envelope for reading changes.
 - Acceptance: command ID, idempotency key, expected version checks, append-only event write, projection update.
 
-6. Build read-model restore path.
+5. Build read-model restore path.
 - Acceptance: `GET /v1/readings/:id` returns current projection; snapshots/events replay strategy is in place.
 
-7. Implement question tree and saved card groups.
+6. Implement question tree and saved card groups.
 - Acceptance: root/sub-questions and named groups persist with relationships.
 
-8. Start provider-connections domain with capability model.
+7. Start provider-connections domain with capability model.
 - Acceptance: schema/API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
 
-9. Add interpretation request job model with cancellable state machine.
+8. Add interpretation request job model with cancellable state machine.
 - Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
 
-10. Implement high-card warning plumbing.
+9. Implement high-card warning plumbing.
 - Acceptance: server returns estimate metadata and warning threshold signal for large card sets.
 
-11. Implement desktop sidebar resize handles + smooth motion polish.
+10. Implement desktop sidebar resize handles + smooth motion polish.
 - Acceptance: left/right panels resize by drag on desktop and persist per user widths.
 
-12. Introduce multi-mode canvas architecture.
+11. Introduce multi-mode canvas architecture.
 - Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
 
-13. Extend deck preference flow with per-reading deck override.
+12. Extend deck preference flow with per-reading deck override.
 - Acceptance: reading creation can override persisted default deck before assignment.
 
 ## Post-Core Strategic Queue (Unlock after Gate 0)

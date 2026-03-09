@@ -4,23 +4,34 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node dist/main.js",
-    "start:dev": "npm --prefix ../../packages/shared run build && tsc -p tsconfig.json && node dist/main.js",
+    "start": "node dist/apps/api/src/main.js",
+    "start:dev": "npm --prefix ../../packages/shared run build && tsc -p tsconfig.json && node dist/apps/api/src/main.js",
     "build": "npm --prefix ../../packages/shared run build && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.12",
     "@nestjs/core": "^11.0.12",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.12",
     "@tarology/shared": "file:../../packages/shared",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "express-session": "^1.19.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.1.16",
+    "@types/express-session": "^1.18.2",
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.3"
+    "@types/passport": "^1.0.17",
+    "@types/passport-google-oauth20": "^2.0.17",
+    "supertest": "^7.2.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
   }
 }
