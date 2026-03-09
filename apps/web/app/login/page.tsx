@@ -1,4 +1,4 @@
-import { getServerApiBaseUrl } from "../../lib/api-origin";
+import { getClientApiBaseUrl } from "../../lib/api-origin";
 
 interface LoginPageProps {
   searchParams?: Promise<{
@@ -18,7 +18,7 @@ function sanitizeReturnTo(value: string | string[] | undefined): string {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const returnTo = sanitizeReturnTo(resolvedSearchParams?.returnTo);
-  const authStartUrl = new URL("/v1/auth/google/start", getServerApiBaseUrl());
+  const authStartUrl = new URL("/v1/auth/google/start", getClientApiBaseUrl());
   authStartUrl.searchParams.set("returnTo", returnTo);
 
   return (

@@ -28,8 +28,8 @@ Google auth local setup:
   - `GOOGLE_OAUTH_CLIENT_SECRET`
   - `GOOGLE_OAUTH_CALLBACK_URL` (default `http://localhost:3001/v1/auth/google/callback`)
 - Web env vars:
-  - `API_BASE_URL`
   - `NEXT_PUBLIC_API_BASE_URL`
+  - `NEXT_PUBLIC_API_BASE_URL` must be browser-reachable; the login link and reading auth check use this public origin
 - Google OAuth callback URI for local development:
   - `http://localhost:3001/v1/auth/google/callback`
 
