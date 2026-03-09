@@ -1,25 +1,156 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AnalysisPanel, type RightPanelTab } from "./analysis-panel";
+import { useEffect, useState } from "react";
 import { CanvasPanel } from "./canvas-panel";
 import { HistoryRail } from "./history-rail";
-import { ReadingStudioTopbar } from "./reading-studio-topbar";
-import { groupReadingsByRecency } from "../../lib/group-readings-by-recency";
+import { ThreadsPanel } from "./threads-panel";
 import {
   interpretationHistoryMock,
   questionThreadsMock,
   type ReadingHistoryFilter,
   readingHistoryMock,
 } from "../../lib/reading-studio-mock";
+import {
+  LEFT_PANEL_STORAGE_KEY,
+  RIGHT_PANEL_STORAGE_KEY,
+  getDefaultShellUiState,
+  panelModeFromOpen,
+  readShellUiState,
+  type PanelSide,
+  type ReadingShellUiState,
+  writeShellUiState,
+} from "../../lib/ui-shell-state";
 
-export type MobileDrawerState = "none" | "history" | "analysis";
+interface CollapsedPanelRailProps {
+  side: PanelSide;
+  controlsId: string;
+  onExpand: () => void;
+}
 
-function filterReadings(searchQuery: string, statusFilter: ReadingHistoryFilter) {
-  const normalizedQuery = searchQuery.trim().toLowerCase();
+const railContextIcons: Record<PanelSide, string[]> = {
+  left: ["R", "Q", "F"],
+  right: ["T", "I", "C"],
+};
 
-  return readingHistoryMock.filter((reading) => {
-    if (statusFilter !== "all" && reading.status !== statusFilter) {
+function CollapsedPanelRail({ side, controlsId, onExpand }: CollapsedPanelRailProps) {
+  const sideLabel = side === "left" ? "left" : "right";
+  const glyph = side === "left" ? ">" : "<";
+
+  return (
+    <div className="reading-shell-rail">
+      <button
+        type="button"
+        className="reading-shell-toggle"
+        aria-label={`Expand ${sideLabel} sidebar`}
+        aria-controls={controlsId}
+        aria-expanded={false}
+        onClick={onExpand}
+      >
+        <span aria-hidden="true">{glyph}</span>
+      </button>
+      <div className="reading-shell-rail-icons" aria-hidden="true">
+        {railContextIcons[side].map((icon) => (
+          <span key={`${side}-${icon}`} className="reading-shell-rail-icon">
+            {icon}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function isLikelyMobileViewport(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+
+  return window.matchMedia("(max-width: 1023px)").matches;
+}
+
+export function ReadingStudioShell() {
+  const [shellState, setShellState] = useState<ReadingShellUiState>(() =>
+    getDefaultShellUiState()
+  );
+  const [didHydrateStorage, setDidHydrateStorage] = useState(false);
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<ReadingHistoryFilter>("all");
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const restoredState = readShellUiState(window.localStorage);
+    const hasPersistedLeftState = window.localStorage.getItem(LEFT_PANEL_STORAGE_KEY) !== null;
+    const hasPersistedRightState = window.localStorage.getItem(RIGHT_PANEL_STORAGE_KEY) !== null;
+
+    if (!hasPersistedLeftState && !hasPersistedRightState && isLikelyMobileViewport()) {
+      setShellState({ leftOpen: false, rightOpen: false });
+      setDidHydrateStorage(true);
+      return;
+    }
+
+    setShellState(restoredState);
+    setDidHydrateStorage(true);
+  }, []);
+
+  useEffect(() => {
+    if (!didHydrateStorage || typeof window === "undefined") {
+      return;
+    }
+
+    writeShellUiState(window.localStorage, shellState);
+  }, [didHydrateStorage, shellState]);
+
+  useEffect(() => {
+    function closeDrawersOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      setShellState((current) => {
+        if (!current.leftOpen && !current.rightOpen) {
+          return current;
+        }
+
+        return {
+          leftOpen: false,
+          rightOpen: false,
+        };
+      });
+    }
+
+    window.addEventListener("keydown", closeDrawersOnEscape);
+    return () => window.removeEventListener("keydown", closeDrawersOnEscape);
+  }, []);
+
+  function togglePanel(side: PanelSide) {
+    setShellState((current) =>
+      side === "left"
+        ? { ...current, leftOpen: !current.leftOpen }
+        : { ...current, rightOpen: !current.rightOpen }
+    );
+  }
+
+  function openPanel(side: PanelSide) {
+    setShellState((current) =>
+      side === "left"
+        ? { ...current, leftOpen: true }
+        : { ...current, rightOpen: true }
+    );
+  }
+
+  function closePanel(side: PanelSide) {
+    setShellState((current) =>
+      side === "left"
+        ? { ...current, leftOpen: false }
+        : { ...current, rightOpen: false }
+    );
+  }
+
+  const normalizedQuery = historySearchQuery.trim().toLowerCase();
+  const filteredReadings = readingHistoryMock.filter((reading) => {
+    if (historyStatusFilter !== "all" && reading.status !== historyStatusFilter) {
       return false;
     }
 
@@ -29,188 +160,117 @@ function filterReadings(searchQuery: string, statusFilter: ReadingHistoryFilter)
 
     return reading.title.toLowerCase().includes(normalizedQuery);
   });
-}
-
-export function ReadingStudioShell() {
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [activeRightTab, setActiveRightTab] = useState<RightPanelTab>("threads");
-  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerState>("none");
-  const [historySearchQuery, setHistorySearchQuery] = useState("");
-  const [historyStatusFilter, setHistoryStatusFilter] = useState<ReadingHistoryFilter>("all");
-
-  const filteredReadings = useMemo(
-    () => filterReadings(historySearchQuery, historyStatusFilter),
-    [historySearchQuery, historyStatusFilter]
-  );
-
-  const groupedReadings = useMemo(
-    () => groupReadingsByRecency(filteredReadings),
-    [filteredReadings]
-  );
 
   const activeReading = filteredReadings[0] ?? readingHistoryMock[0];
 
-  useEffect(() => {
-    if (mobileDrawer === "none") {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMobileDrawer("none");
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mobileDrawer]);
-
-  function handleNewReading() {
-    // Placeholder action until create-reading command flow is wired.
-    setHistoryStatusFilter("all");
-    setHistorySearchQuery("");
-  }
-
-  const desktopColumns = `${leftCollapsed ? "4.5rem" : "21rem"} minmax(0, 1fr) ${
-    rightCollapsed ? "4.5rem" : "23rem"
-  }`;
-
   return (
-    <div className="pb-8">
-      <ReadingStudioTopbar
-        activeReading={activeReading}
-        leftCollapsed={leftCollapsed}
-        rightCollapsed={rightCollapsed}
-        onToggleDesktopHistoryPanel={() => setLeftCollapsed((current) => !current)}
-        onToggleDesktopAnalysisPanel={() => setRightCollapsed((current) => !current)}
-        onOpenMobileHistoryDrawer={() => setMobileDrawer("history")}
-        onOpenMobileAnalysisDrawer={() => setMobileDrawer("analysis")}
-        onNewReading={handleNewReading}
-      />
+    <div
+      className="reading-shell"
+      data-left-mode={panelModeFromOpen(shellState.leftOpen)}
+      data-right-mode={panelModeFromOpen(shellState.rightOpen)}
+      data-hydrated={didHydrateStorage ? "true" : "false"}
+    >
+      {shellState.leftOpen ? (
+        <button
+          type="button"
+          className="reading-shell-backdrop reading-shell-backdrop-left"
+          aria-label="Close left sidebar backdrop"
+          onClick={() => closePanel("left")}
+        />
+      ) : null}
+      {shellState.rightOpen ? (
+        <button
+          type="button"
+          className="reading-shell-backdrop reading-shell-backdrop-right"
+          aria-label="Close right sidebar backdrop"
+          onClick={() => closePanel("right")}
+        />
+      ) : null}
 
-      <div className="mx-auto mt-4 max-w-[1500px] px-4 lg:px-8">
-        <div className="lg:grid lg:items-start lg:gap-4" style={{ gridTemplateColumns: desktopColumns }}>
-          <aside
-            id="desktop-history-panel"
-            className="surface hidden min-h-[calc(100vh-9rem)] rounded-2xl p-3 lg:block"
-          >
-            {leftCollapsed ? (
-              <div className="flex h-full flex-col items-center justify-center gap-4">
-                <button
-                  type="button"
-                  aria-label="Expand history panel"
-                  aria-expanded="false"
-                  onClick={() => setLeftCollapsed(false)}
-                  className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-2 py-2 text-xs font-semibold text-[var(--color-ink)]"
-                >
-                  Open
-                </button>
-                <span className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)] [writing-mode:vertical-rl]">
-                  History
-                </span>
-              </div>
-            ) : (
-              <HistoryRail
-                groups={groupedReadings}
-                activeReadingId={activeReading.id}
-                searchQuery={historySearchQuery}
-                statusFilter={historyStatusFilter}
-                totalCount={readingHistoryMock.length}
-                onSearchQueryChange={setHistorySearchQuery}
-                onStatusFilterChange={setHistoryStatusFilter}
-                onNewReading={handleNewReading}
-              />
-            )}
-          </aside>
-
-          <main className="surface-strong min-h-[calc(100vh-9rem)] rounded-2xl p-4 sm:p-5">
-            <CanvasPanel reading={activeReading} />
-          </main>
-
-          <aside
-            id="desktop-analysis-panel"
-            className="surface hidden min-h-[calc(100vh-9rem)] rounded-2xl p-3 lg:block"
-          >
-            {rightCollapsed ? (
-              <div className="flex h-full flex-col items-center justify-center gap-4">
-                <button
-                  type="button"
-                  aria-label="Expand analysis panel"
-                  aria-expanded="false"
-                  onClick={() => setRightCollapsed(false)}
-                  className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-2 py-2 text-xs font-semibold text-[var(--color-ink)]"
-                >
-                  Open
-                </button>
-                <span className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)] [writing-mode:vertical-rl]">
-                  Analysis
-                </span>
-              </div>
-            ) : (
-              <AnalysisPanel
-                activeTab={activeRightTab}
-                threads={questionThreadsMock}
-                interpretations={interpretationHistoryMock}
-                onTabChange={setActiveRightTab}
-              />
-            )}
-          </aside>
-        </div>
-      </div>
-
-      {mobileDrawer !== "none" && (
-        <div className="fixed inset-0 z-40 lg:hidden" aria-live="polite">
-          <button
-            type="button"
-            aria-label="Close drawer backdrop"
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setMobileDrawer("none")}
-          />
-
-          <aside
-            role="dialog"
-            aria-modal="true"
-            aria-label={mobileDrawer === "history" ? "History drawer" : "Analysis drawer"}
-            className={`surface absolute inset-y-0 w-[min(88vw,24rem)] overflow-y-auto p-4 ${
-              mobileDrawer === "history" ? "left-0" : "right-0"
-            }`}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg text-[var(--color-ink)]">
-                {mobileDrawer === "history" ? "History" : "Analysis"}
-              </h2>
+      <aside
+        id="reading-history-sidebar"
+        className="reading-shell-sidebar reading-shell-sidebar-left"
+        data-side="left"
+        data-open={shellState.leftOpen ? "true" : "false"}
+      >
+        {shellState.leftOpen ? (
+          <>
+            <div className="reading-shell-sidebar-header">
               <button
                 type="button"
-                onClick={() => setMobileDrawer("none")}
-                className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-2 py-1 text-xs font-semibold text-[var(--color-ink)]"
+                className="reading-shell-toggle"
+                aria-label="Collapse left sidebar"
+                aria-controls="reading-history-sidebar"
+                aria-expanded={shellState.leftOpen}
+                onClick={() => togglePanel("left")}
               >
-                Close
+                <span aria-hidden="true">&lt;</span>
               </button>
             </div>
-
-            {mobileDrawer === "history" ? (
+            <div className="reading-shell-sidebar-content">
               <HistoryRail
-                groups={groupedReadings}
+                readings={filteredReadings}
                 activeReadingId={activeReading.id}
                 searchQuery={historySearchQuery}
                 statusFilter={historyStatusFilter}
                 totalCount={readingHistoryMock.length}
                 onSearchQueryChange={setHistorySearchQuery}
                 onStatusFilterChange={setHistoryStatusFilter}
-                onNewReading={handleNewReading}
               />
-            ) : (
-              <AnalysisPanel
-                activeTab={activeRightTab}
+            </div>
+          </>
+        ) : (
+          <CollapsedPanelRail
+            side="left"
+            controlsId="reading-history-sidebar"
+            onExpand={() => togglePanel("left")}
+          />
+        )}
+      </aside>
+
+      <main id="reading-canvas-panel" className="reading-shell-main">
+        <CanvasPanel
+          reading={activeReading}
+          onOpenLeftPanel={() => openPanel("left")}
+          onOpenRightPanel={() => openPanel("right")}
+        />
+      </main>
+
+      <aside
+        id="reading-threads-sidebar"
+        className="reading-shell-sidebar reading-shell-sidebar-right"
+        data-side="right"
+        data-open={shellState.rightOpen ? "true" : "false"}
+      >
+        {shellState.rightOpen ? (
+          <>
+            <div className="reading-shell-sidebar-header">
+              <button
+                type="button"
+                className="reading-shell-toggle"
+                aria-label="Collapse right sidebar"
+                aria-controls="reading-threads-sidebar"
+                aria-expanded={shellState.rightOpen}
+                onClick={() => togglePanel("right")}
+              >
+                <span aria-hidden="true">&gt;</span>
+              </button>
+            </div>
+            <div className="reading-shell-sidebar-content">
+              <ThreadsPanel
                 threads={questionThreadsMock}
                 interpretations={interpretationHistoryMock}
-                onTabChange={setActiveRightTab}
               />
-            )}
-          </aside>
-        </div>
-      )}
+            </div>
+          </>
+        ) : (
+          <CollapsedPanelRail
+            side="right"
+            controlsId="reading-threads-sidebar"
+            onExpand={() => togglePanel("right")}
+          />
+        )}
+      </aside>
     </div>
   );
 }

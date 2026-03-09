@@ -17,6 +17,21 @@ Root scripts:
 - `npm run dev:web`
 - `npm run dev:api`
 - `npm run typecheck`
+- `npm run ci:checks`
+
+Google auth local setup:
+- API env vars:
+  - `SESSION_SECRET`
+  - `WEB_APP_URL` (default `http://localhost:3000`)
+  - `API_BASE_URL` (default `http://localhost:3001`)
+  - `GOOGLE_OAUTH_CLIENT_ID`
+  - `GOOGLE_OAUTH_CLIENT_SECRET`
+  - `GOOGLE_OAUTH_CALLBACK_URL` (default `http://localhost:3001/v1/auth/google/callback`)
+- Web env vars:
+  - `API_BASE_URL`
+  - `NEXT_PUBLIC_API_BASE_URL`
+- Google OAuth callback URI for local development:
+  - `http://localhost:3001/v1/auth/google/callback`
 
 Delivery docs:
 - [docs/engineering-workflow.md](./docs/engineering-workflow.md)
