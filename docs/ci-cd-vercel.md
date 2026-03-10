@@ -19,10 +19,15 @@ These are used by the Vercel CLI in GitHub Actions.
 
 ## Vercel Project Setup
 1. Create a Vercel project for the web app.
-2. Ensure it points to this repo and the web app directory (`apps/web`) if needed.
+2. Ensure it points to this repo and sets the project Root Directory to `apps/web`.
 3. Generate a Vercel token.
 4. Capture org and project IDs.
 5. Add all three values to GitHub repository secrets.
+
+## Monorepo Deployment Note
+- The GitHub Actions deploy jobs run `vercel pull` and `vercel deploy` from the repo root, not from `apps/web`.
+- This is required so workspace siblings like `packages/shared` are uploaded to Vercel during preview and production builds.
+- The Vercel project itself should still be configured with Root Directory `apps/web`.
 
 ## Branch Protection (Recommended)
 Enable a branch protection rule for `main`:
