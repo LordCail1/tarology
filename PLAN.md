@@ -48,6 +48,11 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
   - `POST /v1/readings` protected by session guard
   - API auth tests + web auth route tests
   - `ci:checks` now runs API tests and web tests before build
+- Google auth follow-up hardening:
+  - `/login` now builds Google auth links from the public browser API origin
+  - `/reading` auth gating now happens client-side with credentialed browser requests instead of forwarding server-side cookies to the API
+  - web TypeScript now resolves `@tarology/shared` from source for clean CI and preview builds
+  - Vercel preview/production deploy jobs now run from repo root so monorepo workspace packages are uploaded during builds
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -141,6 +146,7 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 cd /home/ram2c/gitclones/tarology
 git status --short
 npm run ci:checks
+./.tools/bin/gh pr checks 8
 sed -n '1,220p' docs/product/README.md
 sed -n '1,260p' PLAN.md
 ```
