@@ -38,6 +38,7 @@ Ship a reliable V1 foundation for Tarology v2 that matches the charter: determin
 - Deterministic deck assignment on reading creation.
 - Shared `CreateReading` contract package.
 - CI/CD baseline and Vercel preview/production pipeline.
+- Engineering workflow now includes a local post-merge branch cleanup command, with GitHub remote branch auto-delete enabled.
 - Reading Studio shell redesign with persisted panel state and mobile drawers.
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
