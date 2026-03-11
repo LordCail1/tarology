@@ -21,12 +21,12 @@ Execution sequencing:
   - `prd-15-sharing-engagement-and-monetization.md`
 - Existing PRDs now include expansion contract/safety/roadmap requirements:
   - `prd-04`, `prd-06`, `prd-08`, `prd-09`, `prd-10`.
-- Web has minimal Reading Studio shell at `/reading` with:
-  - center-first layout,
-  - collapsible sidebars with desktop rails,
-  - mobile slide-over drawers,
-  - per-user panel open/closed persistence,
-  - branded empty state + bottom composer.
+- Web now has a production-shaped Reading Studio shell at `/reading` with:
+  - explicit active reading selection and grouped history,
+  - desktop drag-resize sidebars with persisted widths,
+  - mobile drawers plus desktop-specific panel rails/toggles,
+  - local adapter seams for layout preferences and reading workspace restore,
+  - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`).
 - Product docs explicitly require:
   - desktop sidebar drag-resize with smooth motion,
   - multi-mode canvas architecture (`freeform`, `grid`),
@@ -67,6 +67,13 @@ Execution sequencing:
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
+- Reading Studio frontend scaffold branch:
+  - desktop sidebar drag-resize now works with persisted widths and keyboard fallback
+  - history is grouped by recency with explicit active-reading restore behavior
+  - `ReadingStudioPreferenceAdapter` and `ReadingStudioDataSource` exist as web-local seams for later branch integration
+  - center canvas supports `freeform` and `grid` with local drag, snap, rotate, flip, and per-mode layout memory
+  - local workspace/layout restore survives refresh via adapter-backed localStorage persistence
+  - web regression coverage now includes drag-resize persistence and canvas workspace restore flows
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -92,6 +99,10 @@ Execution sequencing:
 
 ## Immediate Queue (Gate -1 and Gate 0 MVP)
 Gate 0 is only complete when the app can create multiple readings, preserve card layout/state durably, and restore exact prior readings when users switch back to them.
+
+Status note:
+- Queue items 12 and 13 are complete as frontend-local web scaffolding on `feature/reading-studio-resize-and-canvas-modes`.
+- Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
 
 1. Implement profile shell baseline.
 - Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
@@ -128,9 +139,11 @@ Gate 0 is only complete when the app can create multiple readings, preserve card
 
 12. Implement desktop sidebar resize handles + smooth motion polish.
 - Acceptance: left/right panels resize by drag on desktop and persist per user widths.
+  Status: complete as frontend-local scaffolding.
 
 13. Introduce multi-mode canvas architecture.
 - Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
+  Status: complete as frontend-local scaffolding.
 
 14. Extend deck preference flow with per-reading deck override.
 - Acceptance: reading creation can override persisted default deck before assignment.
@@ -186,6 +199,7 @@ Gate 0 is only complete when the app can create multiple readings, preserve card
 - Provenance quality can regress if not contract-tested.
 - Persona features can create anthropomorphic misunderstanding without clear framing.
 - Deck creation introduces moderation/IP policy burden.
+- The Reading Studio currently restores from web-local persistence; swapping to durable backend restore must preserve mode memory, selection behavior, and sidebar preference semantics.
 
 ## Next Agent Start Commands
 ```bash

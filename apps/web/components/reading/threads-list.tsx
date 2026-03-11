@@ -1,4 +1,4 @@
-import type { QuestionThreadItem } from "../../lib/reading-studio-mock";
+import type { QuestionThreadItem } from "../../lib/reading-studio-types";
 
 interface ThreadsListProps {
   threads: QuestionThreadItem[];

@@ -1,16 +1,15 @@
-import type {
-  ReadingHistoryFilter,
-  ReadingHistoryItem,
-} from "../../lib/reading-studio-mock";
+import type { HistoryGroup } from "../../lib/group-readings-by-recency";
+import type { ReadingHistoryFilter } from "../../lib/reading-studio-types";
 
 interface HistoryRailProps {
-  readings: ReadingHistoryItem[];
+  groupedReadings: HistoryGroup[];
   activeReadingId: string;
   searchQuery: string;
   statusFilter: ReadingHistoryFilter;
   totalCount: number;
   onSearchQueryChange: (nextQuery: string) => void;
   onStatusFilterChange: (nextFilter: ReadingHistoryFilter) => void;
+  onReadingSelect: (readingId: string) => void;
 }
 
 const filterLabels: Record<ReadingHistoryFilter, string> = {
@@ -21,15 +20,17 @@ const filterLabels: Record<ReadingHistoryFilter, string> = {
 };
 
 export function HistoryRail({
-  readings,
+  groupedReadings,
   activeReadingId,
   searchQuery,
   statusFilter,
   totalCount,
   onSearchQueryChange,
   onStatusFilterChange,
+  onReadingSelect,
 }: HistoryRailProps) {
   const filterOrder: ReadingHistoryFilter[] = ["all", "active", "paused", "complete"];
+  const filteredCount = groupedReadings.reduce((count, group) => count + group.items.length, 0);
 
   return (
     <section aria-labelledby="reading-history-title" className="reading-sidebar-block">
@@ -69,32 +70,55 @@ export function HistoryRail({
       </div>
 
       <p className="reading-sidebar-count">
-        Showing {readings.length} of {totalCount} readings
+        Showing {filteredCount} of {totalCount} readings
       </p>
 
-      {readings.length === 0 ? (
+      {filteredCount === 0 ? (
         <p className="reading-sidebar-empty">No readings match current filters.</p>
       ) : (
-        <ul className="reading-sidebar-list">
-          {readings.map((reading) => {
-            const isActive = reading.id === activeReadingId;
+        <div className="reading-sidebar-group-list">
+          {groupedReadings.map((group) => (
+            <section
+              key={group.label}
+              aria-labelledby={`reading-history-group-${group.label}`}
+              className="reading-sidebar-group"
+            >
+              <h3
+                id={`reading-history-group-${group.label}`}
+                className="reading-sidebar-group-title"
+              >
+                {group.label}
+              </h3>
 
-            return (
-              <li key={reading.id}>
-                <article
-                  className="reading-sidebar-item"
-                  data-active={isActive ? "true" : "false"}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <h3 className="reading-sidebar-item-title">{reading.title}</h3>
-                  <p className="reading-sidebar-item-meta">
-                    {reading.createdAtLabel} · {reading.cardCount} cards · {reading.status}
-                  </p>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
+              <ul className="reading-sidebar-list">
+                {group.items.map((reading) => {
+                  const isActive = reading.id === activeReadingId;
+
+                  return (
+                    <li key={reading.id}>
+                      <button
+                        type="button"
+                        className="reading-sidebar-item-button"
+                        onClick={() => onReadingSelect(reading.id)}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <article
+                          className="reading-sidebar-item"
+                          data-active={isActive ? "true" : "false"}
+                        >
+                          <p className="reading-sidebar-item-title">{reading.title}</p>
+                          <p className="reading-sidebar-item-meta">
+                            {reading.createdAtLabel} · {reading.cardCount} cards · {reading.status}
+                          </p>
+                        </article>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </section>
   );

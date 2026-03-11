@@ -1,7 +1,8 @@
-import type { ReadingHistoryItem } from "../../lib/reading-studio-mock";
+import type { ReadingHistoryItem } from "../../lib/reading-studio-types";
 
 interface ReadingStudioTopbarProps {
   activeReading: ReadingHistoryItem;
+  isDesktop: boolean;
   leftCollapsed: boolean;
   rightCollapsed: boolean;
   onToggleDesktopHistoryPanel: () => void;
@@ -13,6 +14,7 @@ interface ReadingStudioTopbarProps {
 
 export function ReadingStudioTopbar({
   activeReading,
+  isDesktop,
   leftCollapsed,
   rightCollapsed,
   onToggleDesktopHistoryPanel,
@@ -33,54 +35,58 @@ export function ReadingStudioTopbar({
           </h1>
         </div>
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <button
-            type="button"
-            aria-label={leftCollapsed ? "Expand history panel" : "Collapse history panel"}
-            aria-expanded={!leftCollapsed}
-            aria-controls="desktop-history-panel"
-            onClick={onToggleDesktopHistoryPanel}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:bg-white/[0.08]"
-          >
-            {leftCollapsed ? "Show History" : "Hide History"}
-          </button>
-          <button
-            type="button"
-            aria-label={rightCollapsed ? "Expand analysis panel" : "Collapse analysis panel"}
-            aria-expanded={!rightCollapsed}
-            aria-controls="desktop-analysis-panel"
-            onClick={onToggleDesktopAnalysisPanel}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:bg-white/[0.08]"
-          >
-            {rightCollapsed ? "Show Analysis" : "Hide Analysis"}
-          </button>
-          <button
-            type="button"
-            onClick={onNewReading}
-            className="rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-black transition hover:brightness-110"
-          >
-            New Reading
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 lg:hidden">
-          <button
-            type="button"
-            aria-label="Open history drawer"
-            onClick={onOpenMobileHistoryDrawer}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
-          >
-            History
-          </button>
-          <button
-            type="button"
-            aria-label="Open analysis drawer"
-            onClick={onOpenMobileAnalysisDrawer}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
-          >
-            Analysis
-          </button>
-        </div>
+        {isDesktop ? (
+          <div className="hidden items-center gap-2 lg:flex">
+            <button
+              type="button"
+              aria-label={leftCollapsed ? "Expand history panel" : "Collapse history panel"}
+              aria-expanded={!leftCollapsed}
+              aria-controls="desktop-history-panel"
+              onClick={onToggleDesktopHistoryPanel}
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:bg-white/[0.08]"
+            >
+              {leftCollapsed ? "Show History" : "Hide History"}
+            </button>
+            <button
+              type="button"
+              aria-label={rightCollapsed ? "Expand analysis panel" : "Collapse analysis panel"}
+              aria-expanded={!rightCollapsed}
+              aria-controls="desktop-analysis-panel"
+              onClick={onToggleDesktopAnalysisPanel}
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:bg-white/[0.08]"
+            >
+              {rightCollapsed ? "Show Analysis" : "Hide Analysis"}
+            </button>
+            <button
+              type="button"
+              onClick={onNewReading}
+              disabled
+              aria-disabled="true"
+              className="rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)]/35 px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              New Reading
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 lg:hidden">
+            <button
+              type="button"
+              aria-label="Open history drawer"
+              onClick={onOpenMobileHistoryDrawer}
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
+            >
+              History
+            </button>
+            <button
+              type="button"
+              aria-label="Open analysis drawer"
+              onClick={onOpenMobileAnalysisDrawer}
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
+            >
+              Analysis
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
