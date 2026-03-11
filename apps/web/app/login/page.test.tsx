@@ -13,7 +13,8 @@ describe("LoginPage", () => {
   });
 
   it("renders Google sign-in URL with return path", async () => {
-    process.env.API_BASE_URL = "http://localhost:3001";
+    process.env.API_BASE_URL = "http://internal-api:3001";
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.tarology.test";
 
     const view = await LoginPage({
       searchParams: Promise.resolve({ returnTo: "/reading" }),
@@ -24,12 +25,13 @@ describe("LoginPage", () => {
       screen.getByRole("link", { name: "Continue with Google" })
     ).toHaveAttribute(
       "href",
-      "http://localhost:3001/v1/auth/google/start?returnTo=%2Freading"
+      "https://api.tarology.test/v1/auth/google/start?returnTo=%2Freading"
     );
   });
 
   it("sanitizes invalid return paths to /reading", async () => {
-    process.env.API_BASE_URL = "http://localhost:3001";
+    process.env.API_BASE_URL = "http://internal-api:3001";
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.tarology.test";
 
     const view = await LoginPage({
       searchParams: Promise.resolve({ returnTo: "https://evil.example/x" }),
@@ -40,7 +42,7 @@ describe("LoginPage", () => {
       screen.getByRole("link", { name: "Continue with Google" })
     ).toHaveAttribute(
       "href",
-      "http://localhost:3001/v1/auth/google/start?returnTo=%2Freading"
+      "https://api.tarology.test/v1/auth/google/start?returnTo=%2Freading"
     );
   });
 });
