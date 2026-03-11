@@ -4,10 +4,10 @@
 - CI and CD are defined in `.github/workflows/ci-cd.yml`.
 - Codex review trigger automation is defined in `.github/workflows/codex-review-trigger.yml`.
 - On PR to `main`:
-  - run `ci-checks` (install, typecheck, build),
+  - run `ci-checks` (`npm ci`, then `npm run ci:checks` for workspace typecheck, API tests, web tests, and build),
   - deploy preview to Vercel if secrets are configured.
 - On push to `main`:
-  - run `ci-checks`,
+  - run `ci-checks` (`npm ci`, then `npm run ci:checks`),
   - deploy production to Vercel if secrets are configured.
 
 ## Required GitHub Secrets
