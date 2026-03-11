@@ -37,7 +37,9 @@ Enable a branch protection rule for `main`:
 
 ## Notes
 - Deploy jobs are automatically skipped when Vercel secrets are not configured.
-- Current CD deploys the Next.js web app. The NestJS API deployment target will be added separately.
+- Current CD deploys the Next.js web app only.
+- Public API hosting and full-stack CD are intentionally deferred until the Gate 0 durable reading MVP is complete.
+- Once that MVP threshold is reached, the next delivery step is extending CD to the API/DB-backed stack with post-deploy smoke checks.
 - Codex review is requested by PR comment mention (`@codex review`), auto-posted by workflow when missing.
 
 ## References
