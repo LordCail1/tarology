@@ -31,14 +31,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test web
-        run: npm run test --workspace @tarology/web
-
-      - name: Build
-        run: npm run build
+      - name: Run repo ci:checks
+        run: npm run ci:checks
 
   deploy-preview:
     name: deploy-preview

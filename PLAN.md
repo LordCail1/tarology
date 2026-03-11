@@ -60,6 +60,10 @@ Execution sequencing:
   - `/reading` auth gating now happens client-side with credentialed browser requests instead of forwarding server-side cookies to the API
   - web TypeScript now resolves `@tarology/shared` from source for clean CI and preview builds
   - Vercel preview/production deploy jobs now run from repo root so monorepo workspace packages are uploaded during builds
+- CI contract parity fix:
+  - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
+  - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification
+  - API Vitest now resolves `@tarology/shared` from workspace source so clean CI runners do not depend on a prebuilt `packages/shared/dist` directory
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
