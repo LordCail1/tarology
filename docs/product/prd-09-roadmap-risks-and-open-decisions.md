@@ -9,15 +9,27 @@ Coverage: sections 16 through 19
 - Profile shell baseline.
 - Default deck preference onboarding.
 
-### 16.2 Gate 0 (Core Reliability)
+### 16.2 Gate 0 (Core Reliability MVP)
 - deterministic reading creation,
+- multiple reading history with reopen/delete/archive flow,
+- durable card layout/state persistence across refresh and reading switches,
 - command envelope + idempotency,
 - event log + snapshots + restore path,
 - question/groups persistence,
 - interpretation warning + cancellation,
 - canvas mode baseline (`freeform` + `grid`).
 
-### 16.3 Post-Core Releases
+Gate 0 exit rule:
+- user can create multiple readings, switch between them, and see exact prior card state/layout restored without data loss.
+
+### 16.3 Gate 0.5 (Dogfooding Deployment Baseline)
+- public API hosting on a stable domain,
+- managed Postgres + durable session store,
+- production env hard-fail behavior (no localhost fallbacks),
+- Docker packaging/local full-stack runtime,
+- full-stack CD on merge to `main` with post-deploy smoke tests.
+
+### 16.4 Post-Core Releases
 - Release A (V1.5): Visual Storytelling Mode.
 - Release B (V1.6): Fusion Lab.
 - Release C (V1.7): Dialogue Mode.

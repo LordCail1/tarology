@@ -13,6 +13,10 @@ Current workspace layout:
 - `apps/api` - NestJS API foundation
 - `packages/shared` - shared contracts/types
 
+Current deployment status:
+- Vercel deploys the Next.js web shell today.
+- Public API hosting and full-stack CD are intentionally scheduled for the first gate after the durable multi-reading MVP (create/switch/delete/restore reading state).
+
 Root scripts:
 - `npm run dev:web`
 - `npm run dev:api`

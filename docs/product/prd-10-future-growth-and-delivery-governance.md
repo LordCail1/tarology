@@ -61,6 +61,9 @@ Reading Studio must remain embeddable as a containerized feature:
 - no direct dependency on social or notes modules,
 - integration happens through contracts/events only.
 
+Delivery rule:
+- Dockerized packaging becomes a required baseline before post-MVP full-stack dogfooding deployment, but it does not block early Gate 0 product reliability work.
+
 If app evolves into a broader platform, Reading Studio should continue to run unchanged behind its interfaces.
 
 ## 21) Delivery Governance (Git + CI/CD)
@@ -92,13 +95,19 @@ If app evolves into a broader platform, Reading Studio should continue to run un
 - Required status check name: `ci-checks`.
 - Codex review trigger workflow runs on PR lifecycle events and ensures `@codex review` comment exists.
 
-### 21.4 CD Baseline (V1 Hosting)
+### 21.4 CD Baseline (Current + Post-MVP)
 - Hosting target for V1 web app is Vercel.
 - Deployment flows:
   - PR -> preview deployment (when deploy secrets are present),
   - `main` -> production deployment (when deploy secrets are present).
 - Deployment automation is defined in repository workflow files under `.github/workflows`.
-- API deployment remains separately planned; CI still validates API build from day one.
+- Current hosted production may remain web-only until Gate 0 exit criteria are met.
+- The next delivery gate after Gate 0 is full-stack dogfooding deployment:
+  - public API hosting,
+  - managed Postgres,
+  - durable session storage,
+  - and post-deploy smoke tests.
+- API deployment is intentionally deferred only until the durable reading MVP threshold is met; after that it is prioritized before post-core feature releases.
 
 ### 21.5 Checkpoint Discipline
 - Contributors create checkpoint commits at meaningful milestones.
