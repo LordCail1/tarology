@@ -1,115 +1,279 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { READING_STUDIO_ACTIVE_READING_STORAGE_KEY } from "../../lib/reading-studio-data-source";
+import { READING_STUDIO_LAYOUT_STORAGE_KEY } from "../../lib/reading-studio-preferences";
 import { ReadingStudioShell } from "./reading-studio-shell";
+
+const profileFixture = {
+  userId: "usr_123",
+  email: "reader@example.com",
+  displayName: "Reader Example",
+  avatarUrl: null,
+  provider: "google" as const,
+  createdAt: "2026-03-11T10:00:00.000Z",
+};
+
+const preferencesFixture = {
+  defaultDeckId: "thoth",
+  defaultDeck: {
+    id: "thoth",
+    name: "Thoth Tarot",
+    description: "Starter deck",
+    specVersion: "thoth-v1",
+    previewImageUrl: "/images/cards/thoth/TheSun.jpg",
+    backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
+    cardCount: 78,
+  },
+  onboardingComplete: true,
+  updatedAt: "2026-03-11T10:05:00.000Z",
+};
+
+function setViewportWidth(widthPx: number) {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    writable: true,
+    value: widthPx,
+  });
+  window.dispatchEvent(new Event("resize"));
+}
+
+async function renderHydratedShell(expectedTitle: string = "Career realignment and confidence") {
+  render(<ReadingStudioShell profile={profileFixture} preferences={preferencesFixture} />);
+  await screen.findByRole("heading", {
+    name: expectedTitle,
+    level: 1,
+  });
+}
+
+function dispatchMouseDrag(
+  element: HTMLElement,
+  start: { clientX: number; clientY: number },
+  end?: { clientX: number; clientY: number }
+) {
+  fireEvent.mouseDown(element, start);
+
+  if (end) {
+    fireEvent.mouseMove(window, end);
+  }
+
+  fireEvent.mouseUp(window, end ?? start);
+}
 
 describe("ReadingStudioShell", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    setViewportWidth(1440);
+    vi.restoreAllMocks();
   });
 
-  it("renders minimal shell headings with logo watermark and composer", () => {
-    render(<ReadingStudioShell />);
+  it("renders the hydrated shell with grouped history, topbar, canvas, and analysis tabs", async () => {
+    await renderHydratedShell();
 
     expect(screen.getByRole("heading", { name: "Reading History" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Card Fan and Canvas" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Expand right sidebar" }));
-    expect(screen.getByRole("heading", { name: "Question Threads" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Interpretation History" })).toBeInTheDocument();
-    expect(screen.getByAltText("Tarot-logy logo watermark")).toBeInTheDocument();
+    expect(screen.getByText("Reader Example")).toBeInTheDocument();
+    expect(screen.getByText("Default deck: Thoth Tarot")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Career realignment and confidence",
+        level: 1,
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse history panel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand analysis panel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Freeform" })).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("Ask a question or start a new reading...")
     ).toBeInTheDocument();
-    expect(screen.queryByText("Face-down fan")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand analysis panel" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Threads" })).toBeInTheDocument()
+    );
+    expect(screen.getByRole("tab", { name: "Interpretations" })).toBeInTheDocument();
   });
 
-  it("uses desktop first-visit defaults of left expanded and right collapsed", () => {
-    render(<ReadingStudioShell />);
+  it("restores persisted layout preferences from localStorage", async () => {
+    window.localStorage.setItem(
+      READING_STUDIO_LAYOUT_STORAGE_KEY,
+      JSON.stringify({
+        leftOpen: false,
+        rightOpen: true,
+        leftWidthPx: 300,
+        rightWidthPx: 360,
+      })
+    );
 
-    const leftToggle = screen.getByRole("button", { name: "Collapse left sidebar" });
-    const rightToggle = screen.getByRole("button", { name: "Expand right sidebar" });
+    await renderHydratedShell();
 
-    expect(leftToggle).toHaveAttribute("aria-expanded", "true");
-    expect(rightToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Expand history panel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse analysis panel" })).toBeInTheDocument();
+    expect(
+      document.querySelector(".reading-shell")?.getAttribute("style")
+    ).toContain("--left-expanded-width: 300px");
+    expect(
+      document.querySelector(".reading-shell")?.getAttribute("style")
+    ).toContain("--right-expanded-width: 360px");
   });
 
-  it("restores persisted sidebar state from localStorage", async () => {
-    window.localStorage.setItem("tarology.ui.leftPanelOpen", "false");
-    window.localStorage.setItem("tarology.ui.rightPanelOpen", "true");
+  it("toggles panels and persists layout preferences", async () => {
+    await renderHydratedShell();
 
-    render(<ReadingStudioShell />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse history panel" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Expand history panel" })).toBeInTheDocument()
+    );
+
+    let storedLayout = JSON.parse(
+      window.localStorage.getItem(READING_STUDIO_LAYOUT_STORAGE_KEY) ?? "{}"
+    );
+    expect(storedLayout.leftOpen).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand analysis panel" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Collapse analysis panel" })).toBeInTheDocument()
+    );
+
+    storedLayout = JSON.parse(
+      window.localStorage.getItem(READING_STUDIO_LAYOUT_STORAGE_KEY) ?? "{}"
+    );
+    expect(storedLayout.rightOpen).toBe(true);
+  });
+
+  it("supports keyboard resizing and persists panel widths", async () => {
+    setViewportWidth(1680);
+    await renderHydratedShell();
+
+    const historyResizeHandle = screen.getByRole("separator", {
+      name: "Resize history sidebar",
+    });
+    expect(historyResizeHandle).toBeInTheDocument();
+    expect(
+      screen.queryByRole("separator", { name: "Resize analysis sidebar" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.keyDown(historyResizeHandle, { key: "ArrowRight" });
+
+    await waitFor(() => {
+      const storedLayout = JSON.parse(
+        window.localStorage.getItem(READING_STUDIO_LAYOUT_STORAGE_KEY) ?? "{}"
+      );
+      expect(storedLayout.leftWidthPx).toBeGreaterThan(280);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand analysis panel" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("separator", { name: "Resize analysis sidebar" })
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("supports drag resizing and persists panel widths on release", async () => {
+    setViewportWidth(1680);
+    await renderHydratedShell();
+
+    const historyResizeHandle = screen.getByRole("separator", {
+      name: "Resize history sidebar",
+    });
+
+    fireEvent.mouseDown(historyResizeHandle, { clientX: 280 });
+    fireEvent.mouseMove(window, { clientX: 344 });
+    fireEvent.mouseUp(window, { clientX: 344 });
+
+    await waitFor(() => {
+      const storedLayout = JSON.parse(
+        window.localStorage.getItem(READING_STUDIO_LAYOUT_STORAGE_KEY) ?? "{}"
+      );
+      expect(storedLayout.leftWidthPx).toBe(344);
+    });
+
+    expect(document.querySelector(".reading-shell")?.getAttribute("style")).toContain(
+      "--left-expanded-width: 344px"
+    );
+  });
+
+  it("keeps the active reading stable when filters hide it and restores that workspace after refresh", async () => {
+    const { unmount } = render(
+      <ReadingStudioShell profile={profileFixture} preferences={preferencesFixture} />
+    );
+    await screen.findByRole("heading", { name: "Reading History" });
+
+    fireEvent.click(screen.getByRole("button", { name: /Creative project momentum sprint/i }));
 
     await waitFor(() =>
       expect(
-        screen.getByRole("button", {
-          name: "Expand left sidebar",
-        })
-      ).toHaveAttribute("aria-expanded", "false")
+        screen.getByRole("heading", { name: "Creative project momentum sprint" })
+      ).toBeInTheDocument()
     );
-    expect(
-      screen.getByRole("button", { name: "Collapse right sidebar" })
-    ).toHaveAttribute("aria-expanded", "true");
-  });
 
-  it("toggles both sidebars and persists the new state", async () => {
-    render(<ReadingStudioShell />);
+    const activeCard = screen.getByRole("button", { name: "The Magician card" });
+    dispatchMouseDrag(activeCard, { clientX: 50, clientY: 80 });
+    await waitFor(() => expect(activeCard).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.click(screen.getByRole("button", { name: "Rotate +15°" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse left sidebar" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Expand left sidebar" })).toBeInTheDocument()
+      expect(within(activeCard).getByText("Rotation 36°")).toBeInTheDocument()
     );
-    expect(window.localStorage.getItem("tarology.ui.leftPanelOpen")).toBe("false");
 
-    fireEvent.click(screen.getByRole("button", { name: "Expand right sidebar" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Collapse right sidebar" })).toBeInTheDocument()
-    );
-    expect(window.localStorage.getItem("tarology.ui.rightPanelOpen")).toBe("true");
-  });
+    fireEvent.change(screen.getByLabelText("Search readings"), {
+      target: { value: "Career" },
+    });
 
-  it("supports drawer close through backdrop click and Escape", async () => {
-    render(<ReadingStudioShell />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Collapse left sidebar" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Open right panel" }));
     expect(
-      screen.getByRole("button", { name: "Close right sidebar backdrop" })
+      screen.getByRole("heading", { name: "Creative project momentum sprint" })
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Creative project momentum sprint/i })
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Close right sidebar backdrop" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "Close right sidebar backdrop" })
-      ).not.toBeInTheDocument()
-    );
+    unmount();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open right panel" }));
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "Close right sidebar backdrop" })
-      ).not.toBeInTheDocument()
+    await renderHydratedShell("Creative project momentum sprint");
+
+    expect(
+      screen.getByRole("heading", { name: "Creative project momentum sprint" })
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: "The Magician card" })).getByText(
+        "Rotation 36°"
+      )
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY)).toBe(
+      "rdg_004"
     );
   });
 
-  it("filters reading history with search and status controls", () => {
-    render(<ReadingStudioShell />);
+  it("uses drawer behavior on mobile and closes through backdrop and Escape", async () => {
+    setViewportWidth(768);
+    await renderHydratedShell();
 
-    const searchInput = screen.getByLabelText("Search readings");
-    fireEvent.change(searchInput, { target: { value: "Creative" } });
+    expect(screen.getByRole("button", { name: "Open history drawer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open analysis drawer" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand history panel" })).not.toBeInTheDocument();
 
-    expect(screen.getByText("Creative project momentum sprint")).toBeInTheDocument();
-    expect(screen.queryByText("Career realignment and confidence")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open analysis drawer" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Close analysis drawer backdrop" })
+      ).toBeInTheDocument()
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /Paused/i }));
-    expect(screen.getByText("No readings match current filters.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close analysis drawer backdrop" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Close analysis drawer backdrop" })
+      ).not.toBeInTheDocument()
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /All/i }));
-    fireEvent.change(searchInput, { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: /Complete/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Open analysis drawer" }));
+    fireEvent.keyDown(window, { key: "Escape" });
 
-    expect(screen.getByText("Spring direction spread")).toBeInTheDocument();
-    expect(screen.queryByText("Relationship clarity check-in")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Close analysis drawer backdrop" })
+      ).not.toBeInTheDocument()
+    );
   });
 });
