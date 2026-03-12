@@ -21,17 +21,31 @@ Execution sequencing:
   - `prd-15-sharing-engagement-and-monetization.md`
 - Existing PRDs now include expansion contract/safety/roadmap requirements:
   - `prd-04`, `prd-06`, `prd-08`, `prd-09`, `prd-10`.
-- Web has minimal Reading Studio shell at `/reading` with:
-  - center-first layout,
-  - collapsible sidebars with desktop rails,
-  - mobile slide-over drawers,
-  - per-user panel open/closed persistence,
-  - branded empty state + bottom composer.
+- Web now has a production-shaped Reading Studio shell at `/reading` with:
+  - explicit active reading selection and grouped history,
+  - desktop drag-resize sidebars with persisted widths,
+  - mobile drawers plus desktop-specific panel rails/toggles,
+  - local adapter seams for layout preferences and reading workspace restore,
+  - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`).
+- Profile/preferences onboarding baseline is now implemented:
+  - Prisma/Postgres persists `users`, `auth_identities`, `profiles`, `user_preferences`, and `decks`
+  - Google callback provisioning now creates/updates user, identity, profile, and preference shell records transactionally
+  - `GET /v1/profile`, `GET /v1/preferences`, `PATCH /v1/preferences`, and `GET /v1/decks` are live behind session auth
+  - `/onboarding` captures the first-run default deck and `/reading` redirects there until onboarding is complete
+  - the Reading Studio history rail now renders a lightweight persisted profile shell and default deck label
+- Deterministic deck selection is now semantically real for the built-in Thoth deck:
+  - the API owns a code-level `ThothDeckSpec` manifest with stable ordered string card IDs
+  - reading creation resolves `deckId` from explicit input or saved preferences and shuffles the selected deck spec
+  - card assignments now return stable string `cardId` values instead of numeric ordinals
 - Product docs explicitly require:
   - desktop sidebar drag-resize with smooth motion,
   - multi-mode canvas architecture (`freeform`, `grid`),
   - first-run default deck selection + per-reading override.
-- API still uses in-memory reading persistence and must move to DB-backed durability.
+- API now has a DB-backed reading durability baseline:
+  - `POST /v1/readings` persists deterministic assignments in PostgreSQL via Prisma
+  - `GET /v1/readings` and `GET /v1/readings/:id` return durable history/detail state
+  - `POST /v1/readings/:id/commands` supports idempotent, version-checked `archive`, `reopen`, and `delete`
+  - lifecycle events and milestone snapshots support restore-from-history for reading state
 - Vercel currently deploys only the Next.js web app; the NestJS API is not yet publicly hosted.
 - Current documentation now aligns on delaying full-stack hosting until the durable reading MVP is complete.
 
@@ -67,6 +81,26 @@ Execution sequencing:
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
+- Reading Studio frontend scaffold branch:
+  - desktop sidebar drag-resize now works with persisted widths and keyboard fallback
+  - history is grouped by recency with explicit active-reading restore behavior
+  - `ReadingStudioPreferenceAdapter` and `ReadingStudioDataSource` exist as web-local seams for later branch integration
+  - center canvas supports `freeform` and `grid` with local drag, snap, rotate, flip, and per-mode layout memory
+  - local workspace/layout restore survives refresh via adapter-backed localStorage persistence
+  - web regression coverage now includes drag-resize persistence and canvas workspace restore flows
+- Reading durability/history backend branch:
+  - Prisma/Postgres now replaces the in-memory reading map for the canonical create/read path
+  - shared reading contracts now include lifecycle status, summaries/details, history filters, and command envelopes
+  - reading lifecycle commands are append-only, idempotent, and guarded by expected-version checks
+  - lifecycle events (`reading.created`, `reading.archived`, `reading.reopened`, `reading.deleted`) and milestone snapshots are persisted
+  - restore-from-history is implemented as snapshot plus tail-event replay inside `ReadingsService`
+  - API regression coverage now includes persistence across app restarts, owner-scoped history, lifecycle commands, idempotency conflicts, and restore correctness
+- Profile/default-deck onboarding branch:
+  - Prisma/Postgres now also persists identity-adjacent user state (`users`, `auth_identities`, `profiles`, `user_preferences`, `decks`)
+  - the seeded `thoth` deck is available through the authenticated deck catalog and is backed by a real API deck spec manifest (`thoth-v1`)
+  - Google auth callback now provisions internal UUID-backed users before saving the session
+  - `/reading` now gates on both auth and saved default deck, while `/onboarding` completes first-run deck selection
+  - web regression coverage now includes onboarding redirects, onboarding completion, and profile/default-deck shell rendering
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -90,50 +124,41 @@ Execution sequencing:
 - Card voice posture is archetypal persona (interpretive, non-literal).
 - Engagement model is reflective progression, not manipulative loops.
 
-## Immediate Queue (Gate -1 and Gate 0 MVP)
+## Immediate Queue (Remaining Gate -1 and Gate 0 MVP Work)
 Gate 0 is only complete when the app can create multiple readings, preserve card layout/state durably, and restore exact prior readings when users switch back to them.
+
+Status note:
+- Queue items 1 and 2 are now complete on `feature/profile-preferences-onboarding`.
+- Queue items 3, 4, 6, and 7 are now complete on `feature/reading-durability-and-history` for reading lifecycle durability.
+- Queue items 12 and 13 are complete as frontend-local web scaffolding on `feature/reading-studio-resize-and-canvas-modes`, and `canvasMode` now persists in the API read model.
+- Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
 
 1. Implement profile shell baseline.
 - Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
+  Status: complete.
 
 2. Add default deck preference onboarding baseline.
 - Acceptance: first authenticated session captures and persists a default deck preference.
+  Status: complete for the seeded Thoth deck.
 
-3. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
-- Acceptance: readings survive API restart; in-memory map removed from canonical path.
-
-4. Introduce command mutation envelope for reading changes.
-- Acceptance: command ID, idempotency key, expected version checks, append-only event write, projection update.
-
-5. Persist semantic card/layout mutations.
+3. Persist semantic card/layout mutations.
 - Acceptance: draw/flip/drag/rotate/group actions persist as semantic events and survive refresh/reopen without corrupting deterministic assignment.
 
-6. Build read-model restore path.
-- Acceptance: `GET /v1/readings/:id` returns current projection including layout state; snapshots/events replay strategy is in place.
-
-7. Implement readings history query + reopen/delete baseline.
-- Acceptance: users can create multiple readings, reopen any prior reading, and safely delete/archive a reading without affecting other readings.
-
-8. Implement question tree and saved card groups.
+4. Implement question tree and saved card groups.
 - Acceptance: root/sub-questions and named groups persist with relationships.
 
-9. Start provider-connections domain with capability model.
+5. Start provider-connections domain with capability model.
 - Acceptance: schema/API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
 
-10. Add interpretation request job model with cancellable state machine.
+6. Add interpretation request job model with cancellable state machine.
 - Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
 
-11. Implement high-card warning plumbing.
+7. Implement high-card warning plumbing.
 - Acceptance: server returns estimate metadata and warning threshold signal for large card sets.
 
-12. Implement desktop sidebar resize handles + smooth motion polish.
-- Acceptance: left/right panels resize by drag on desktop and persist per user widths.
-
-13. Introduce multi-mode canvas architecture.
-- Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
-
-14. Extend deck preference flow with per-reading deck override.
+8. Extend deck preference flow with per-reading deck override.
 - Acceptance: reading creation can override persisted default deck before assignment.
+  Status note: API-side `deckId` override is already supported on create; UI override remains pending.
 
 ## Next Gate After MVP (Gate 0.5 - Dogfooding Deployment Baseline)
 1. Public API deployment baseline.
@@ -186,12 +211,21 @@ Gate 0 is only complete when the app can create multiple readings, preserve card
 - Provenance quality can regress if not contract-tested.
 - Persona features can create anthropomorphic misunderstanding without clear framing.
 - Deck creation introduces moderation/IP policy burden.
+- The Reading Studio currently restores from web-local persistence; swapping to durable backend restore must preserve mode memory, selection behavior, and sidebar preference semantics.
+- The durable backend currently covers reading lifecycle and immutable card assignment state; canvas/question mutation durability still needs to be added without breaking restore compatibility.
+- The current deck catalog is intentionally narrow: only the built-in Thoth deck is selectable, and card-image filename normalization is still deferred.
+- Deck assets are temporarily sourced from `tarology_old` with project-owner approval; broader licensing policy still needs a durable product decision.
 
 ## Next Agent Start Commands
 ```bash
 cd /home/ram2c/gitclones/tarology
-git fetch origin main
 git status --short
+cd apps/api && npx prisma dev --name tarology-local
+# press "t" in the Prisma dev terminal, then export the printed DATABASE_URL in a second shell
+cd /home/ram2c/gitclones/tarology
+export DATABASE_URL='postgres://...'
+export TEST_DATABASE_URL="$DATABASE_URL"
+npm run prisma:seed --workspace @tarology/api
 npm run ci:checks
 sed -n '1,220p' docs/product/README.md
 sed -n '1,260p' PLAN.md

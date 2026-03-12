@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Reading {
+  id                      String                  @id @db.Uuid
+  ownerUserId             String                  @map("owner_user_id")
+  rootQuestion            String                  @map("root_question")
+  status                  String                  @default("active")
+  deckId                  String?                 @map("deck_id")
+  deckSpecVersion         String                  @map("deck_spec_version")
+  shuffleAlgorithmVersion String                  @map("shuffle_algorithm_version")
+  seedCommitment          String                  @map("seed_commitment")
+  orderHash               String                  @map("order_hash")
+  canvasMode              String                  @default("freeform") @map("canvas_mode")
+  version                 Int                     @default(1)
+  createdAt               DateTime                @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                @map("updated_at") @db.Timestamptz(6)
+  archivedAt              DateTime?               @map("archived_at") @db.Timestamptz(6)
+  deletedAt               DateTime?               @map("deleted_at") @db.Timestamptz(6)
+  cards                   ReadingCard[]
+  events                  ReadingEvent[]
+  snapshots               ReadingSnapshot[]
+  createReceipts          ReadingCreateReceipt[]
+  commandReceipts         ReadingCommandReceipt[]
+
+  @@index([ownerUserId, updatedAt(sort: Desc)])
+  @@map("readings")
+}
+
+model ReadingCard {
+  readingId         String   @map("reading_id") @db.Uuid
+  deckIndex         Int      @map("deck_index")
+  cardId            Int      @map("card_id")
+  assignedReversal  Boolean  @map("assigned_reversal")
+  createdAt         DateTime @map("created_at") @db.Timestamptz(6)
+  reading           Reading  @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([readingId, deckIndex])
+  @@map("reading_cards")
+}
+
+model ReadingEvent {
+  id             String    @id @db.Uuid
+  readingId      String    @map("reading_id") @db.Uuid
+  ownerUserId    String    @map("owner_user_id")
+  version        Int
+  eventType      String    @map("event_type")
+  payload        Json
+  commandId      String?   @map("command_id")
+  idempotencyKey String?   @map("idempotency_key")
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt      DateTime  @map("created_at") @db.Timestamptz(6)
+  reading        Reading   @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([readingId, version])
+  @@map("reading_events")
+}
+
+model ReadingSnapshot {
+  id         String   @id @db.Uuid
+  readingId  String   @map("reading_id") @db.Uuid
+  version    Int
+  projection Json
+  createdAt  DateTime @map("created_at") @db.Timestamptz(6)
+  reading    Reading  @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([readingId, version])
+  @@map("reading_snapshots")
+}
+
+model ReadingCreateReceipt {
+  id             String   @id @db.Uuid
+  ownerUserId    String   @map("owner_user_id")
+  idempotencyKey String   @map("idempotency_key")
+  requestHash    String   @map("request_hash")
+  readingId      String   @map("reading_id") @db.Uuid
+  responseJson   Json     @map("response_json")
+  createdAt      DateTime @map("created_at") @db.Timestamptz(6)
+  reading        Reading  @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([ownerUserId, idempotencyKey])
+  @@map("reading_create_receipts")
+}
+
+model ReadingCommandReceipt {
+  id               String   @id @db.Uuid
+  readingId        String   @map("reading_id") @db.Uuid
+  ownerUserId      String   @map("owner_user_id")
+  commandId        String   @map("command_id")
+  idempotencyKey   String   @map("idempotency_key")
+  requestHash      String   @map("request_hash")
+  resultingVersion Int      @map("resulting_version")
+  responseJson     Json     @map("response_json")
+  createdAt        DateTime @map("created_at") @db.Timestamptz(6)
+  reading          Reading  @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([readingId, commandId])
+  @@unique([readingId, idempotencyKey])
+  @@map("reading_command_receipts")
+}
