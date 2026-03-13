@@ -89,6 +89,9 @@ Execution sequencing:
 - Live layout guard hardening:
   - desktop panel toggles now re-run layout coercion so reopening a saved sidebar cannot bypass the center-column guard
   - shell resize handling now re-coerces current layout state on viewport changes so desktop shrink flows stay within guarded widths
+- Command idempotency race hardening:
+  - command application now re-checks persisted receipts before surfacing a lifecycle version conflict, preserving legitimate duplicate-command retries under concurrency
+  - API regression coverage now exercises the “missed replay then lost update race” path
 - CI contract parity fix:
   - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification

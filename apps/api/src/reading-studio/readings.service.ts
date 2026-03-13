@@ -394,6 +394,16 @@ export class ReadingsService {
       });
     } catch (error) {
       if (error instanceof VersionConflictError) {
+        const duplicateReplay = await this.getCommandReplay(
+          readingId,
+          payload,
+          idempotencyKey,
+          requestHash
+        );
+        if (duplicateReplay) {
+          return duplicateReplay;
+        }
+
         const latest = await this.readingsRepository.findCurrentVersion(user.userId, readingId);
         const currentVersion = latest?.version ?? payload.expectedVersion;
 
