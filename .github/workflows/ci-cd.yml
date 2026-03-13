@@ -31,8 +31,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres@localhost:5432/tarology?schema=public
-      TEST_DATABASE_URL: postgresql://postgres@localhost:5432/tarology?schema=public
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: tarology
+      POSTGRES_USER: postgres
 
     steps:
       - name: Checkout
@@ -49,7 +51,10 @@ jobs:
         run: npm ci
 
       - name: Run repo ci:checks
-        run: npm run ci:checks
+        run: |
+          export DATABASE_URL="postgresql://${POSTGRES_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?schema=public"
+          export TEST_DATABASE_URL="$DATABASE_URL"
+          npm run ci:checks
 
   deploy-preview:
     name: deploy-preview
