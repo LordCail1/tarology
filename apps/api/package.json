@@ -5,22 +5,30 @@
   "type": "module",
   "scripts": {
     "start": "node dist/apps/api/src/main.js",
-    "start:dev": "npm --prefix ../../packages/shared run build && tsc -p tsconfig.json && node dist/apps/api/src/main.js",
-    "build": "npm --prefix ../../packages/shared run build && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "start:dev": "npm --prefix ../../packages/shared run build && npm run prisma:generate && tsc -p tsconfig.json && node dist/apps/api/src/main.js",
+    "build": "npm --prefix ../../packages/shared run build && npm run prisma:generate && tsc -p tsconfig.json",
+    "typecheck": "npm run prisma:generate && tsc -p tsconfig.json --noEmit",
+    "test": "npm run prisma:generate && npm run prisma:migrate:deploy && npm run prisma:seed && vitest run --config vitest.config.ts",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema ./prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
+    "prisma:seed": "tsx ./prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.12",
     "@nestjs/core": "^11.0.12",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.12",
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
     "@tarology/shared": "file:../../packages/shared",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dotenv": "^17.3.1",
     "express-session": "^1.19.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -30,8 +38,13 @@
     "@types/node": "^22.10.2",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
+    "prisma": "^7.5.0",
     "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "vitest": "^4.0.18"
+  },
+  "prisma": {
+    "seed": "tsx ./prisma/seed.ts"
   }
 }

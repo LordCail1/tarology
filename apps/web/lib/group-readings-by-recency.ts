@@ -1,4 +1,4 @@
-import type { ReadingHistoryItem } from "./reading-studio-mock";
+import type { ReadingHistoryItem } from "./reading-studio-types";
 
 export type HistoryGroupLabel = "Today" | "Yesterday" | "Previous 7 Days" | "Older";
 
