@@ -15,6 +15,11 @@ Migration note:
 3. If a requirement spans multiple areas, update all affected PRDs and keep terms consistent.
 4. Keep `PLAN.md` aligned with any changed requirement or sequencing.
 
+Temporary working note:
+- [Open Decisions Worklog](./open-decisions-worklog.md)
+  - Use this only for in-progress product decisions that may span multiple sessions.
+  - Fold final outcomes back into the charter/PRDs and then delete the worklog.
+
 ## PRD Map
 - [PRD 01 - Product Foundation](./prd-01-product-foundation.md)
 - [PRD 02 - V1 Scope and UX Blueprint](./prd-02-v1-scope-and-ux.md)

@@ -112,6 +112,9 @@ Execution sequencing:
   - conceptual data model docs now distinguish immutable `reading_cards` assignment from mutable workspace state persisted via semantic events/projections
   - lifecycle event docs now align with the actual reading status vocabulary (`archived`, `reopened`, `deleted`) instead of the obsolete `reading.completed` label
   - charter and governance docs now point contributors to the real repo gate, `npm run ci:checks`, and the current Gate 0.5 deployment sequence
+- Temporary product decision worklog:
+  - `docs/product/open-decisions-worklog.md` now tracks the three active strategy questions that may require multiple discussion rounds and intermediate commits
+  - this file is intentionally non-canonical and must be deleted after its outcomes are folded into the charter/PRDs/plan
 - Reading Studio frontend scaffold branch:
   - desktop sidebar drag-resize now works with persisted widths and keyboard fallback
   - history is grouped by recency with explicit active-reading restore behavior
