@@ -41,7 +41,8 @@ export class AuthController {
       throw new UnauthorizedException("Google authentication failed.");
     }
 
-    await this.identityService.saveSessionUser(request.session, user);
+    const persistedUser = await this.identityService.provisionAuthenticatedUser(user);
+    await this.identityService.saveSessionUser(request.session, persistedUser);
     const returnTo = this.identityService.consumeReturnTo(request.session);
     response.redirect(this.identityService.toWebRedirectUrl(returnTo));
   }

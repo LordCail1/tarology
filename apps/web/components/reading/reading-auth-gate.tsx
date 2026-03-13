@@ -2,50 +2,81 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { GetSessionResponse } from "@tarology/shared";
-import { getClientApiBaseUrl } from "../../lib/api-origin";
+import type { ProfileShellDto, UserPreferencesDto } from "@tarology/shared";
+import {
+  fetchPreferences,
+  fetchProfile,
+  fetchSession,
+  isUnauthorizedClientApiError,
+} from "../../lib/client-api";
 import { ReadingStudioShell } from "./reading-studio-shell";
 
-type AuthStatus = "checking" | "authenticated" | "unauthenticated";
+type AuthGateStatus = "checking" | "ready" | "error";
 
-async function fetchClientSession(): Promise<GetSessionResponse | null> {
-  try {
-    const response = await fetch(`${getClientApiBaseUrl()}/v1/auth/session`, {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    });
-
-    if (response.status === 401 || !response.ok) {
-      return null;
-    }
-
-    return (await response.json()) as GetSessionResponse;
-  } catch {
-    return null;
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
   }
+
+  return "Unable to load your workspace access right now. Please try again.";
 }
 
 export function ReadingAuthGate() {
   const router = useRouter();
-  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
+  const [authStatus, setAuthStatus] = useState<AuthGateStatus>("checking");
+  const [profile, setProfile] = useState<ProfileShellDto | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferencesDto | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkSession() {
-      const session = await fetchClientSession();
-      if (cancelled) {
-        return;
-      }
+      setAuthStatus("checking");
+      setErrorMessage(null);
 
-      if (!session) {
-        setAuthStatus("unauthenticated");
-        router.replace("/login?returnTo=%2Freading");
-        return;
-      }
+      try {
+        const session = await fetchSession();
+        if (cancelled) {
+          return;
+        }
 
-      setAuthStatus("authenticated");
+        if (!session) {
+          router.replace("/login?returnTo=%2Freading");
+          return;
+        }
+
+        const [{ profile: loadedProfile }, { preferences: loadedPreferences }] = await Promise.all([
+          fetchProfile(),
+          fetchPreferences(),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!loadedPreferences.defaultDeckId) {
+          router.replace("/onboarding?returnTo=%2Freading");
+          return;
+        }
+
+        setProfile(loadedProfile);
+        setPreferences(loadedPreferences);
+        setAuthStatus("ready");
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        if (isUnauthorizedClientApiError(error)) {
+          router.replace("/login?returnTo=%2Freading");
+          return;
+        }
+
+        setErrorMessage(getErrorMessage(error));
+        setAuthStatus("error");
+      }
     }
 
     void checkSession();
@@ -53,9 +84,9 @@ export function ReadingAuthGate() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [reloadToken, router]);
 
-  if (authStatus !== "authenticated") {
+  if (authStatus === "checking") {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 py-10">
         <section className="surface w-full rounded-2xl p-8 text-center">
@@ -71,5 +102,32 @@ export function ReadingAuthGate() {
     );
   }
 
-  return <ReadingStudioShell />;
+  if (authStatus === "error") {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 py-10">
+        <section className="surface w-full rounded-2xl p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+            Tarology v2
+          </p>
+          <h1 className="mt-2 text-2xl text-[var(--color-ink)]">Unable to load workspace</h1>
+          <p className="mt-3 text-sm text-[var(--color-muted)]">
+            {errorMessage ?? "Loading your session and deck preferences failed."}
+          </p>
+          <button
+            type="button"
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+            onClick={() => setReloadToken((current) => current + 1)}
+          >
+            Retry
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!profile || !preferences) {
+    return null;
+  }
+
+  return <ReadingStudioShell profile={profile} preferences={preferences} />;
 }

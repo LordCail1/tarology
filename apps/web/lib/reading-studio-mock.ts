@@ -1,35 +1,30 @@
-export type ReadingStatus = "active" | "paused" | "complete";
-export type ReadingHistoryFilter = "all" | ReadingStatus;
-export type InterpretationStatus = "ready" | "running" | "queued";
+import type {
+  InterpretationHistoryItem,
+  QuestionThreadItem,
+  ReadingCanvasCard,
+  ReadingHistoryItem,
+  ReadingStudioSnapshot,
+  ReadingStudioWorkspace,
+} from "./reading-studio-types";
 
-export interface ReadingHistoryItem {
-  id: string;
-  title: string;
-  createdAtIso: string;
-  createdAtLabel: string;
-  cardCount: number;
-  status: ReadingStatus;
-}
+export type {
+  AnalysisTab,
+  CanvasMode,
+  InterpretationHistoryItem,
+  InterpretationStatus,
+  PanelSide,
+  QuestionThreadItem,
+  ReadingCanvasCard,
+  ReadingHistoryFilter,
+  ReadingHistoryItem,
+  ReadingStatus,
+  ReadingStudioAction,
+  ReadingStudioLayoutPreferences,
+  ReadingStudioSnapshot,
+  ReadingStudioWorkspace,
+} from "./reading-studio-types";
 
-export interface QuestionThreadItem {
-  id: string;
-  parentId: string | null;
-  label: string;
-  depth: number;
-  updatedAtLabel: string;
-}
-
-export interface InterpretationHistoryItem {
-  id: string;
-  threadId: string;
-  groupName: string;
-  summary: string;
-  status: InterpretationStatus;
-  createdAtLabel: string;
-  citationCount: number;
-}
-
-export const readingHistoryMock: ReadingHistoryItem[] = [
+const readingHistorySeed: ReadingHistoryItem[] = [
   {
     id: "rdg_001",
     title: "Career realignment and confidence",
@@ -43,7 +38,7 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
     title: "Relationship clarity check-in",
     createdAtIso: "2026-03-07T20:14:00.000-05:00",
     createdAtLabel: "Yesterday, 20:14",
-    cardCount: 3,
+    cardCount: 5,
     status: "paused",
   },
   {
@@ -51,7 +46,7 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
     title: "Spring direction spread",
     createdAtIso: "2026-03-05T13:30:00.000-05:00",
     createdAtLabel: "Mar 05, 2026",
-    cardCount: 7,
+    cardCount: 5,
     status: "complete",
   },
   {
@@ -59,7 +54,7 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
     title: "Creative project momentum sprint",
     createdAtIso: "2026-03-03T18:10:00.000-05:00",
     createdAtLabel: "Mar 03, 2026",
-    cardCount: 4,
+    cardCount: 5,
     status: "complete",
   },
   {
@@ -67,69 +62,140 @@ export const readingHistoryMock: ReadingHistoryItem[] = [
     title: "Crossroads spread review",
     createdAtIso: "2026-02-24T08:25:00.000-05:00",
     createdAtLabel: "Feb 24, 2026",
-    cardCount: 6,
+    cardCount: 5,
     status: "paused",
   },
 ];
 
-export const questionThreadsMock: QuestionThreadItem[] = [
-  {
-    id: "th_root",
-    parentId: null,
-    label: "What should I focus on this month?",
-    depth: 0,
-    updatedAtLabel: "Updated 8m ago",
-  },
-  {
-    id: "th_energy",
-    parentId: "th_root",
-    label: "Where is my energy currently blocked?",
-    depth: 1,
-    updatedAtLabel: "Updated 4m ago",
-  },
-  {
-    id: "th_action",
-    parentId: "th_root",
-    label: "What practical step can I take first?",
-    depth: 1,
-    updatedAtLabel: "Updated 2m ago",
-  },
-  {
-    id: "th_reflect",
-    parentId: "th_action",
-    label: "How do I stay consistent if progress is slow?",
-    depth: 2,
-    updatedAtLabel: "Updated now",
-  },
+const cardLabelSeed = [
+  "The Magician",
+  "The Star",
+  "Six of Swords",
+  "Queen of Pentacles",
+  "Ace of Wands",
 ];
 
-export const interpretationHistoryMock: InterpretationHistoryItem[] = [
-  {
-    id: "ir_001",
-    threadId: "th_root",
-    groupName: "Whole table",
-    summary:
-      "Momentum improves when uncertainty is acknowledged first, then translated into one visible action.",
-    status: "ready",
-    createdAtLabel: "09:50",
-    citationCount: 6,
-  },
-  {
-    id: "ir_002",
-    threadId: "th_energy",
-    groupName: "The Star + Five of Pentacles",
-    summary: "Current pattern points to recovery fatigue and cautious optimism rebuilding over time.",
-    status: "ready",
-    createdAtLabel: "09:55",
-    citationCount: 4,
-  },
-  {
-    id: "ir_003",
-    threadId: "th_action",
-    groupName: "Ace of Wands focus",
-    summary: "Queued synthesis with practical next-step framing.",
-    status: "queued",
-    createdAtLabel: "09:57",
-    citationCount: 0,
-  },
-];
+function createCards(readingId: string, readingIndex: number): ReadingCanvasCard[] {
+  const xOffset = readingIndex * 12;
+  const yOffset = readingIndex * 10;
+
+  return cardLabelSeed.map((label, cardIndex) => ({
+    id: `${readingId}_card_${cardIndex + 1}`,
+    label,
+    assignedReversal: (readingIndex + cardIndex) % 2 === 1,
+    isFaceUp: true,
+    rotationDeg: (readingIndex * 7 + cardIndex * 5) % 360,
+    freeform: {
+      xPx: 40 + cardIndex * 148 + xOffset,
+      yPx: 72 + ((cardIndex + readingIndex) % 2) * 38 + yOffset,
+      stackOrder: cardIndex + 1,
+    },
+    grid: {
+      column: cardIndex % 4,
+      row: Math.floor(cardIndex / 4),
+    },
+  }));
+}
+
+function createThreads(reading: ReadingHistoryItem): QuestionThreadItem[] {
+  return [
+    {
+      id: `${reading.id}_th_root`,
+      parentId: null,
+      label: `What is the core pattern in "${reading.title}"?`,
+      depth: 0,
+      updatedAtLabel: "Updated 12m ago",
+    },
+    {
+      id: `${reading.id}_th_block`,
+      parentId: `${reading.id}_th_root`,
+      label: "Where is the current tension asking for patience?",
+      depth: 1,
+      updatedAtLabel: "Updated 6m ago",
+    },
+    {
+      id: `${reading.id}_th_action`,
+      parentId: `${reading.id}_th_root`,
+      label: "What practical next step feels grounded?",
+      depth: 1,
+      updatedAtLabel: "Updated 3m ago",
+    },
+    {
+      id: `${reading.id}_th_reflect`,
+      parentId: `${reading.id}_th_action`,
+      label: "How do I keep momentum without forcing certainty?",
+      depth: 2,
+      updatedAtLabel: "Updated now",
+    },
+  ];
+}
+
+function createInterpretations(
+  reading: ReadingHistoryItem,
+  threads: QuestionThreadItem[]
+): InterpretationHistoryItem[] {
+  return [
+    {
+      id: `${reading.id}_ir_001`,
+      threadId: threads[0].id,
+      groupName: "Whole table",
+      summary:
+        "The spread suggests progress comes from turning scattered effort into one visible commitment.",
+      status: "ready",
+      createdAtLabel: "09:50",
+      citationCount: 6,
+    },
+    {
+      id: `${reading.id}_ir_002`,
+      threadId: threads[1].id,
+      groupName: `${cardLabelSeed[1]} + ${cardLabelSeed[3]}`,
+      summary:
+        "Recovery themes stay strongest when care and discipline reinforce each other instead of competing.",
+      status: "ready",
+      createdAtLabel: "09:55",
+      citationCount: 4,
+    },
+    {
+      id: `${reading.id}_ir_003`,
+      threadId: threads[2].id,
+      groupName: cardLabelSeed[4],
+      summary: "Queued synthesis with practical next-step framing.",
+      status: "queued",
+      createdAtLabel: "09:57",
+      citationCount: 0,
+    },
+  ];
+}
+
+function createWorkspace(
+  reading: ReadingHistoryItem,
+  readingIndex: number
+): ReadingStudioWorkspace {
+  const threads = createThreads(reading);
+  const interpretations = createInterpretations(reading, threads);
+
+  return {
+    reading,
+    threads,
+    interpretations,
+    canvas: {
+      activeMode: "freeform",
+      cards: createCards(reading.id, readingIndex),
+    },
+  };
+}
+
+export const readingStudioSeedSnapshot: ReadingStudioSnapshot = {
+  activeReadingId: readingHistorySeed[0].id,
+  history: readingHistorySeed,
+  workspaces: Object.fromEntries(
+    readingHistorySeed.map((reading, index) => [reading.id, createWorkspace(reading, index)])
+  ),
+};
+
+export const readingHistoryMock = readingStudioSeedSnapshot.history;
+export const questionThreadsMock =
+  readingStudioSeedSnapshot.workspaces[readingStudioSeedSnapshot.activeReadingId].threads;
+export const interpretationHistoryMock =
+  readingStudioSeedSnapshot.workspaces[readingStudioSeedSnapshot.activeReadingId]
+    .interpretations;

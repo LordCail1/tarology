@@ -3,7 +3,7 @@ import {
   groupReadingsByRecency,
   type HistoryGroup,
 } from "./group-readings-by-recency";
-import type { ReadingHistoryItem } from "./reading-studio-mock";
+import type { ReadingHistoryItem } from "./reading-studio-types";
 
 function flattenIds(groups: HistoryGroup[]): string[] {
   return groups.flatMap((group) => group.items.map((item) => item.id));

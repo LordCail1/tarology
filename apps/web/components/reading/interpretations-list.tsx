@@ -1,4 +1,4 @@
-import type { InterpretationHistoryItem } from "../../lib/reading-studio-mock";
+import type { InterpretationHistoryItem } from "../../lib/reading-studio-types";
 
 interface InterpretationsListProps {
   interpretations: InterpretationHistoryItem[];

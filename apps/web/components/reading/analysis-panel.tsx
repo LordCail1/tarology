@@ -1,7 +1,7 @@
 import type {
   InterpretationHistoryItem,
   QuestionThreadItem,
-} from "../../lib/reading-studio-mock";
+} from "../../lib/reading-studio-types";
 import { InterpretationsList } from "./interpretations-list";
 import { ThreadsList } from "./threads-list";
 

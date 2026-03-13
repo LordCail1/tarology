@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
+import { AuthProvider } from "@prisma/client";
 import type { Session } from "express-session";
 import type { AuthenticatedUser } from "@tarology/shared";
+import { PrismaService } from "../database/prisma.service.js";
+import { ProfileBootstrapService } from "../profile/profile-bootstrap.service.js";
 import { getIdentityRuntimeConfig } from "./identity-runtime-config.js";
 
 const DEFAULT_RETURN_TO = "/reading";
@@ -11,6 +14,11 @@ type IdentitySession = Session & {
 
 @Injectable()
 export class IdentityService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly profileBootstrapService: ProfileBootstrapService
+  ) {}
+
   sanitizeReturnTo(returnTo: string | undefined): string {
     if (!returnTo) {
       return DEFAULT_RETURN_TO;
@@ -38,6 +46,67 @@ export class IdentityService {
 
   getSessionUser(session: IdentitySession | undefined): AuthenticatedUser | null {
     return session?.user ?? null;
+  }
+
+  async provisionAuthenticatedUser(user: AuthenticatedUser): Promise<AuthenticatedUser> {
+    return this.prisma.$transaction(async (tx) => {
+      const existingIdentity = await tx.authIdentity.findUnique({
+        where: {
+          provider_providerSubject: {
+            provider: AuthProvider.google,
+            providerSubject: user.providerSubject,
+          },
+        },
+      });
+
+      let persistedUser;
+      if (existingIdentity) {
+        persistedUser = await tx.user.update({
+          where: { id: existingIdentity.userId },
+          data: { email: user.email },
+        });
+
+        await tx.authIdentity.update({
+          where: { id: existingIdentity.id },
+          data: {
+            emailSnapshot: user.email,
+            displayNameSnapshot: user.displayName,
+            avatarUrlSnapshot: user.avatarUrl,
+          },
+        });
+      } else {
+        persistedUser =
+          (await tx.user.findUnique({
+            where: { email: user.email },
+          })) ??
+          (await tx.user.create({
+            data: {
+              email: user.email,
+            },
+          }));
+
+        await tx.authIdentity.create({
+          data: {
+            userId: persistedUser.id,
+            provider: AuthProvider.google,
+            providerSubject: user.providerSubject,
+            emailSnapshot: user.email,
+            displayNameSnapshot: user.displayName,
+            avatarUrlSnapshot: user.avatarUrl,
+          },
+        });
+      }
+
+      await this.profileBootstrapService.ensureUserShell(tx, persistedUser, {
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+      });
+
+      return {
+        ...user,
+        userId: persistedUser.id,
+      };
+    });
   }
 
   async saveSessionUser(

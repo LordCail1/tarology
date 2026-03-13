@@ -1,18 +1,10 @@
 import { getClientApiBaseUrl } from "../../lib/api-origin";
+import { sanitizeReturnTo } from "../../lib/return-to";
 
 interface LoginPageProps {
   searchParams?: Promise<{
     returnTo?: string | string[];
   }>;
-}
-
-function sanitizeReturnTo(value: string | string[] | undefined): string {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  if (!candidate || !candidate.startsWith("/") || candidate.startsWith("//")) {
-    return "/reading";
-  }
-
-  return candidate;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {

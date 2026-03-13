@@ -6,9 +6,10 @@ import { GoogleAuthStartGuard } from "./google-auth-start.guard.js";
 import { GoogleStrategy } from "./google.strategy.js";
 import { IdentityService } from "./identity.service.js";
 import { SessionAuthGuard } from "./session-auth.guard.js";
+import { ProfileModule } from "../profile/profile.module.js";
 
 @Module({
-  imports: [PassportModule.register({ session: false })],
+  imports: [PassportModule.register({ session: false }), ProfileModule],
   controllers: [AuthController],
   providers: [
     IdentityService,
