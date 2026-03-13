@@ -83,6 +83,9 @@ Execution sequencing:
 - Auth callback race hardening:
   - identity provisioning now retries once on unique-constraint races so concurrent first-login callbacks converge instead of surfacing intermittent 500s
   - API regression coverage now exercises retry behavior for first-login provisioning
+- Google subject-anchor hardening:
+  - unknown Google subjects no longer auto-link onto pre-existing users by email fallback; email collisions now surface as explicit conflicts instead
+  - API regression coverage now protects the managed-domain/reassigned-email collision path
 - Sidebar restore rebalancing:
   - restored desktop panel widths are now rebalanced jointly against the center-column minimum instead of being clamped independently against stale defaults
   - web regression coverage now protects the narrow-viewport restore case where both sidebars reopen together

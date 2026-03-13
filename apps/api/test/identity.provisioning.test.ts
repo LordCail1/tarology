@@ -1,3 +1,4 @@
+import { ConflictException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "@tarology/shared";
 import { IdentityService } from "../src/identity/identity.service.js";
@@ -48,6 +49,38 @@ describe("IdentityService provisioning", () => {
     expect(bootstrap.ensureUserShell).toHaveBeenCalledOnce();
   });
 
+  it("rejects linking a new Google subject onto an existing email-owned account", async () => {
+    const existingUser = { id: "persisted-user-email-owner", email: baseUser.email };
+    const tx = {
+      authIdentity: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        create: vi.fn(),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue(existingUser),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (innerTx: typeof tx) => Promise<AuthenticatedUser>) =>
+        callback(tx)
+      ),
+    };
+    const bootstrap = {
+      ensureUserShell: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new IdentityService(prisma as never, bootstrap as never);
+
+    await expect(service.provisionAuthenticatedUser(baseUser)).rejects.toBeInstanceOf(
+      ConflictException
+    );
+    expect(tx.user.create).not.toHaveBeenCalled();
+    expect(tx.authIdentity.create).not.toHaveBeenCalled();
+    expect(bootstrap.ensureUserShell).not.toHaveBeenCalled();
+  });
+
   it("reuses an existing auth identity and updates snapshots on repeat login", async () => {
     const existingIdentity = {
       id: "identity-1",
@@ -92,20 +125,24 @@ describe("IdentityService provisioning", () => {
   });
 
   it("retries unique-constraint races during first-login provisioning", async () => {
-    const createdUser = { id: "persisted-user-2", email: baseUser.email };
+    const existingIdentity = {
+      id: "identity-race-replay",
+      userId: "persisted-user-2",
+    };
+    const updatedUser = { id: existingIdentity.userId, email: baseUser.email };
     const retryableRaceError = Object.assign(new Error("race"), {
       code: "P2002",
     });
     const tx = {
       authIdentity: {
-        findUnique: vi.fn().mockResolvedValue(null),
-        update: vi.fn(),
-        create: vi.fn().mockResolvedValue(undefined),
+        findUnique: vi.fn().mockResolvedValue(existingIdentity),
+        update: vi.fn().mockResolvedValue(undefined),
+        create: vi.fn(),
       },
       user: {
-        findUnique: vi.fn().mockResolvedValue(createdUser),
+        findUnique: vi.fn(),
         create: vi.fn(),
-        update: vi.fn(),
+        update: vi.fn().mockResolvedValue(updatedUser),
       },
     };
     const prisma = {
@@ -123,9 +160,10 @@ describe("IdentityService provisioning", () => {
 
     const persisted = await service.provisionAuthenticatedUser(baseUser);
 
-    expect(persisted.userId).toBe(createdUser.id);
+    expect(persisted.userId).toBe(existingIdentity.userId);
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
-    expect(tx.authIdentity.create).toHaveBeenCalledOnce();
+    expect(tx.authIdentity.update).toHaveBeenCalledOnce();
+    expect(tx.authIdentity.create).not.toHaveBeenCalled();
     expect(bootstrap.ensureUserShell).toHaveBeenCalledOnce();
   });
 });

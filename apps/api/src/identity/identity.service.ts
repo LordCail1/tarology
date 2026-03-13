@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { AuthProvider } from "@prisma/client";
 import type { Session } from "express-session";
 import type { AuthenticatedUser } from "@tarology/shared";
@@ -9,6 +9,8 @@ import { getIdentityRuntimeConfig } from "./identity-runtime-config.js";
 const DEFAULT_RETURN_TO = "/reading";
 const UNIQUE_CONSTRAINT_ERROR_CODE = "P2002";
 const PROVISION_RETRY_LIMIT = 2;
+const GOOGLE_SUBJECT_EMAIL_COLLISION_MESSAGE =
+  "This Google account email is already linked to a different sign-in identity.";
 type IdentitySession = Session & {
   user?: AuthenticatedUser;
   returnTo?: string;
@@ -92,15 +94,19 @@ export class IdentityService {
               },
             });
           } else {
-            persistedUser =
-              (await tx.user.findUnique({
-                where: { email: user.email },
-              })) ??
-              (await tx.user.create({
-                data: {
-                  email: user.email,
-                },
-              }));
+            const existingEmailUser = await tx.user.findUnique({
+              where: { email: user.email },
+            });
+
+            if (existingEmailUser) {
+              throw new ConflictException(GOOGLE_SUBJECT_EMAIL_COLLISION_MESSAGE);
+            }
+
+            persistedUser = await tx.user.create({
+              data: {
+                email: user.email,
+              },
+            });
 
             await tx.authIdentity.create({
               data: {
@@ -125,7 +131,8 @@ export class IdentityService {
           };
         });
       } catch (error) {
-        // Concurrent first-login callbacks can race on unique email/provider keys.
+        // Concurrent callbacks for the same Google subject can still race before the retry
+        // observes the committed auth identity.
         if (!isUniqueConstraintError(error) || attempt === PROVISION_RETRY_LIMIT - 1) {
           throw error;
         }
