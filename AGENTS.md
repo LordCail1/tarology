@@ -55,6 +55,7 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Prefer command-style mutation interfaces for meaningful state changes.
 - Keep shared contracts in `packages/shared` and import from there.
 - Do not commit directly on `main`; use branch + PR workflow.
+- Before pushing or opening a PR, complete the `Before Push / Before PR` checklist in `docs/engineering-workflow.md`.
 - Every PR must include a Codex review trigger comment using `@codex review` (manual or auto workflow).
 - Run `npm run ci:checks` before ending a working session.
 
