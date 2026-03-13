@@ -61,4 +61,23 @@ describe("reading-studio-layout", () => {
       rightWidthPx: 460,
     });
   });
+
+  it("rebalances restored desktop widths together to preserve the center column", () => {
+    expect(
+      coerceLayoutPreferences(
+        {
+          leftOpen: true,
+          rightOpen: true,
+          leftWidthPx: 420,
+          rightWidthPx: 460,
+        },
+        1024
+      )
+    ).toEqual({
+      leftOpen: true,
+      rightOpen: true,
+      leftWidthPx: 282,
+      rightWidthPx: 322,
+    });
+  });
 });

@@ -90,4 +90,42 @@ describe("IdentityService provisioning", () => {
       },
     });
   });
+
+  it("retries unique-constraint races during first-login provisioning", async () => {
+    const createdUser = { id: "persisted-user-2", email: baseUser.email };
+    const retryableRaceError = Object.assign(new Error("race"), {
+      code: "P2002",
+    });
+    const tx = {
+      authIdentity: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn(),
+        create: vi.fn().mockResolvedValue(undefined),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue(createdUser),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: vi
+        .fn()
+        .mockRejectedValueOnce(retryableRaceError)
+        .mockImplementationOnce(
+          async (callback: (innerTx: typeof tx) => Promise<AuthenticatedUser>) => callback(tx)
+        ),
+    };
+    const bootstrap = {
+      ensureUserShell: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new IdentityService(prisma as never, bootstrap as never);
+
+    const persisted = await service.provisionAuthenticatedUser(baseUser);
+
+    expect(persisted.userId).toBe(createdUser.id);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(tx.authIdentity.create).toHaveBeenCalledOnce();
+    expect(bootstrap.ensureUserShell).toHaveBeenCalledOnce();
+  });
 });

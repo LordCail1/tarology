@@ -7,10 +7,25 @@ import { ProfileBootstrapService } from "../profile/profile-bootstrap.service.js
 import { getIdentityRuntimeConfig } from "./identity-runtime-config.js";
 
 const DEFAULT_RETURN_TO = "/reading";
+const UNIQUE_CONSTRAINT_ERROR_CODE = "P2002";
+const PROVISION_RETRY_LIMIT = 2;
 type IdentitySession = Session & {
   user?: AuthenticatedUser;
   returnTo?: string;
 };
+
+function isUniqueConstraintError(
+  error: unknown
+): error is {
+  code: string;
+} {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === UNIQUE_CONSTRAINT_ERROR_CODE
+  );
+}
 
 @Injectable()
 export class IdentityService {
@@ -49,64 +64,75 @@ export class IdentityService {
   }
 
   async provisionAuthenticatedUser(user: AuthenticatedUser): Promise<AuthenticatedUser> {
-    return this.prisma.$transaction(async (tx) => {
-      const existingIdentity = await tx.authIdentity.findUnique({
-        where: {
-          provider_providerSubject: {
-            provider: AuthProvider.google,
-            providerSubject: user.providerSubject,
-          },
-        },
-      });
-
-      let persistedUser;
-      if (existingIdentity) {
-        persistedUser = await tx.user.update({
-          where: { id: existingIdentity.userId },
-          data: { email: user.email },
-        });
-
-        await tx.authIdentity.update({
-          where: { id: existingIdentity.id },
-          data: {
-            emailSnapshot: user.email,
-            displayNameSnapshot: user.displayName,
-            avatarUrlSnapshot: user.avatarUrl,
-          },
-        });
-      } else {
-        persistedUser =
-          (await tx.user.findUnique({
-            where: { email: user.email },
-          })) ??
-          (await tx.user.create({
-            data: {
-              email: user.email,
+    for (let attempt = 0; attempt < PROVISION_RETRY_LIMIT; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const existingIdentity = await tx.authIdentity.findUnique({
+            where: {
+              provider_providerSubject: {
+                provider: AuthProvider.google,
+                providerSubject: user.providerSubject,
+              },
             },
-          }));
+          });
 
-        await tx.authIdentity.create({
-          data: {
+          let persistedUser;
+          if (existingIdentity) {
+            persistedUser = await tx.user.update({
+              where: { id: existingIdentity.userId },
+              data: { email: user.email },
+            });
+
+            await tx.authIdentity.update({
+              where: { id: existingIdentity.id },
+              data: {
+                emailSnapshot: user.email,
+                displayNameSnapshot: user.displayName,
+                avatarUrlSnapshot: user.avatarUrl,
+              },
+            });
+          } else {
+            persistedUser =
+              (await tx.user.findUnique({
+                where: { email: user.email },
+              })) ??
+              (await tx.user.create({
+                data: {
+                  email: user.email,
+                },
+              }));
+
+            await tx.authIdentity.create({
+              data: {
+                userId: persistedUser.id,
+                provider: AuthProvider.google,
+                providerSubject: user.providerSubject,
+                emailSnapshot: user.email,
+                displayNameSnapshot: user.displayName,
+                avatarUrlSnapshot: user.avatarUrl,
+              },
+            });
+          }
+
+          await this.profileBootstrapService.ensureUserShell(tx, persistedUser, {
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+          });
+
+          return {
+            ...user,
             userId: persistedUser.id,
-            provider: AuthProvider.google,
-            providerSubject: user.providerSubject,
-            emailSnapshot: user.email,
-            displayNameSnapshot: user.displayName,
-            avatarUrlSnapshot: user.avatarUrl,
-          },
+          };
         });
+      } catch (error) {
+        // Concurrent first-login callbacks can race on unique email/provider keys.
+        if (!isUniqueConstraintError(error) || attempt === PROVISION_RETRY_LIMIT - 1) {
+          throw error;
+        }
       }
+    }
 
-      await this.profileBootstrapService.ensureUserShell(tx, persistedUser, {
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-      });
-
-      return {
-        ...user,
-        userId: persistedUser.id,
-      };
-    });
+    throw new Error("Provisioning retry limit exhausted.");
   }
 
   async saveSessionUser(

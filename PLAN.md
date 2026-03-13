@@ -80,6 +80,12 @@ Execution sequencing:
 - Test database precedence hardening:
   - `PrismaService` now resolves connections through the shared runtime-config precedence instead of bypassing `TEST_DATABASE_URL`
   - API regression coverage now asserts test-mode Prisma uses the isolated test connection when both DB env vars are present
+- Auth callback race hardening:
+  - identity provisioning now retries once on unique-constraint races so concurrent first-login callbacks converge instead of surfacing intermittent 500s
+  - API regression coverage now exercises retry behavior for first-login provisioning
+- Sidebar restore rebalancing:
+  - restored desktop panel widths are now rebalanced jointly against the center-column minimum instead of being clamped independently against stale defaults
+  - web regression coverage now protects the narrow-viewport restore case where both sidebars reopen together
 - CI contract parity fix:
   - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification

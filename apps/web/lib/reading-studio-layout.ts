@@ -63,26 +63,86 @@ export function clampPanelWidth(
   return Math.max(minWidth, Math.min(proposedWidthPx, Math.min(maxWidth, centerGuardedMax)));
 }
 
+function clampWidthToSideBounds(side: PanelSide, proposedWidthPx: number): number {
+  const minWidth = side === "left" ? MIN_LEFT_PANEL_WIDTH_PX : MIN_RIGHT_PANEL_WIDTH_PX;
+  const maxWidth = side === "left" ? MAX_LEFT_PANEL_WIDTH_PX : MAX_RIGHT_PANEL_WIDTH_PX;
+  return Math.max(minWidth, Math.min(proposedWidthPx, maxWidth));
+}
+
+function rebalanceOpenPanels(
+  layout: ReadingStudioLayoutPreferences,
+  viewportWidth: number
+): Pick<ReadingStudioLayoutPreferences, "leftWidthPx" | "rightWidthPx"> {
+  const leftWidthPx = clampWidthToSideBounds("left", layout.leftWidthPx);
+  const rightWidthPx = clampWidthToSideBounds("right", layout.rightWidthPx);
+
+  if (!layout.leftOpen || !layout.rightOpen) {
+    return {
+      leftWidthPx,
+      rightWidthPx,
+    };
+  }
+
+  const maxCombinedWidth = viewportWidth - MIN_CENTER_COLUMN_WIDTH_PX;
+  const combinedWidth = leftWidthPx + rightWidthPx;
+  if (combinedWidth <= maxCombinedWidth) {
+    return {
+      leftWidthPx,
+      rightWidthPx,
+    };
+  }
+
+  const overflowPx = combinedWidth - maxCombinedWidth;
+  const leftSlackPx = leftWidthPx - MIN_LEFT_PANEL_WIDTH_PX;
+  const rightSlackPx = rightWidthPx - MIN_RIGHT_PANEL_WIDTH_PX;
+  const totalSlackPx = leftSlackPx + rightSlackPx;
+
+  if (totalSlackPx <= 0) {
+    return {
+      leftWidthPx: MIN_LEFT_PANEL_WIDTH_PX,
+      rightWidthPx: MIN_RIGHT_PANEL_WIDTH_PX,
+    };
+  }
+
+  let leftReductionPx = Math.min(
+    leftSlackPx,
+    Math.round((overflowPx * leftSlackPx) / totalSlackPx)
+  );
+  let rightReductionPx = overflowPx - leftReductionPx;
+
+  if (rightReductionPx > rightSlackPx) {
+    const shiftedOverflowPx = rightReductionPx - rightSlackPx;
+    rightReductionPx = rightSlackPx;
+    leftReductionPx = Math.min(leftSlackPx, leftReductionPx + shiftedOverflowPx);
+  } else if (leftReductionPx > leftSlackPx) {
+    const shiftedOverflowPx = leftReductionPx - leftSlackPx;
+    leftReductionPx = leftSlackPx;
+    rightReductionPx = Math.min(rightSlackPx, rightReductionPx + shiftedOverflowPx);
+  }
+
+  return {
+    leftWidthPx: leftWidthPx - leftReductionPx,
+    rightWidthPx: rightWidthPx - rightReductionPx,
+  };
+}
+
 export function coerceLayoutPreferences(
   candidate: Partial<ReadingStudioLayoutPreferences> | null | undefined,
   viewportWidth: number
 ): ReadingStudioLayoutPreferences {
   const defaults = getDefaultLayoutPreferences(viewportWidth);
-
-  return {
+  const initialLayout = {
     leftOpen: candidate?.leftOpen ?? defaults.leftOpen,
     rightOpen: candidate?.rightOpen ?? defaults.rightOpen,
-    leftWidthPx: clampPanelWidth(
-      defaults,
-      "left",
-      candidate?.leftWidthPx ?? defaults.leftWidthPx,
-      viewportWidth
-    ),
-    rightWidthPx: clampPanelWidth(
-      defaults,
-      "right",
-      candidate?.rightWidthPx ?? defaults.rightWidthPx,
-      viewportWidth
-    ),
+    leftWidthPx: candidate?.leftWidthPx ?? defaults.leftWidthPx,
+    rightWidthPx: candidate?.rightWidthPx ?? defaults.rightWidthPx,
+  };
+  const balancedWidths = rebalanceOpenPanels(initialLayout, viewportWidth);
+
+  return {
+    leftOpen: initialLayout.leftOpen,
+    rightOpen: initialLayout.rightOpen,
+    leftWidthPx: balancedWidths.leftWidthPx,
+    rightWidthPx: balancedWidths.rightWidthPx,
   };
 }
