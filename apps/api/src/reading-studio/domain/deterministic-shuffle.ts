@@ -61,21 +61,25 @@ function buildOrderHash(assignments: CardAssignment[]): string {
   return createHash("sha256").update(compact).digest("hex");
 }
 
-export function buildDeterministicCardAssignment(): BuiltAssignment {
+export function buildDeterministicCardAssignment(cardIds: readonly string[]): BuiltAssignment {
   const seed = randomBytes(32);
   const seedCommitment = createHash("sha256").update(seed).digest("hex");
   const rng = createDeterministicRng(seed);
 
-  const cardIds: number[] = Array.from({ length: TOTAL_TAROT_CARDS }, (_, index) => index);
-
-  for (let index = cardIds.length - 1; index > 0; index -= 1) {
-    const swapIndex = rng.nextInt(index + 1);
-    const current = cardIds[index];
-    cardIds[index] = cardIds[swapIndex];
-    cardIds[swapIndex] = current;
+  if (cardIds.length !== TOTAL_TAROT_CARDS) {
+    throw new Error(`Expected ${TOTAL_TAROT_CARDS} cards, received ${cardIds.length}.`);
   }
 
-  const assignments: CardAssignment[] = cardIds.map((cardId, deckIndex) => ({
+  const orderedCardIds = [...cardIds];
+
+  for (let index = orderedCardIds.length - 1; index > 0; index -= 1) {
+    const swapIndex = rng.nextInt(index + 1);
+    const current = orderedCardIds[index];
+    orderedCardIds[index] = orderedCardIds[swapIndex];
+    orderedCardIds[swapIndex] = current;
+  }
+
+  const assignments: CardAssignment[] = orderedCardIds.map((cardId, deckIndex) => ({
     deckIndex,
     cardId,
     assignedReversal: rng.nextInt(2) === 1,
@@ -88,4 +92,3 @@ export function buildDeterministicCardAssignment(): BuiltAssignment {
     shuffleAlgorithmVersion: SHUFFLE_ALGORITHM_VERSION,
   };
 }
-

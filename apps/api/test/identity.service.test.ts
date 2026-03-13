@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { IdentityService } from "../src/identity/identity.service.js";
 
 describe("IdentityService", () => {
-  const service = new IdentityService();
+  const service = new IdentityService({} as never, {} as never);
 
   it("keeps safe relative return paths", () => {
     expect(service.sanitizeReturnTo("/reading")).toBe("/reading");

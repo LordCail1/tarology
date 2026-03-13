@@ -4,18 +4,13 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { AppModule } from "../src/app.module.js";
 import { configureApp } from "../src/bootstrap.js";
+import { configureApiTestEnvironment } from "./test-environment.js";
 
 describe("Auth baseline API", () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    process.env.SESSION_SECRET = "test-session-secret";
-    process.env.WEB_APP_URL = "http://localhost:3000";
-    process.env.API_BASE_URL = "http://localhost:3001";
-    process.env.GOOGLE_OAUTH_CLIENT_ID = "test-client-id";
-    process.env.GOOGLE_OAUTH_CLIENT_SECRET = "test-client-secret";
-    process.env.GOOGLE_OAUTH_CALLBACK_URL =
-      "http://localhost:3001/v1/auth/google/callback";
+    configureApiTestEnvironment();
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -39,9 +34,18 @@ describe("Auth baseline API", () => {
       .post("/v1/readings")
       .send({
         rootQuestion: "Will this stay protected?",
-        deckSpecVersion: "rider-waite-v1",
+        deckId: "thoth",
       })
       .expect(401);
+  });
+
+  it("returns 401 for profile, preferences, and deck catalog without auth", async () => {
+    await request(app.getHttpServer()).get("/v1/profile").expect(401);
+    await request(app.getHttpServer()).get("/v1/preferences").expect(401);
+    await request(app.getHttpServer()).patch("/v1/preferences").send({
+      defaultDeckId: "thoth",
+    }).expect(401);
+    await request(app.getHttpServer()).get("/v1/decks").expect(401);
   });
 
   it("keeps logout idempotent without an active session", async () => {
