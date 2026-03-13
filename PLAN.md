@@ -85,6 +85,7 @@ Execution sequencing:
   - API regression coverage now exercises retry behavior for first-login provisioning
 - Google subject-anchor hardening:
   - unknown Google subjects no longer auto-link onto pre-existing users by email fallback; email collisions now surface as explicit conflicts instead
+  - known Google subjects also surface explicit conflicts when their latest provider email is already claimed by a different internal account
   - API regression coverage now protects the managed-domain/reassigned-email collision path
 - Sidebar restore rebalancing:
   - restored desktop panel widths are now rebalanced jointly against the center-column minimum instead of being clamped independently against stale defaults

@@ -80,6 +80,14 @@ export class IdentityService {
 
           let persistedUser;
           if (existingIdentity) {
+            const existingEmailUser = await tx.user.findUnique({
+              where: { email: user.email },
+            });
+
+            if (existingEmailUser && existingEmailUser.id !== existingIdentity.userId) {
+              throw new ConflictException(GOOGLE_SUBJECT_EMAIL_COLLISION_MESSAGE);
+            }
+
             persistedUser = await tx.user.update({
               where: { id: existingIdentity.userId },
               data: { email: user.email },

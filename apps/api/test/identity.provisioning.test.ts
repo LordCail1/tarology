@@ -124,6 +124,42 @@ describe("IdentityService provisioning", () => {
     });
   });
 
+  it("rejects email collisions when a known Google subject changes to another user's email", async () => {
+    const existingIdentity = {
+      id: "identity-subject-owner",
+      userId: "persisted-user-1",
+    };
+    const otherUser = { id: "persisted-user-2", email: baseUser.email };
+    const tx = {
+      authIdentity: {
+        findUnique: vi.fn().mockResolvedValue(existingIdentity),
+        update: vi.fn(),
+        create: vi.fn(),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue(otherUser),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (innerTx: typeof tx) => Promise<AuthenticatedUser>) =>
+        callback(tx)
+      ),
+    };
+    const bootstrap = {
+      ensureUserShell: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new IdentityService(prisma as never, bootstrap as never);
+
+    await expect(service.provisionAuthenticatedUser(baseUser)).rejects.toBeInstanceOf(
+      ConflictException
+    );
+    expect(tx.user.update).not.toHaveBeenCalled();
+    expect(tx.authIdentity.update).not.toHaveBeenCalled();
+    expect(bootstrap.ensureUserShell).not.toHaveBeenCalled();
+  });
+
   it("retries unique-constraint races during first-login provisioning", async () => {
     const existingIdentity = {
       id: "identity-race-replay",
@@ -140,7 +176,7 @@ describe("IdentityService provisioning", () => {
         create: vi.fn(),
       },
       user: {
-        findUnique: vi.fn(),
+        findUnique: vi.fn().mockResolvedValue(updatedUser),
         create: vi.fn(),
         update: vi.fn().mockResolvedValue(updatedUser),
       },
