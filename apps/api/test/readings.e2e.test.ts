@@ -381,4 +381,53 @@ describe("Reading durability and history API", () => {
 
     await closeTrackedApp(otherApp);
   });
+
+  it("does not replay command receipts for a different user who does not own the reading", async () => {
+    const ownerApp = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(ownerApp.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "private-command-target")
+      .send({
+        rootQuestion: "Who should be able to reuse this command?",
+        deckId: "thoth",
+        deckSpecVersion: "thoth-v1",
+      })
+      .expect(201);
+
+    const archived = await request(ownerApp.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "private-command-replay")
+      .send({
+        commandId: "c64a3ac7-b2c3-4f14-959a-1dcb2ea3d7ba",
+        expectedVersion: 1,
+        type: "archive_reading",
+        payload: {},
+      })
+      .expect(200);
+
+    expect(archived.body).toMatchObject({
+      reading: {
+        status: "archived",
+        version: 2,
+      },
+    });
+
+    await closeTrackedApp(ownerApp);
+
+    const otherApp = await createAuthorizedApp(OTHER_TEST_USER);
+
+    await request(otherApp.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "private-command-replay")
+      .send({
+        commandId: "c64a3ac7-b2c3-4f14-959a-1dcb2ea3d7ba",
+        expectedVersion: 1,
+        type: "archive_reading",
+        payload: {},
+      })
+      .expect(404);
+
+    await closeTrackedApp(otherApp);
+  });
 });

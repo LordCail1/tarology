@@ -61,7 +61,7 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
           return;
         }
 
-        if (loadedPreferences.onboardingComplete || loadedPreferences.defaultDeckId) {
+        if (loadedPreferences.defaultDeckId) {
           router.replace(returnTo);
           return;
         }
@@ -115,6 +115,7 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
   }
 
   const selectedDeck = decks.find((deck) => deck.id === selectedDeckId) ?? null;
+  const hasPersistedDefaultDeck = preferences?.defaultDeckId !== null;
 
   if (state === "loading") {
     return (
@@ -216,7 +217,7 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
                 Status
               </dt>
               <dd className="mt-1 text-sm font-semibold text-[var(--color-ink)]">
-                {preferences.onboardingComplete ? "Complete" : "Pending setup"}
+                {hasPersistedDefaultDeck ? "Complete" : "Pending setup"}
               </dd>
             </div>
           </dl>

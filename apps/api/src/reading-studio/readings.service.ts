@@ -312,17 +312,21 @@ export class ReadingsService {
       },
     });
 
-    const replay = await this.getCommandReplay(readingId, payload, idempotencyKey, requestHash);
-    if (replay) {
-      return replay;
-    }
-
     const currentRecord = await this.readingsRepository.findOwnedById(
       user.userId,
       readingId,
       true
     );
-    if (!currentRecord || currentRecord.deletedAt !== null) {
+    if (!currentRecord) {
+      throw new NotFoundException("Reading not found.");
+    }
+
+    const replay = await this.getCommandReplay(readingId, payload, idempotencyKey, requestHash);
+    if (replay) {
+      return replay;
+    }
+
+    if (currentRecord.deletedAt !== null) {
       throw new NotFoundException("Reading not found.");
     }
 
