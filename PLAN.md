@@ -1,6 +1,6 @@
 # Tarology v2 Plan
 
-Last updated: 2026-03-11 (America/Toronto)
+Last updated: 2026-03-13 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
@@ -74,6 +74,9 @@ Execution sequencing:
   - `/reading` auth gating now happens client-side with credentialed browser requests instead of forwarding server-side cookies to the API
   - web TypeScript now resolves `@tarology/shared` from source for clean CI and preview builds
   - Vercel preview/production deploy jobs now run from repo root so monorepo workspace packages are uploaded during builds
+- Hosted session-cookie proxy hardening:
+  - API bootstrap now trusts the first upstream proxy before enabling production secure session cookies
+  - API regression coverage now asserts production-mode bootstrap sets proxy trust for TLS-terminating deployments
 - CI contract parity fix:
   - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification

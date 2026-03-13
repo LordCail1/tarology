@@ -14,6 +14,11 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 export function configureApp(app: INestApplication): void {
   const config = getIdentityRuntimeConfig();
 
+  if (config.secureCookies) {
+    // Secure cookies need proxy-aware HTTPS detection when TLS terminates upstream.
+    app.getHttpAdapter().getInstance().set("trust proxy", 1);
+  }
+
   app.enableCors({
     origin: [config.webAppUrl],
     credentials: true,
