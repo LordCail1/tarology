@@ -26,10 +26,11 @@ Event/outbox requirement:
 - Minimum event set for future integrations:
   - `reading.created`
   - `reading.updated`
-  - `reading.completed`
+  - `reading.archived`
+  - `reading.reopened`
+  - `reading.deleted`
   - `interpretation.completed`
   - `interpretation.cancelled`
   - `interpretation.warning-triggered`
   - `question.created`
   - `card-group.created`
-

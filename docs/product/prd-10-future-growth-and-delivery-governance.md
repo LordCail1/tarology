@@ -91,6 +91,8 @@ If app evolves into a broader platform, Reading Studio should continue to run un
 - Baseline CI gates:
   - dependency install,
   - workspace typecheck,
+  - API tests,
+  - web tests,
   - workspace build.
 - Required status check name: `ci-checks`.
 - Codex review trigger workflow runs on PR lifecycle events and ensures `@codex review` comment exists.
@@ -114,4 +116,4 @@ If app evolves into a broader platform, Reading Studio should continue to run un
 - Before ending a coding session:
   - update `PLAN.md` with current state and next tasks,
   - ensure `AGENTS.md` still points the next session to the right context,
-  - run required local checks (`typecheck`, `build`).
+  - run `npm run ci:checks`.

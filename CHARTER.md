@@ -332,7 +332,7 @@ Core entities:
 - `decks`
 - `cards`
 - `readings`
-- `reading_cards` (fixed assignment + canvas state)
+- `reading_cards` (fixed assignment metadata only)
 - `question_threads`
 - `card_groups`
 - `card_group_members`
@@ -348,6 +348,7 @@ Core entities:
 Data invariants:
 - `reading_cards` assignment is immutable for `cardId` and `assignedReversal` after creation.
 - visual `rotationDeg` is mutable and independent from reversal meaning.
+- mutable workspace state persists through semantic events/projections; it must not rewrite the immutable assignment identity stored in `reading_cards`.
 - each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
 - each reading stores active `canvasMode` and mode-switch history as semantic events.
 - each interpretation request stores frozen target context.
@@ -364,8 +365,6 @@ Command-oriented mutation API with idempotency.
 - `GET /v1/readings`
 - `GET /v1/readings/{id}`
 - `POST /v1/readings/{id}/commands`
-- `GET /v1/readings/{id}/events?afterVersion=`
-- `GET /v1/readings/{id}/stream`
 - `GET /v1/decks`
 - `POST /v1/interpretations`
 - `GET /v1/interpretations/{id}`
@@ -381,6 +380,10 @@ Command-oriented mutation API with idempotency.
 - `GET /v1/provider-connections/oauth/callback`
 - `PATCH /v1/provider-connections/{id}`
 - `DELETE /v1/provider-connections/{id}`
+
+V1 integration/read-model sync extensions:
+- `GET /v1/readings/{id}/events?afterVersion=`
+- `GET /v1/readings/{id}/stream`
 
 ### 10.3 Command Rules
 - All commands include:
@@ -435,7 +438,9 @@ Event/outbox requirement:
 - Minimum event set for future integrations:
   - `reading.created`
   - `reading.updated`
-  - `reading.completed`
+  - `reading.archived`
+  - `reading.reopened`
+  - `reading.deleted`
   - `interpretation.completed`
   - `interpretation.cancelled`
   - `interpretation.warning-triggered`
@@ -765,24 +770,32 @@ If app evolves into a broader platform, Reading Studio should continue to run un
 - Baseline CI gates:
   - dependency install,
   - workspace typecheck,
+  - API tests,
+  - web tests,
   - workspace build.
 - Required status check name: `ci-checks`.
 - Codex review trigger workflow runs on PR lifecycle events and ensures `@codex review` comment exists.
 
-### 21.4 CD Baseline (V1 Hosting)
+### 21.4 CD Baseline (Current + Post-MVP)
 - Hosting target for V1 web app is Vercel.
 - Deployment flows:
   - PR -> preview deployment (when deploy secrets are present),
   - `main` -> production deployment (when deploy secrets are present).
 - Deployment automation is defined in repository workflow files under `.github/workflows`.
-- API deployment remains separately planned; CI still validates API build from day one.
+- Current hosted production may remain web-only until Gate 0 exit criteria are met.
+- The next delivery gate after Gate 0 is full-stack dogfooding deployment:
+  - public API hosting,
+  - managed Postgres,
+  - durable session storage,
+  - and post-deploy smoke tests.
+- API deployment is intentionally deferred only until the durable reading MVP threshold is met; after that it is prioritized before post-core feature releases.
 
 ### 21.5 Checkpoint Discipline
 - Contributors create checkpoint commits at meaningful milestones.
 - Before ending a coding session:
   - update `PLAN.md` with current state and next tasks,
   - ensure `AGENTS.md` still points the next session to the right context,
-  - run required local checks (`typecheck`, `build`).
+  - run `npm run ci:checks`.
 
 ---
 

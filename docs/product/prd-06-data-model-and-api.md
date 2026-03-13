@@ -14,7 +14,7 @@ Core entities:
 - `decks`
 - `cards`
 - `readings`
-- `reading_cards` (fixed assignment + canvas state)
+- `reading_cards` (fixed assignment metadata only)
 - `question_threads`
 - `card_groups`
 - `card_group_members`
@@ -44,6 +44,7 @@ Post-core entities:
 Data invariants:
 - `reading_cards` assignment is immutable for `cardId` and `assignedReversal` after creation.
 - visual `rotationDeg` is mutable and independent from reversal meaning.
+- mutable workspace state persists through semantic events/projections; it must not rewrite the immutable assignment identity stored in `reading_cards`.
 - each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
 - each reading stores active `canvasMode` and mode-switch history as semantic events.
 - interpretation/storyboard/fusion/dialogue requests store frozen context tuple (`readingId`, `questionId`, `groupId`, `stateVersion`).
@@ -61,8 +62,6 @@ Command-oriented mutation API with idempotency.
 - `GET /v1/readings`
 - `GET /v1/readings/{id}`
 - `POST /v1/readings/{id}/commands`
-- `GET /v1/readings/{id}/events?afterVersion=`
-- `GET /v1/readings/{id}/stream`
 - `GET /v1/decks`
 - `POST /v1/interpretations`
 - `GET /v1/interpretations/{id}`
@@ -78,6 +77,10 @@ Command-oriented mutation API with idempotency.
 - `GET /v1/provider-connections/oauth/callback`
 - `PATCH /v1/provider-connections/{id}`
 - `DELETE /v1/provider-connections/{id}`
+
+V1 integration/read-model sync extensions:
+- `GET /v1/readings/{id}/events?afterVersion=`
+- `GET /v1/readings/{id}/stream`
 
 ### 10.3 Post-Core Endpoints (V1.5+)
 - `POST /v1/storyboards`

@@ -5,7 +5,7 @@ Coverage: global metadata + sections 0 through 3
 
 Global context:
 - Status: Draft v0.3
-- Last updated: 2026-03-08
+- Last updated: 2026-03-13
 - Owner: Product + Engineering
 - Purpose: Canonical map for all contributors (human and AI) building Tarology v2.
 
@@ -31,6 +31,14 @@ This version merges:
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
 15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
 16. Users choose a default tarot deck during first-time onboarding; new readings use this default unless the user explicitly overrides deck selection before creation.
+17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
+18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
+19. Symbolic outputs support dual register (`plain` default, `esoteric` optional) with semantic parity.
+20. Engagement model is reflective progression; manipulative/addictive loop design is explicitly rejected.
+21. Sharing rollout is private-first (tokenized unlisted links) before any public social feed.
+22. Custom deck creation is template-moderated and requires rights attestation before publish/share.
+23. Monetization direction is subscription plus optional usage packs.
+24. Persona implementation remains provider-agnostic; no OpenClaw lock-in.
 
 ## 1) Product Vision
 Tarology helps beginners receive and explore tarot readings through high-quality AI symbolic synthesis.
@@ -63,4 +71,3 @@ Primary JTBD:
 4. Threaded inquiry: users can branch questions without losing context.
 5. Durable by default: acknowledged state changes must survive refresh/crash.
 6. Reflective safety: suggestions are reflective, never prescriptive directives.
-

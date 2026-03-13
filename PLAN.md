@@ -107,6 +107,11 @@ Execution sequencing:
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
+- Future-direction docs alignment pass:
+  - `prd-01` is re-synced with the charter's full locked-decision set, including symbolic expansion, persona, sharing, and monetization constraints
+  - conceptual data model docs now distinguish immutable `reading_cards` assignment from mutable workspace state persisted via semantic events/projections
+  - lifecycle event docs now align with the actual reading status vocabulary (`archived`, `reopened`, `deleted`) instead of the obsolete `reading.completed` label
+  - charter and governance docs now point contributors to the real repo gate, `npm run ci:checks`, and the current Gate 0.5 deployment sequence
 - Reading Studio frontend scaffold branch:
   - desktop sidebar drag-resize now works with persisted widths and keyboard fallback
   - history is grouped by recency with explicit active-reading restore behavior
