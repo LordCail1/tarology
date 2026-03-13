@@ -1,5 +1,6 @@
 import {
   clampPanelWidth,
+  coerceLayoutPreferences,
   getViewportWidth,
 } from "./reading-studio-layout";
 import { getHighestStackOrder } from "./reading-studio-canvas";
@@ -24,9 +25,12 @@ export function applyLayoutAction(
 ): ReadingStudioLayoutPreferences {
   switch (action.type) {
     case "layout.panelToggled":
-      return action.side === "left"
-        ? { ...current, leftOpen: !current.leftOpen }
-        : { ...current, rightOpen: !current.rightOpen };
+      return coerceLayoutPreferences(
+        action.side === "left"
+          ? { ...current, leftOpen: !current.leftOpen }
+          : { ...current, rightOpen: !current.rightOpen },
+        viewportWidth
+      );
     case "layout.panelResized":
       return action.side === "left"
         ? {

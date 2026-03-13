@@ -19,6 +19,7 @@ import { createLocalReadingStudioDataSource } from "../../lib/reading-studio-dat
 import { groupReadingsByRecency } from "../../lib/group-readings-by-recency";
 import {
   RESIZE_KEYBOARD_STEP_PX,
+  coerceLayoutPreferences,
   getViewportWidth,
   isDesktopViewport,
 } from "../../lib/reading-studio-layout";
@@ -180,7 +181,11 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
 
   useEffect(() => {
     function handleWindowResize() {
-      setViewportWidth(getViewportWidth());
+      const nextViewportWidth = getViewportWidth();
+      setViewportWidth(nextViewportWidth);
+      setLayoutPreferences((current) =>
+        current ? coerceLayoutPreferences(current, nextViewportWidth) : current
+      );
     }
 
     window.addEventListener("resize", handleWindowResize);

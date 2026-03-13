@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { READING_STUDIO_ACTIVE_READING_STORAGE_KEY } from "../../lib/reading-studio-data-source";
 import { READING_STUDIO_LAYOUT_STORAGE_KEY } from "../../lib/reading-studio-preferences";
@@ -115,6 +115,30 @@ describe("ReadingStudioShell", () => {
     expect(
       document.querySelector(".reading-shell")?.getAttribute("style")
     ).toContain("--right-expanded-width: 360px");
+  });
+
+  it("re-coerces desktop sidebar widths after viewport shrink", async () => {
+    window.localStorage.setItem(
+      READING_STUDIO_LAYOUT_STORAGE_KEY,
+      JSON.stringify({
+        leftOpen: true,
+        rightOpen: true,
+        leftWidthPx: 420,
+        rightWidthPx: 460,
+      })
+    );
+
+    await renderHydratedShell();
+
+    act(() => {
+      setViewportWidth(1024);
+    });
+
+    await waitFor(() => {
+      const rootStyle = document.querySelector(".reading-shell")?.getAttribute("style") ?? "";
+      expect(rootStyle).toContain("--left-expanded-width: 282px");
+      expect(rootStyle).toContain("--right-expanded-width: 322px");
+    });
   });
 
   it("toggles panels and persists layout preferences", async () => {

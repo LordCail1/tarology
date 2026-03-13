@@ -86,6 +86,9 @@ Execution sequencing:
 - Sidebar restore rebalancing:
   - restored desktop panel widths are now rebalanced jointly against the center-column minimum instead of being clamped independently against stale defaults
   - web regression coverage now protects the narrow-viewport restore case where both sidebars reopen together
+- Live layout guard hardening:
+  - desktop panel toggles now re-run layout coercion so reopening a saved sidebar cannot bypass the center-column guard
+  - shell resize handling now re-coerces current layout state on viewport changes so desktop shrink flows stay within guarded widths
 - CI contract parity fix:
   - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification
