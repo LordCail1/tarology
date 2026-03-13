@@ -73,14 +73,12 @@ export interface GetPreferencesResponse {
 export interface UpdatePreferencesRequest {
   defaultDeckId: string;
 }
-
 export interface CreateReadingRequest {
   rootQuestion: string;
   deckId?: string;
-  deckSpecVersion?: string;
+  deckSpecVersion: string;
   canvasMode?: CanvasMode;
 }
-
 export interface ReadingCardAssignment {
   deckIndex: number;
   cardId: string;

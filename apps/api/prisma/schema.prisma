@@ -68,7 +68,6 @@ model UserPreference {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   defaultDeck          Deck?    @relation(fields: [defaultDeckId], references: [id], onDelete: SetNull)
 }
-
 model Reading {
   id                      String                  @id @db.Uuid
   ownerUserId             String                  @map("owner_user_id")
