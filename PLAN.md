@@ -77,6 +77,9 @@ Execution sequencing:
 - Hosted session-cookie proxy hardening:
   - API bootstrap now trusts the first upstream proxy before enabling production secure session cookies
   - API regression coverage now asserts production-mode bootstrap sets proxy trust for TLS-terminating deployments
+- Test database precedence hardening:
+  - `PrismaService` now resolves connections through the shared runtime-config precedence instead of bypassing `TEST_DATABASE_URL`
+  - API regression coverage now asserts test-mode Prisma uses the isolated test connection when both DB env vars are present
 - CI contract parity fix:
   - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification
