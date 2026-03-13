@@ -128,9 +128,9 @@ Execution sequencing:
 Gate 0 is only complete when the app can create multiple readings, preserve card layout/state durably, and restore exact prior readings when users switch back to them.
 
 Status note:
-- Queue items 1 and 2 are now complete on `feature/profile-preferences-onboarding`.
-- Queue items 3, 4, 6, and 7 are now complete on `feature/reading-durability-and-history` for reading lifecycle durability.
-- Queue items 12 and 13 are complete as frontend-local web scaffolding on `feature/reading-studio-resize-and-canvas-modes`, and `canvasMode` now persists in the API read model.
+- Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
+- Queue items 3, 4, 6, and 7 are complete for DB-backed reading durability, lifecycle commands, restore projection, and multi-reading history.
+- Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
 - Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
 
 1. Implement profile shell baseline.
@@ -141,22 +141,46 @@ Status note:
 - Acceptance: first authenticated session captures and persists a default deck preference.
   Status: complete for the seeded Thoth deck.
 
-3. Persist semantic card/layout mutations.
+3. Add persistent storage baseline (PostgreSQL + migrations + local dev setup).
+- Acceptance: readings survive API restart; in-memory map removed from canonical path.
+  Status: complete.
+
+4. Introduce command mutation envelope for reading changes.
+- Acceptance: command ID, idempotency key, expected version checks, append-only event write, projection update.
+  Status: complete for reading lifecycle commands.
+
+5. Persist semantic card/layout mutations.
 - Acceptance: draw/flip/drag/rotate/group actions persist as semantic events and survive refresh/reopen without corrupting deterministic assignment.
 
-4. Implement question tree and saved card groups.
+6. Build read-model restore path.
+- Acceptance: `GET /v1/readings/:id` returns current projection including layout state; snapshots/events replay strategy is in place.
+  Status: complete for current reading lifecycle and immutable assignment state.
+
+7. Implement readings history query + reopen/delete baseline.
+- Acceptance: users can create multiple readings, reopen any prior reading, and safely delete/archive a reading without affecting other readings.
+  Status: complete.
+
+8. Implement question tree and saved card groups.
 - Acceptance: root/sub-questions and named groups persist with relationships.
 
-5. Start provider-connections domain with capability model.
+9. Start provider-connections domain with capability model.
 - Acceptance: schema/API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
 
-6. Add interpretation request job model with cancellable state machine.
+10. Add interpretation request job model with cancellable state machine.
 - Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
 
-7. Implement high-card warning plumbing.
+11. Implement high-card warning plumbing.
 - Acceptance: server returns estimate metadata and warning threshold signal for large card sets.
 
-8. Extend deck preference flow with per-reading deck override.
+12. Implement desktop sidebar resize handles + smooth motion polish.
+- Acceptance: left/right panels resize by drag on desktop and persist per user widths.
+  Status: complete as web-shell scaffolding.
+
+13. Introduce multi-mode canvas architecture.
+- Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
+  Status: complete in the web shell and persisted in the reading detail projection.
+
+14. Extend deck preference flow with per-reading deck override.
 - Acceptance: reading creation can override persisted default deck before assignment.
   Status note: API-side `deckId` override is already supported on create; UI override remains pending.
 

@@ -51,7 +51,6 @@ interface ReadingStudioShellProps {
   profile: ProfileShellDto;
   preferences: UserPreferencesDto;
 }
-
 const railContextIcons: Record<PanelSide, string[]> = {
   left: ["R", "Q", "F"],
   right: ["T", "I", "C"],
