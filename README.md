@@ -7,6 +7,7 @@ Start here:
 - [CHARTER.md](./CHARTER.md) - canonical product and engineering spec
 - [PLAN.md](./PLAN.md) - current implementation status and next queue
 - [AGENTS.md](./AGENTS.md) - Codex/new-session bootstrap instructions
+- [docs/local-dev-runbook.md](./docs/local-dev-runbook.md) - canonical local startup + smoke-test guide
 
 Current workspace layout:
 - `apps/web` - Next.js UI shell
@@ -27,6 +28,10 @@ Root scripts:
 - `npm run dev:api`
 - `npm run typecheck`
 - `npm run ci:checks`
+
+Recommended local startup path:
+- use [docs/local-dev-runbook.md](./docs/local-dev-runbook.md)
+- it covers database bring-up, API/web startup, auth prerequisites, current mock-vs-real behavior, and manual smoke tests
 
 Database local setup:
 - API requires `DATABASE_URL` in production and for local test/CI execution.

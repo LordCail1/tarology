@@ -34,6 +34,9 @@ npm run typecheck
 npm run build
 ```
 
+For local stack bring-up and manual smoke tests on `main`, use:
+- [`docs/local-dev-runbook.md`](./local-dev-runbook.md)
+
 ## Before Push / Before PR
 Before pushing a branch or opening a PR:
 

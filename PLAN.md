@@ -55,6 +55,9 @@ Execution sequencing:
   - `identity`
   - `provider-connections`
   - `reading-studio`
+- Local runbook baseline:
+  - `docs/local-dev-runbook.md` now documents the canonical local startup path for database, API, and web
+  - manual smoke-test steps now distinguish between real API-backed flows and the Reading Studio's current local mock workspace behavior
 - Deterministic deck assignment on reading creation.
 - Shared `CreateReading` contract package.
 - CI/CD baseline and Vercel preview/production pipeline.
