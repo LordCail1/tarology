@@ -35,18 +35,26 @@ This file is the session bootstrap for any new Codex agent working in this repo.
   - `apps/web` = Next.js UI
   - `apps/api` = NestJS API
   - `packages/shared` = shared contracts/types
-- Keep module boundaries explicit in NestJS (`identity`, `provider-connections`, `reading-studio`, then `knowledge`, `profile`, `workflow` when added).
+- Keep module boundaries explicit in NestJS (`identity`, `provider-connections`, `profile`, `reading-studio`, then `knowledge`, `workflow`, and other support modules when added).
 - Design all boundaries so reading studio can be embedded into a bigger multi-page product later (notes mode/social surfaces).
 
 ## 4) Current Implementation Snapshot
-- Monorepo scaffold is in place.
-- API has a bootstrap `POST /v1/readings` path with seeded shuffle assignment and response contract.
-- UI has a minimal Reading Studio shell with collapsible sidebars and center-first layout.
-- Drag-resize sidebars, multi-mode canvas interactions, and deck preference flows are documented requirements but not fully implemented yet.
-- Persistence is currently in-memory for readings (not production-safe yet).
+- Monorepo scaffold is in place with `apps/web`, `apps/api`, and `packages/shared`.
+- API now has Postgres-backed auth/profile/preferences and reading durability baselines:
+  - Google session auth,
+  - persisted `users`, `auth_identities`, `profiles`, `user_preferences`, and seeded `decks`,
+  - `POST /v1/readings`, `GET /v1/readings`, `GET /v1/readings/:id`, and `POST /v1/readings/:id/commands`.
+- Reading creation is deterministic-at-creation and DB-backed, not in-memory.
+- UI now has a production-shaped Reading Studio shell with:
+  - collapsible and desktop-resizable sidebars,
+  - `freeform` / `grid` canvas modes,
+  - local layout/workspace persistence,
+  - auth gating and onboarding gating.
+- Important current limitation: the visible Reading Studio history/workspace state is still seeded client-side and persisted in `localStorage`; the web shell has not yet been wired to the durable reading API for create/history/restore flows.
 - Product docs now include strategic post-core PRDs (`prd-11` through `prd-15`) and updated API/safety/roadmap guidance.
 - GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.
 - Required checks on `main`: `ci-checks`, `request-codex-review`.
+- Use `docs/local-dev-runbook.md` for the canonical local startup and smoke-test flow.
 - See `PLAN.md` for exact next backlog.
 
 ## 5) Engineering Rules

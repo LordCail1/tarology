@@ -22,6 +22,14 @@ Current deployment status:
   - seeded Thoth deck catalog entry + API deck spec manifest,
   - `/onboarding` first-run default deck selection,
   - `/reading` gating on authenticated session plus saved default deck.
+- Gate 0 reading durability baseline is also in the local repo now:
+  - DB-backed reading create/list/detail/command APIs,
+  - deterministic deck assignments stored in Postgres,
+  - archive/reopen/delete lifecycle commands with idempotency and version checks.
+- Current UI integration note:
+  - the Reading Studio shell is real and interactive,
+  - but its visible history/workspace restore path is still seeded client-side and persisted in browser `localStorage`,
+  - and the `New Reading` button in the shell is still disabled.
 
 Root scripts:
 - `npm run dev:web`

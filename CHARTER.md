@@ -1,7 +1,7 @@
 # Tarology v2 Charter and Execution Spec
 
 Status: Draft v0.3  
-Last updated: 2026-03-08  
+Last updated: 2026-03-13  
 Owner: Product + Engineering  
 Purpose: Canonical map for all contributors (human and AI) building Tarology v2.
 
@@ -274,20 +274,25 @@ Future curated-data alignment:
 
 ## 8) System Architecture
 ### 8.1 Repository Shape
-Monorepo:
+Current repo today:
 - `apps/web` (Next.js frontend)
 - `apps/api` (NestJS backend)
-- `apps/worker` (workflow workers)
 - `packages/shared` (types/contracts)
+
+Planned monorepo additions after core reliability:
+- `apps/worker` (workflow workers)
 - `packages/prompt-skills` (versioned AI skills)
 
-NestJS module boundaries (required):
-- `identity` (app auth/session/user)
-- `provider-connections` (LLM credentials + capability matrix)
-- `reading-studio` (readings, cards, threads, interpretations)
-- `knowledge` (retrieval caches, source metadata, citation policy)
-- `profile` (stats and progression)
-- `integration` (event publishing, webhooks, external ports)
+NestJS module boundaries over time (required):
+- implemented today:
+  - `identity` (app auth/session/user)
+  - `provider-connections` (LLM credentials + capability matrix scaffold)
+  - `profile` (profile and preferences)
+  - `reading-studio` (readings, cards, threads, interpretations)
+- planned later:
+  - `knowledge` (retrieval caches, source metadata, citation policy)
+  - `workflow` / worker integration for durable AI jobs
+  - `integration` (event publishing, webhooks, external ports)
 
 Rule:
 - Modules communicate through explicit service interfaces and event contracts.

@@ -270,9 +270,11 @@ Status note:
 ```bash
 cd /home/ram2c/gitclones/tarology
 git status --short
+sed -n '1,260p' docs/local-dev-runbook.md
 cd apps/api && npx prisma dev --name tarology-local
 # press "t" in the Prisma dev terminal, then export the printed DATABASE_URL in a second shell
 cd /home/ram2c/gitclones/tarology
+set -a && source apps/api/.env && set +a
 export DATABASE_URL='postgres://...'
 export TEST_DATABASE_URL="$DATABASE_URL"
 npm run prisma:seed --workspace @tarology/api
