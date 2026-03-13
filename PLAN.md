@@ -100,6 +100,7 @@ Execution sequencing:
   - GitHub Actions `ci-checks` now runs the root `npm run ci:checks` script after `npm ci`
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification
   - API Vitest now resolves `@tarology/shared` from workspace source so clean CI runners do not depend on a prebuilt `packages/shared/dist` directory
+- Workflow docs now include an explicit before-push / before-PR checklist covering branch update, clean status, local verification, and PR handoff notes
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion

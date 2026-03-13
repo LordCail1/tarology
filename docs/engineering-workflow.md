@@ -34,6 +34,30 @@ npm run typecheck
 npm run build
 ```
 
+## Before Push / Before PR
+Before pushing a branch or opening a PR:
+
+```bash
+git fetch origin main
+git status --short
+npm run ci:checks
+```
+
+- Update the branch with the latest `origin/main` before review:
+  - `git rebase origin/main` is preferred for a clean history.
+  - `git merge origin/main` is acceptable if the branch should stay merge-based.
+- Resolve conflicts on the feature branch before opening the PR whenever possible.
+- `git status --short` should be clean after the intended changes are committed:
+  - no stray debug edits,
+  - no temporary files,
+  - no half-finished experiments left in the branch.
+- If `npm run ci:checks` requires extra env vars, services, or seed data, document that in the PR.
+- Every PR description should include:
+  - what changed,
+  - acceptance evidence,
+  - migrations / env vars / manual smoke steps,
+  - known risks or follow-up work.
+
 ## Post-Merge Cleanup
 After a PR is merged:
 
