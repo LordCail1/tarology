@@ -75,6 +75,11 @@ V1 support policy:
   - left and right panels are desktop-resizable by drag handle.
   - panel width preference is persisted per user.
 
+### 5.1.1 Reading Lifecycle and Reader Labels
+- Canonical reading lifecycle is `active`, `archived`, or `deleted`.
+- `reopen` is an action that returns an archived reading to `active`; it is not a separate status.
+- Reader-facing organization states such as `completed` or custom labels may exist later, but they are not lifecycle and must not be treated as the source of truth for restore/history behavior.
+
 ### 5.2 Core Journey
 1. User logs in with Google.
 2. On first login, user selects a default tarot deck; preference is persisted.
@@ -91,4 +96,3 @@ V1 support policy:
   - optional deep layer with citations.
 11. All meaningful actions persist continuously.
 12. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
-

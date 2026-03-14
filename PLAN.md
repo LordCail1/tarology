@@ -1,6 +1,6 @@
 # Tarology v2 Plan
 
-Last updated: 2026-03-13 (America/Toronto)
+Last updated: 2026-03-14 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
@@ -108,6 +108,10 @@ Execution sequencing:
   - coordination work stays in the primary repo checkout
   - each implementation branch gets its own dedicated worktree under `/home/ram2c/gitclones/.worktrees/tarology/<branch-name>`
   - helper commands now exist for worktree creation/list/prune
+- Reading lifecycle vocabulary decision resolved:
+  - canonical system status is `active` / `archived` / `deleted`
+  - `reopen` remains an action/event, not a steady-state status
+  - reader-facing states such as `completed` belong to a separate label/tag layer if introduced later
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
@@ -147,6 +151,7 @@ Execution sequencing:
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
 - Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
 - User default deck is captured during onboarding and can be overridden per reading.
+- Reading lifecycle status is `active` / `archived` / `deleted`; reader-facing organization labels are a separate concern.
 - MVP threshold is durable multi-reading behavior:
   - users can create multiple readings,
   - switch between readings from history,
@@ -169,6 +174,7 @@ Status note:
 - Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
 - Queue items 3, 4, 6, and 7 are complete for DB-backed reading durability, lifecycle commands, restore projection, and multi-reading history.
 - Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
+- Short-term alignment follow-up: replace the web mock `paused` / `complete` reading status vocabulary with canonical lifecycle status before durable history wiring lands.
 - Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
 
 1. Implement profile shell baseline.

@@ -1,7 +1,7 @@
 # Open Decisions Worklog
 
 Status: Temporary working document
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 Owner: Product + Engineering
 
 Purpose:
@@ -94,10 +94,14 @@ Important:
 - Option 3 is richer conceptually, but likely premature for the current stage of the product.
 
 ### Provisional leaning
-- Pending discussion.
+- Normalize system lifecycle to `active` / `archived` / `deleted`, and treat reader-defined organization states as a separate label/tag layer.
 
 ### Final decision
-- Pending.
+- Canonical reading lifecycle remains `active`, `archived`, and `deleted`.
+- `reopen` is an action/event that returns a reading to `active`; it is not a steady-state status.
+- Reader-facing organization states such as `completed`, `paused`, or other custom groupings belong to a separate label/tag layer and must not replace canonical lifecycle in contracts, persistence, or restore logic.
 
 ### Follow-up updates
-- Pending.
+- Update charter and PRDs so lifecycle status is explicitly separated from reader-defined labels.
+- Normalize web mock/UI status vocabulary to the canonical lifecycle before wiring the durable API-backed history flow.
+- If richer user organization is added later, model it as labels/tags or a separate progress concept rather than extending the lifecycle enum.

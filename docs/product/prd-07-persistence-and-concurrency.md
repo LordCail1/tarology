@@ -19,6 +19,7 @@ Rules:
 - Restore path: latest snapshot + tail events.
 - Use optimistic concurrency for semantic edits.
 - For low-value layout conflicts, last-write-wins is acceptable.
+- Lifecycle persistence is limited to canonical reading states (`active`, `archived`, `deleted`); reader-defined labels or progress markers are separate metadata and must not change restore semantics.
 
 Event/outbox requirement:
 - Domain events are written transactionally with state changes.

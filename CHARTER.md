@@ -351,6 +351,8 @@ Data invariants:
 - mutable workspace state persists through semantic events/projections; it must not rewrite the immutable assignment identity stored in `reading_cards`.
 - each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
 - each reading stores active `canvasMode` and mode-switch history as semantic events.
+- reading lifecycle status is limited to `active`, `archived`, and `deleted`; `reopened` is an event/action, not a persisted status value.
+- reader-defined organization states (for example `completed` or custom labels) belong to a separate label/tag layer and must not replace canonical lifecycle status in persistence or API contracts.
 - each interpretation request stores frozen target context.
 - provider credentials are never returned in raw form after initial save.
 - OAuth refresh/access tokens are encrypted and rotated per provider policy.
