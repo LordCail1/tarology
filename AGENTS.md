@@ -8,8 +8,9 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 3. Read `CHARTER.md` fully for global tie-breaker context.
 4. Read `PLAN.md` fully.
 5. Read `docs/engineering-workflow.md`.
-6. Read `docs/ci-cd-vercel.md`, `docs/codex-continuity-research.md`, and `docs/codex-code-review.md` when changing delivery, review, or handoff behavior.
-7. If there is any conflict, follow `CHARTER.md` as tie-breaker and update `PLAN.md` to reflect the chosen implementation path.
+6. Use the global `$parallel-agent-worktrees` skill and read `docs/parallel-agent-worktrees.md` when doing local feature implementation or parallel agent work.
+7. Read `docs/ci-cd-vercel.md`, `docs/codex-continuity-research.md`, and `docs/codex-code-review.md` when changing delivery, review, or handoff behavior.
+8. If there is any conflict, follow `CHARTER.md` as tie-breaker and update `PLAN.md` to reflect the chosen implementation path.
 
 ## 2) Product Intent (Non-Negotiable)
 - Beginner-first tarot reading experience.
@@ -63,6 +64,10 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Prefer command-style mutation interfaces for meaningful state changes.
 - Keep shared contracts in `packages/shared` and import from there.
 - Do not commit directly on `main`; use branch + PR workflow.
+- For local parallel development, use one dedicated Git worktree per active feature branch under `/home/ram2c/gitclones/.worktrees/tarology/<branch-name>`.
+- Coordination/docs/merge work should stay in the primary repo checkout when practical; implementation work should happen in the feature worktree.
+- Before editing in a feature session, verify both `git rev-parse --show-toplevel` and `git branch --show-current`.
+- Do not run multiple implementation agents against the same worktree.
 - Before pushing or opening a PR, complete the `Before Push / Before PR` checklist in `docs/engineering-workflow.md`.
 - Every PR must include a Codex review trigger comment using `@codex review` (manual or auto workflow).
 - Run `npm run ci:checks` before ending a working session.

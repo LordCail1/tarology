@@ -104,6 +104,10 @@ Execution sequencing:
   - required CI gate now covers workspace typecheck, API tests, web tests, and build in the same way as local verification
   - API Vitest now resolves `@tarology/shared` from workspace source so clean CI runners do not depend on a prebuilt `packages/shared/dist` directory
 - Workflow docs now include an explicit before-push / before-PR checklist covering branch update, clean status, local verification, and PR handoff notes
+- Local parallel-agent workflow is now standardized around Git worktrees:
+  - coordination work stays in the primary repo checkout
+  - each implementation branch gets its own dedicated worktree under `/home/ram2c/gitclones/.worktrees/tarology/<branch-name>`
+  - helper commands now exist for worktree creation/list/prune
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion

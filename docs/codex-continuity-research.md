@@ -26,6 +26,8 @@ Scope: How new Codex sessions pick up context in a fresh run.
 - Keep both files updated before ending a session:
   - `AGENTS.md` for instructions.
   - `PLAN.md` for current state and next tasks.
+- For local parallel implementation sessions, use a dedicated Git worktree per branch and open one Codex agent per worktree.
+- Treat the main repo checkout as the coordination lane for planning, docs, and merge handling unless a task explicitly requires otherwise.
 
 ## References
 - https://developers.openai.com/codex/guides/agents-md

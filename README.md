@@ -7,6 +7,7 @@ Start here:
 - [CHARTER.md](./CHARTER.md) - canonical product and engineering spec
 - [PLAN.md](./PLAN.md) - current implementation status and next queue
 - [AGENTS.md](./AGENTS.md) - Codex/new-session bootstrap instructions
+- [docs/parallel-agent-worktrees.md](./docs/parallel-agent-worktrees.md) - standard local workflow for parallel feature agents
 - [docs/local-dev-runbook.md](./docs/local-dev-runbook.md) - canonical local startup + smoke-test guide
 
 Current workspace layout:
@@ -36,6 +37,9 @@ Root scripts:
 - `npm run dev:api`
 - `npm run typecheck`
 - `npm run ci:checks`
+- `npm run git:worktree:add -- <branch-name>`
+- `npm run git:worktree:list`
+- `npm run git:worktree:prune`
 
 Recommended local startup path:
 - use [docs/local-dev-runbook.md](./docs/local-dev-runbook.md)
@@ -79,6 +83,7 @@ Deck assets:
 
 Delivery docs:
 - [docs/engineering-workflow.md](./docs/engineering-workflow.md)
+- [docs/parallel-agent-worktrees.md](./docs/parallel-agent-worktrees.md)
 - [docs/ci-cd-vercel.md](./docs/ci-cd-vercel.md)
 - [docs/codex-continuity-research.md](./docs/codex-continuity-research.md)
 - [docs/codex-code-review.md](./docs/codex-code-review.md)
