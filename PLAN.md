@@ -51,6 +51,12 @@ Execution sequencing:
   - decks may start from starter content or empty templates,
   - symbols are first-class and independently viewable,
   - live web research is no longer a baseline V1 interpretation requirement
+- Web now also has a deck-management surface at `/decks`:
+  - auth-gated deck library route linked from the Reading Studio topbar,
+  - local adapter-backed deck snapshot seeded from the real deck summary API,
+  - deck-library-first cards/symbols browsing with bidirectional linking,
+  - layered `plain_text` / `markdown` entry editing plus minimal visible sources,
+  - basic local import/export controls and view-only starter images.
 - Vercel currently deploys only the Next.js web app; the NestJS API is not yet publicly hosted.
 - Current documentation now aligns on delaying full-stack hosting until the durable reading MVP is complete.
 
@@ -161,6 +167,12 @@ Execution sequencing:
   - Google auth callback now provisions internal UUID-backed users before saving the session
   - `/reading` now gates on both auth and saved default deck, while `/onboarding` completes first-run deck selection
   - web regression coverage now includes onboarding redirects, onboarding completion, and profile/default-deck shell rendering
+- Deck-management surface branch:
+  - `/decks` now exists as an authenticated deck-library route with its own gate and shell
+  - the web app seeds a substantial Thoth starter deck locally from the real deck summary, including 78 cards, starter symbols, links, entries, sources, and image references
+  - cards and symbols can be browsed independently, symbols can be created and linked to cards, and layered entries can be added/edited/archive-soft-deleted in the UI
+  - deck exports and imports now work as basic local JSON actions using the PRD 16 package shape
+  - web regression coverage now includes the deck-management gate, local deck snapshot helpers, import/export helpers, and basic symbol-creation interaction
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -212,8 +224,10 @@ Deck-knowledge pivot follow-ups:
 - Implement deck-management surface baseline.
   Acceptance: users can browse decks/cards/symbols, edit card/symbol information, and inspect symbols independently from any specific card view.
   Guardrail: keep the UI deck-library-first, expose basic import/export controls, and do not add V1 image editing/upload.
+  Status: complete as a web-local, adapter-backed surface; durable API wiring still depends on the knowledge-domain branch.
 - Add deck export/import baseline.
   Acceptance: full deck state can be exported and re-imported without losing card/symbol knowledge or links.
+  Status: complete as local UI/actions; backend ownership and persistence still depend on the knowledge-domain branch.
 
 1. Implement profile shell baseline.
 - Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
@@ -319,6 +333,7 @@ Deck-knowledge pivot follow-ups:
 - Deck creation introduces moderation/IP policy burden.
 - The Reading Studio currently restores from web-local persistence; swapping to durable backend restore must preserve mode memory, selection behavior, and sidebar preference semantics.
 - The durable backend currently covers reading lifecycle and immutable card assignment state; canvas/question mutation durability still needs to be added without breaking restore compatibility.
+- The deck-management surface currently persists its knowledge graph in browser-local storage; it must be re-pointed at the knowledge-domain API without losing the deck-library-first UX or PRD 16 export shape.
 - The current deck catalog is intentionally narrow: only the built-in Thoth deck is selectable, and card-image filename normalization is still deferred.
 - Deck assets are temporarily sourced from `tarology_old` with project-owner approval; broader licensing policy still needs a durable product decision.
 
@@ -340,6 +355,11 @@ sed -n '1,220p' docs/product/prd-04-interpretation-intelligence.md
 sed -n '1,220p' docs/product/prd-06-data-model-and-api.md
 sed -n '1,260p' docs/product/prd-16-deck-knowledge-schema-and-export.md
 sed -n '1,260p' PLAN.md
+cd /home/ram2c/gitclones/.worktrees/tarology/feature/deck-management-surface
+git status --short --branch
+npm run test --workspace @tarology/web
+npm run build --workspace @tarology/web
+# for full branch verification, start Prisma dev in apps/api and rerun root ci:checks with DATABASE_URL and TEST_DATABASE_URL set
 ```
 
 ## Codex Continuity Note

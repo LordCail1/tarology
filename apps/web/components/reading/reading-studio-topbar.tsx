@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReadingHistoryItem } from "../../lib/reading-studio-types";
 
 interface ReadingStudioTopbarProps {
@@ -37,6 +38,12 @@ export function ReadingStudioTopbar({
 
         {isDesktop ? (
           <div className="hidden items-center gap-2 lg:flex">
+            <Link
+              href="/decks"
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:bg-white/[0.08]"
+            >
+              Deck Library
+            </Link>
             <button
               type="button"
               aria-label={leftCollapsed ? "Expand history panel" : "Collapse history panel"}
@@ -69,6 +76,12 @@ export function ReadingStudioTopbar({
           </div>
         ) : (
           <div className="flex items-center gap-2 lg:hidden">
+            <Link
+              href="/decks"
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
+            >
+              Decks
+            </Link>
             <button
               type="button"
               aria-label="Open history drawer"

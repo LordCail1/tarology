@@ -1,0 +1,229 @@
+import { cloneDeckLibraryDeck } from "./deck-management-thoth";
+import type {
+  DeckExportDocument,
+  DeckLibraryDeck,
+  DeckLibrarySnapshot,
+  DeckCardEntry,
+  DeckSymbolEntry,
+} from "./deck-management-types";
+
+function createPortableId(prefix: string): string {
+  const token =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+  return `${prefix}:${token}`;
+}
+
+function digestValue(input: string): string {
+  let hash = 0;
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) | 0;
+  }
+
+  return `digest:${Math.abs(hash).toString(16)}`;
+}
+
+function toCardEntryPayload(entry: DeckCardEntry): DeckExportDocument["cardInformationEntries"][number] {
+  return {
+    entryId: entry.entryId,
+    cardId: entry.cardId,
+    label: entry.label,
+    format: entry.format,
+    summary: entry.summary,
+    sourceIds: entry.sourceIds,
+    sortOrder: entry.sortOrder,
+    bodyText: entry.bodyText,
+  };
+}
+
+function toSymbolEntryPayload(
+  entry: DeckSymbolEntry
+): DeckExportDocument["symbolInformationEntries"][number] {
+  return {
+    entryId: entry.entryId,
+    symbolId: entry.symbolId,
+    label: entry.label,
+    format: entry.format,
+    summary: entry.summary,
+    sourceIds: entry.sourceIds,
+    sortOrder: entry.sortOrder,
+    bodyText: entry.bodyText,
+  };
+}
+
+export function buildDeckExportDocument(deck: DeckLibraryDeck): DeckExportDocument {
+  return {
+    format: "tarology.deck.export",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    deck: {
+      name: deck.name,
+      description: deck.description,
+      deckSpecVersion: deck.specVersion,
+      knowledgeVersion: deck.knowledgeVersion,
+      initializationMode: deck.initializationMode,
+      initializerKey: deck.initializerKey,
+      previewImageUrl: deck.previewImageUrl,
+      backImageUrl: deck.backImageUrl,
+      cardCount: deck.cardCount,
+      originExportDigest: deck.originExportDigest,
+    },
+    cards: deck.cards.map((card) => ({
+      cardId: card.cardId,
+      name: card.name,
+      sortOrder: card.sortOrder,
+      shortLabel: card.shortLabel,
+      faceImageUrl: card.faceImageUrl,
+      metadataJson: card.metadataJson,
+    })),
+    symbols: deck.symbols.map((symbol) => ({
+      symbolId: symbol.symbolId,
+      name: symbol.name,
+      shortLabel: symbol.shortLabel,
+      description: symbol.description,
+      metadataJson: symbol.metadataJson,
+    })),
+    cardSymbols: deck.cardSymbols.map((link) => ({
+      cardId: link.cardId,
+      symbolId: link.symbolId,
+      sortOrder: link.sortOrder,
+      placementHintJson: link.placementHintJson,
+      linkNote: link.linkNote,
+    })),
+    knowledgeSources: deck.knowledgeSources.map((source) => ({
+      sourceId: source.sourceId,
+      kind: source.kind,
+      title: source.title,
+      capturedAt: source.capturedAt,
+      author: source.author,
+      publisher: source.publisher,
+      url: source.url,
+      citationText: source.citationText,
+      publishedAt: source.publishedAt,
+      rightsNote: source.rightsNote,
+      metadataJson: source.metadataJson,
+    })),
+    cardInformationEntries: deck.cardInformationEntries.map(toCardEntryPayload),
+    symbolInformationEntries: deck.symbolInformationEntries.map(toSymbolEntryPayload),
+  };
+}
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function toOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+export function importDeckFromDocument(
+  document: DeckExportDocument,
+  snapshot: DeckLibrarySnapshot
+): DeckLibrarySnapshot {
+  assert(document.format === "tarology.deck.export", "Unsupported deck export format.");
+  assert(document.version === 1, "Unsupported deck export version.");
+  assert(document.cards.length > 0, "Deck export must include cards.");
+
+  const importedAt = new Date().toISOString();
+  const serializedDocument = JSON.stringify(document);
+  const deckId = createPortableId("deck");
+  const clonedDeck: DeckLibraryDeck = {
+    id: deckId,
+    name: `${document.deck.name} (Imported)`,
+    description: document.deck.description,
+    specVersion: document.deck.deckSpecVersion,
+    previewImageUrl: document.deck.previewImageUrl,
+    backImageUrl: document.deck.backImageUrl,
+    cardCount: document.deck.cardCount,
+    knowledgeVersion: document.deck.knowledgeVersion,
+    initializationMode: "imported_clone",
+    initializerKey: document.deck.initializerKey,
+    originExportDigest: digestValue(serializedDocument),
+    symbolCount: document.symbols.length,
+    cards: document.cards.map((card) => ({
+      id: createPortableId("card"),
+      cardId: card.cardId,
+      name: card.name,
+      sortOrder: card.sortOrder,
+      shortLabel: toOptionalString(card.shortLabel),
+      faceImageUrl: toOptionalString(card.faceImageUrl),
+      metadataJson: (card.metadataJson as Record<string, unknown> | null | undefined) ?? null,
+    })),
+    symbols: document.symbols.map((symbol) => ({
+      id: createPortableId("symbol"),
+      symbolId: symbol.symbolId,
+      name: symbol.name,
+      shortLabel: toOptionalString(symbol.shortLabel),
+      description: toOptionalString(symbol.description),
+      metadataJson:
+        (symbol.metadataJson as Record<string, unknown> | null | undefined) ?? null,
+    })),
+    cardSymbols: document.cardSymbols.map((link) => ({
+      id: createPortableId("link"),
+      cardId: link.cardId,
+      symbolId: link.symbolId,
+      sortOrder: typeof link.sortOrder === "number" ? link.sortOrder : null,
+      placementHintJson:
+        (link.placementHintJson as Record<string, unknown> | null | undefined) ?? null,
+      linkNote: toOptionalString(link.linkNote),
+    })),
+    knowledgeSources: document.knowledgeSources.map((source) => ({
+      id: createPortableId("source"),
+      sourceId: source.sourceId,
+      kind: source.kind,
+      title: source.title,
+      capturedAt: source.capturedAt,
+      author: toOptionalString(source.author),
+      publisher: toOptionalString(source.publisher),
+      url: toOptionalString(source.url),
+      citationText: toOptionalString(source.citationText),
+      publishedAt: toOptionalString(source.publishedAt),
+      rightsNote: toOptionalString(source.rightsNote),
+      metadataJson:
+        (source.metadataJson as Record<string, unknown> | null | undefined) ?? null,
+    })),
+    cardInformationEntries: document.cardInformationEntries
+      .filter((entry) => typeof entry.bodyText === "string")
+      .map((entry) => ({
+        id: createPortableId("entry"),
+        entryId: entry.entryId,
+        cardId: entry.cardId,
+        label: entry.label,
+        format: entry.format === "markdown" ? "markdown" : "plain_text",
+        bodyText: entry.bodyText ?? "",
+        summary: entry.summary,
+        tags: [],
+        sourceIds: entry.sourceIds,
+        sortOrder: entry.sortOrder,
+        archivedAt: null,
+        createdAt: importedAt,
+        updatedAt: importedAt,
+      })),
+    symbolInformationEntries: document.symbolInformationEntries
+      .filter((entry) => typeof entry.bodyText === "string")
+      .map((entry) => ({
+        id: createPortableId("entry"),
+        entryId: entry.entryId,
+        symbolId: entry.symbolId,
+        label: entry.label,
+        format: entry.format === "markdown" ? "markdown" : "plain_text",
+        bodyText: entry.bodyText ?? "",
+        summary: entry.summary,
+        tags: [],
+        sourceIds: entry.sourceIds,
+        sortOrder: entry.sortOrder,
+        archivedAt: null,
+        createdAt: importedAt,
+        updatedAt: importedAt,
+      })),
+  };
+
+  return {
+    activeDeckId: clonedDeck.id,
+    decks: [...snapshot.decks.map((deck) => cloneDeckLibraryDeck(deck)), clonedDeck],
+  };
+}
