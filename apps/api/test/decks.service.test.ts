@@ -209,6 +209,101 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects duplicate card-symbol links in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.symbols = [
+      {
+        symbolId: "symbol-1",
+        name: "Lantern",
+        shortLabel: null,
+        description: null,
+        metadataJson: null,
+      },
+    ];
+    payload.cardSymbols = [
+      {
+        cardId: payload.cards[0].cardId,
+        symbolId: "symbol-1",
+        sortOrder: 0,
+        placementHintJson: null,
+        linkNote: null,
+      },
+      {
+        cardId: payload.cards[0].cardId,
+        symbolId: "symbol-1",
+        sortOrder: 1,
+        placementHintJson: null,
+        linkNote: null,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects card information entries with malformed sourceIds in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.cardInformationEntries = [
+      {
+        entryId: "entry-card-1",
+        cardId: payload.cards[0].cardId,
+        label: "core-theme",
+        format: "plain_text",
+        bodyText: "A note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: null as unknown as string[],
+        sortOrder: 0,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects symbol information entries with malformed sourceIds in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.symbols = [
+      {
+        symbolId: "symbol-1",
+        name: "Lantern",
+        shortLabel: null,
+        description: null,
+        metadataJson: null,
+      },
+    ];
+    payload.symbolInformationEntries = [
+      {
+        entryId: "entry-symbol-1",
+        symbolId: "symbol-1",
+        label: "motif",
+        format: "plain_text",
+        bodyText: "A note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: null as unknown as string[],
+        sortOrder: 0,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects duplicate knowledge source identifiers when replacing deck sources", async () => {
     const { prisma, service } = createDecksService();
 

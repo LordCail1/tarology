@@ -150,6 +150,33 @@ function ensureUniqueKnowledgeSourceIds(
   }
 }
 
+function ensureUniqueCardSymbolLinks(
+  links: Array<Pick<ImportDeckRequest["cardSymbols"][number], "cardId" | "symbolId">>,
+  message: string
+): void {
+  const seen = new Set<string>();
+
+  for (const link of links) {
+    const compositeKey = `${link.cardId}::${link.symbolId}`;
+    if (seen.has(compositeKey)) {
+      throw new ConflictException(message);
+    }
+
+    seen.add(compositeKey);
+  }
+}
+
+function requireImportEntrySourceIds(
+  sourceIds: unknown,
+  message: string
+): string[] {
+  if (!Array.isArray(sourceIds) || sourceIds.some((sourceId) => typeof sourceId !== "string")) {
+    throw new BadRequestException(message);
+  }
+
+  return sourceIds;
+}
+
 @Injectable()
 export class DecksService {
   constructor(
@@ -1348,11 +1375,19 @@ export class DecksService {
       }
     }
 
+    ensureUniqueCardSymbolLinks(
+      payload.cardSymbols,
+      "Duplicate card-symbol links are not allowed in import payload."
+    );
+
     for (const entry of payload.cardInformationEntries) {
       if (!cardIds.has(entry.cardId)) {
         throw new BadRequestException("Imported card information entry references an unknown card.");
       }
-      for (const sourceId of entry.sourceIds) {
+      for (const sourceId of requireImportEntrySourceIds(
+        entry.sourceIds,
+        'Imported card information entry field "sourceIds" must be an array of strings.'
+      )) {
         if (!sourceIds.has(sourceId)) {
           throw new BadRequestException("Imported card information entry references an unknown source.");
         }
@@ -1365,7 +1400,10 @@ export class DecksService {
           "Imported symbol information entry references an unknown symbol."
         );
       }
-      for (const sourceId of entry.sourceIds) {
+      for (const sourceId of requireImportEntrySourceIds(
+        entry.sourceIds,
+        'Imported symbol information entry field "sourceIds" must be an array of strings.'
+      )) {
         if (!sourceIds.has(sourceId)) {
           throw new BadRequestException(
             "Imported symbol information entry references an unknown source."
