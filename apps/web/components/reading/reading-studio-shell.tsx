@@ -464,16 +464,18 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
 
   function commitWorkspace(nextWorkspace: ReadingStudioWorkspace) {
     setStudioSnapshot((current) => {
-      if (!current || !current.activeReadingId) {
+      if (!current) {
         return current;
       }
+
+      const workspaceReadingId = nextWorkspace.reading.id;
 
       return {
         ...current,
         history: upsertHistoryItem(current.history, nextWorkspace.reading),
         workspaces: {
           ...current.workspaces,
-          [current.activeReadingId]: nextWorkspace,
+          [workspaceReadingId]: nextWorkspace,
         },
       };
     });

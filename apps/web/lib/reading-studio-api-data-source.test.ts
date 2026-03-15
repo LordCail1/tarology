@@ -14,6 +14,9 @@ import {
 import { createApiReadingStudioDataSource } from "./reading-studio-api-data-source";
 import { READING_STUDIO_ACTIVE_READING_STORAGE_KEY } from "./reading-studio-data-source";
 
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 vi.mock("./client-api", () => ({
   fetchReadings: vi.fn(),
   fetchReading: vi.fn(),
@@ -130,6 +133,7 @@ function createReadingSummary(detail: GetReadingResponse): ListReadingsResponse[
 describe("reading-studio-api-data-source", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.unstubAllGlobals();
     vi.resetAllMocks();
   });
 
@@ -329,5 +333,47 @@ describe("reading-studio-api-data-source", () => {
     );
     expect(workspace.reading.id).toBe("rdg_003");
     expect(workspace.canvas.activeMode).toBe("grid");
+  });
+
+  it("falls back to RFC 4122 v4 ids when randomUUID is unavailable", async () => {
+    const detail = createReadingDetail({
+      readingId: "rdg_003",
+      rootQuestion: "Which motion matters?",
+      version: 5,
+    });
+    const getRandomValues = vi.fn((buffer: Uint8Array) => {
+      buffer.set([
+        0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+        0x77, 0x88,
+      ]);
+      return buffer;
+    });
+
+    vi.stubGlobal("crypto", {
+      getRandomValues,
+    } satisfies Pick<Crypto, "getRandomValues">);
+    vi.mocked(postReadingCommand).mockResolvedValue({
+      reading: detail,
+    });
+
+    const dataSource = createApiReadingStudioDataSource(
+      window.localStorage,
+      preferencesFixture
+    );
+
+    await dataSource.applyWorkspaceAction("rdg_003", 5, {
+      type: "workspace.cardRotated",
+      cardId: "The Magician",
+      deltaDeg: 15,
+    });
+
+    expect(postReadingCommand).toHaveBeenCalledWith(
+      "rdg_003",
+      expect.objectContaining({
+        commandId: expect.stringMatching(UUID_V4_PATTERN),
+      }),
+      expect.stringMatching(UUID_V4_PATTERN)
+    );
+    expect(getRandomValues).toHaveBeenCalled();
   });
 });

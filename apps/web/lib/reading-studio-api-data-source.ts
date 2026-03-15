@@ -18,11 +18,34 @@ import type {
 } from "./reading-studio-types";
 
 function createIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  const cryptoObject = globalThis.crypto;
+
+  if (typeof cryptoObject?.randomUUID === "function") {
+    return cryptoObject.randomUUID();
   }
 
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const randomBytes = new Uint8Array(16);
+
+  if (typeof cryptoObject?.getRandomValues === "function") {
+    cryptoObject.getRandomValues(randomBytes);
+  } else {
+    randomBytes.forEach((_, index) => {
+      randomBytes[index] = Math.floor(Math.random() * 256);
+    });
+  }
+
+  // Generate an RFC 4122-compliant v4 UUID when randomUUID is unavailable.
+  randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40;
+  randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80;
+
+  const hexBytes = Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return [
+    hexBytes.slice(0, 4).join(""),
+    hexBytes.slice(4, 6).join(""),
+    hexBytes.slice(6, 8).join(""),
+    hexBytes.slice(8, 10).join(""),
+    hexBytes.slice(10).join(""),
+  ].join("-");
 }
 
 function readPersistedActiveReadingId(storage: Storage | undefined): string | null {
