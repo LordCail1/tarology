@@ -93,6 +93,10 @@ function computeExportDigest(payload: DeckExportEnvelope): string {
   return createHash("sha256").update(stableStringify(payload)).digest("hex");
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function ensureExclusiveEntryBody(entry: KnowledgeEntryWriteDto): void {
   const hasBodyText = typeof entry.bodyText === "string" && entry.bodyText.trim().length > 0;
   const hasBodyJson = entry.bodyJson !== undefined && entry.bodyJson !== null;
@@ -244,7 +248,7 @@ export class DecksService {
     });
 
     if (!deck) {
-      throw new NotFoundException(`Deck "${deckId}" is not available.`);
+      return this.resolveLegacyDeckForReading(userId, deckId);
     }
 
     return {
@@ -1164,7 +1168,107 @@ export class DecksService {
     return deck;
   }
 
+  private async resolveLegacyDeckForReading(
+    userId: string,
+    legacyDeckId: string
+  ): Promise<{ summary: DeckSummary; cardIds: string[] }> {
+    return this.prisma.$transaction(async (tx) => {
+      const legacyDeck = await tx.deck.findFirst({
+        where: { id: legacyDeckId, ownerUserId: null },
+        select: deckSummarySelect,
+      });
+
+      if (!legacyDeck || !legacyDeck.initializerKey) {
+        throw new NotFoundException(`Deck "${legacyDeckId}" is not available.`);
+      }
+
+      const existingOwnedDeck = await tx.deck.findFirst({
+        where: {
+          ownerUserId: userId,
+          initializerKey: legacyDeck.initializerKey,
+          initializationMode: legacyDeck.initializationMode,
+        },
+        select: { id: true },
+      });
+
+      let ownedDeckId = existingOwnedDeck?.id ?? null;
+      if (!ownedDeckId) {
+        const seed =
+          legacyDeck.initializationMode === "empty_template"
+            ? this.starterDeckTemplatesService.getEmptyTemplateSeed(legacyDeck.initializerKey)
+            : this.starterDeckTemplatesService.getStarterDeckSeed(legacyDeck.initializerKey);
+        const createdDeck = await this.createDeckFromSeed(tx, userId, seed);
+        ownedDeckId = createdDeck.id;
+      }
+
+      await tx.userPreference.updateMany({
+        where: {
+          userId,
+          defaultDeckId: legacyDeckId,
+        },
+        data: {
+          defaultDeckId: ownedDeckId,
+        },
+      });
+
+      const ownedDeck = await tx.deck.findFirst({
+        where: { id: ownedDeckId, ownerUserId: userId },
+        select: {
+          ...deckSummarySelect,
+          cards: {
+            select: {
+              cardId: true,
+            },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+      });
+
+      if (!ownedDeck) {
+        throw new NotFoundException(`Deck "${legacyDeckId}" is not available.`);
+      }
+
+      return {
+        summary: toDeckSummary(ownedDeck),
+        cardIds: ownedDeck.cards.map((card) => card.cardId),
+      };
+    });
+  }
+
   private validateDeckImportPayload(payload: ImportDeckRequest): void {
+    if (!isPlainObject(payload)) {
+      throw new BadRequestException("Deck import payload must be an object.");
+    }
+    if (!isPlainObject(payload.deck)) {
+      throw new BadRequestException('Deck import payload field "deck" must be an object.');
+    }
+    if (!Array.isArray(payload.cards)) {
+      throw new BadRequestException('Deck import payload field "cards" must be an array.');
+    }
+    if (!Array.isArray(payload.symbols)) {
+      throw new BadRequestException('Deck import payload field "symbols" must be an array.');
+    }
+    if (!Array.isArray(payload.cardSymbols)) {
+      throw new BadRequestException(
+        'Deck import payload field "cardSymbols" must be an array.'
+      );
+    }
+    if (!Array.isArray(payload.knowledgeSources)) {
+      throw new BadRequestException(
+        'Deck import payload field "knowledgeSources" must be an array.'
+      );
+    }
+    if (!Array.isArray(payload.cardInformationEntries)) {
+      throw new BadRequestException(
+        'Deck import payload field "cardInformationEntries" must be an array.'
+      );
+    }
+    if (!Array.isArray(payload.symbolInformationEntries)) {
+      throw new BadRequestException(
+        'Deck import payload field "symbolInformationEntries" must be an array.'
+      );
+    }
+
     if (payload.format !== EXPORT_FORMAT || payload.version !== EXPORT_VERSION) {
       throw new BadRequestException("Unsupported deck export format or version.");
     }
