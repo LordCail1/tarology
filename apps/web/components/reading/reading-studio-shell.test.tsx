@@ -26,6 +26,7 @@ type PersistedWorkspaceAction = Extract<
 const mockStudioState = vi.hoisted(() => ({
   snapshot: null as ReadingStudioSnapshot | null,
   createReadingOverride: null as ((rootQuestion: string) => Promise<ReadingStudioWorkspace>) | null,
+  setActiveReadingOverride: null as ((readingId: string) => Promise<ReadingStudioWorkspace>) | null,
   applyWorkspaceActionOverride: null as ((
     readingId: string,
     currentVersion: number,
@@ -97,6 +98,10 @@ vi.mock("../../lib/reading-studio-api-data-source", () => ({
       };
     },
     async setActiveReading(readingId: string) {
+      if (mockStudioState.setActiveReadingOverride) {
+        return mockStudioState.setActiveReadingOverride(readingId);
+      }
+
       const snapshot = mockStudioState.snapshot ?? cloneValue(readingStudioSeedSnapshot);
       mockStudioState.snapshot = snapshot;
       snapshot.activeReadingId = readingId;
@@ -212,6 +217,7 @@ describe("ReadingStudioShell", () => {
     vi.restoreAllMocks();
     mockStudioState.snapshot = cloneValue(readingStudioSeedSnapshot);
     mockStudioState.createReadingOverride = null;
+    mockStudioState.setActiveReadingOverride = null;
     mockStudioState.applyWorkspaceActionOverride = null;
   });
 
@@ -469,6 +475,117 @@ describe("ReadingStudioShell", () => {
     ).toBeInTheDocument();
     expect(window.localStorage.getItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY)).toBe(
       "rdg_004"
+    );
+  });
+
+  it("ignores stale activation responses when reading fetches resolve out of order", async () => {
+    const snapshot = cloneValue(readingStudioSeedSnapshot);
+    const deferredReadingFour = createDeferred<ReadingStudioWorkspace>();
+    const deferredReadingThree = createDeferred<ReadingStudioWorkspace>();
+
+    mockStudioState.snapshot = snapshot;
+    mockStudioState.setActiveReadingOverride = async (readingId) => {
+      if (readingId === "rdg_004") {
+        return deferredReadingFour.promise;
+      }
+
+      if (readingId === "rdg_003") {
+        return deferredReadingThree.promise;
+      }
+
+      throw new Error(`Unexpected reading activation: ${readingId}`);
+    };
+
+    await renderHydratedShell();
+
+    fireEvent.click(screen.getByRole("button", { name: /Creative project momentum sprint/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Spring direction spread/i }));
+
+    await act(async () => {
+      deferredReadingThree.resolve(cloneValue(snapshot.workspaces.rdg_003));
+      await deferredReadingThree.promise;
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Spring direction spread" })).toBeInTheDocument()
+    );
+
+    await act(async () => {
+      deferredReadingFour.resolve(cloneValue(snapshot.workspaces.rdg_004));
+      await deferredReadingFour.promise;
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Spring direction spread" })).toBeInTheDocument()
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Creative project momentum sprint" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("drops stale persisted workspaces when newer optimistic actions already exist", async () => {
+    const snapshot = cloneValue(readingStudioSeedSnapshot);
+    const deferredPersistOne = createDeferred<ReadingStudioWorkspace>();
+    const deferredPersistTwo = createDeferred<ReadingStudioWorkspace>();
+    let callCount = 0;
+
+    mockStudioState.snapshot = snapshot;
+    mockStudioState.applyWorkspaceActionOverride = async (readingId, _currentVersion, action) => {
+      callCount += 1;
+      const nextWorkspace = applyWorkspaceAction(snapshot.workspaces[readingId], action);
+      upsertWorkspace(snapshot, nextWorkspace);
+
+      if (callCount === 1) {
+        return deferredPersistOne.promise.then(() => cloneValue(nextWorkspace));
+      }
+
+      if (callCount === 2) {
+        return deferredPersistTwo.promise.then(() => cloneValue(nextWorkspace));
+      }
+
+      throw new Error(`Unexpected persistence call ${callCount}`);
+    };
+
+    await renderHydratedShell();
+
+    const activeCard = screen.getByRole("button", { name: "The Magician card" });
+    dispatchMouseDrag(activeCard, { clientX: 50, clientY: 80 });
+    await waitFor(() => expect(activeCard).toHaveAttribute("aria-pressed", "true"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Rotate +15°" }));
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("button", { name: "The Magician card" })).getByText("Rotation 15°")
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Rotate +15°" }));
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("button", { name: "The Magician card" })).getByText("Rotation 30°")
+      ).toBeInTheDocument()
+    );
+
+    await act(async () => {
+      deferredPersistOne.resolve(cloneValue(snapshot.workspaces.rdg_001));
+      await deferredPersistOne.promise;
+    });
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("button", { name: "The Magician card" })).getByText("Rotation 30°")
+      ).toBeInTheDocument()
+    );
+
+    await act(async () => {
+      deferredPersistTwo.resolve(cloneValue(snapshot.workspaces.rdg_001));
+      await deferredPersistTwo.promise;
+    });
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("button", { name: "The Magician card" })).getByText("Rotation 30°")
+      ).toBeInTheDocument()
     );
   });
 

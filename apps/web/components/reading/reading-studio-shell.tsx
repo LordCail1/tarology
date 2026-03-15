@@ -161,6 +161,7 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("threads");
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const persistChainRef = useRef(Promise.resolve());
+  const readingActivationRequestIdRef = useRef(0);
   const supportsPointerEvents =
     typeof window !== "undefined" && "PointerEvent" in window;
 
@@ -444,7 +445,13 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
       return;
     }
 
+    const requestId = readingActivationRequestIdRef.current + 1;
+    readingActivationRequestIdRef.current = requestId;
     const nextWorkspace = await dataSource.setActiveReading(readingId);
+
+    if (requestId !== readingActivationRequestIdRef.current) {
+      return;
+    }
 
     setStudioSnapshot((current) => {
       if (!current) {
@@ -463,13 +470,27 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
     setSelectedCardId(null);
   }
 
-  function commitWorkspace(nextWorkspace: ReadingStudioWorkspace) {
+  function commitWorkspace(
+    nextWorkspace: ReadingStudioWorkspace,
+    options?: {
+      skipIfOlderVersion?: boolean;
+    }
+  ) {
     setStudioSnapshot((current) => {
       if (!current) {
         return current;
       }
 
       const workspaceReadingId = nextWorkspace.reading.id;
+      const existingWorkspace = current.workspaces[workspaceReadingId];
+
+      if (
+        options?.skipIfOlderVersion &&
+        existingWorkspace &&
+        existingWorkspace.reading.version > nextWorkspace.reading.version
+      ) {
+        return current;
+      }
 
       return {
         ...current,
@@ -532,7 +553,9 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           action
         );
 
-        commitWorkspace(persistedWorkspace);
+        commitWorkspace(persistedWorkspace, {
+          skipIfOlderVersion: true,
+        });
       })
       .catch(async () => {
         const reloadedWorkspace = await dataSource.setActiveReading(optimisticWorkspace.reading.id);
