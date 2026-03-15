@@ -205,4 +205,50 @@ describe("deck export/import helpers", () => {
     expect(importedCardEntry?.sourceIds).toEqual(["starter:thoth-bundle"]);
     expect(importedSymbolEntry?.sourceIds).toEqual([]);
   });
+
+  it("rejects imported decks with duplicate card ids", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const duplicateCardId = baseDocument.cards[0]?.cardId ?? "major:the-fool";
+    const document = {
+      ...baseDocument,
+      cards: [
+        ...baseDocument.cards,
+        {
+          ...baseDocument.cards[1]!,
+          cardId: duplicateCardId,
+        },
+      ],
+    };
+
+    expect(() =>
+      importDeckFromDocument(document, {
+        activeDeckId: deck.id,
+        decks: [deck],
+      })
+    ).toThrow(`Deck export contains duplicate card ID "${duplicateCardId}".`);
+  });
+
+  it("rejects imported decks with duplicate symbol ids", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const duplicateSymbolId = baseDocument.symbols[0]?.symbolId ?? "sun-disk";
+    const document = {
+      ...baseDocument,
+      symbols: [
+        ...baseDocument.symbols,
+        {
+          ...baseDocument.symbols[1]!,
+          symbolId: duplicateSymbolId,
+        },
+      ],
+    };
+
+    expect(() =>
+      importDeckFromDocument(document, {
+        activeDeckId: deck.id,
+        decks: [deck],
+      })
+    ).toThrow(`Deck export contains duplicate symbol ID "${duplicateSymbolId}".`);
+  });
 });

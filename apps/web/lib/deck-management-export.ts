@@ -156,6 +156,16 @@ function toDisplayBodyText(bodyJson: Record<string, unknown>): string {
   return JSON.stringify(bodyJson, null, 2);
 }
 
+function assertUniqueIds(values: string[], label: string) {
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    assert(typeof value === "string" && value.length > 0, `${label} IDs must be non-empty strings.`);
+    assert(!seen.has(value), `Deck export contains duplicate ${label} ID "${value}".`);
+    seen.add(value);
+  }
+}
+
 function importCardEntry(
   entry: DeckExportDocument["cardInformationEntries"][number],
   importedAt: string
@@ -260,6 +270,14 @@ export function importDeckFromDocument(
   assert(document.format === "tarology.deck.export", "Unsupported deck export format.");
   assert(document.version === 1, "Unsupported deck export version.");
   assert(document.cards.length > 0, "Deck export must include cards.");
+  assertUniqueIds(
+    document.cards.map((card) => card.cardId),
+    "card"
+  );
+  assertUniqueIds(
+    document.symbols.map((symbol) => symbol.symbolId),
+    "symbol"
+  );
 
   const importedAt = new Date().toISOString();
   const serializedDocument = JSON.stringify(document);
