@@ -78,6 +78,17 @@ Card and symbol knowledge edits must not force a `deckSpecVersion` change, becau
 - V1 import does not merge into an existing deck.
 - The imported copy gets new internal database IDs but preserves portable deck content identifiers (`cardId`, `symbolId`, entry IDs, source IDs).
 
+### 3.6 V1 UX defaults are part of the contract
+These product decisions are locked for the first implementation wave and must not be re-decided independently in backend and frontend branches:
+- Choosing the built-in starter deck during onboarding creates an immediately editable user-owned deck instance, not a long-lived reference to a shared template row.
+- Starter-content decks should feel substantial on day one; while curated production content is pending, mock entries, symbols, links, sources, and image references are acceptable.
+- The deck-management experience is deck-library-first: symbols are independently browsable, cards show linked symbols, and symbols show linked cards.
+- Knowledge is authored as layered ordered entries rather than one canonical card or symbol “meaning” blob.
+- The first-party V1 editor only needs to expose `plain_text` and `markdown`; `json` remains available for import/internal advanced cases.
+- Sources are minimal but visible in V1: users can see attached sources and perform lightweight source management without a separate source-management workspace.
+- V1 deck import/export should be exposed through basic UI controls, not a full package-management workflow.
+- Deck and card images are displayable in V1 but not user-editable yet.
+
 ## 4) Canonical Deck Model
 ### 4.1 Deck
 A deck instance represents one user-owned symbolic system.
@@ -265,6 +276,8 @@ Additional rules:
 - The starter-content bundle is identified by `initializerKey`.
 - V1 may ship starter content from curated code-level manifests or seeded database content.
 - Until production-quality deck knowledge is ready, starter-content bundles may use mock content.
+- The built-in starter path used by onboarding should produce a personal deck instance that is immediately usable for readings, editing, and export.
+- Starter-content decks should include image references where available so the deck-management surface can feel real even before image editing exists.
 
 ### 6.2 `empty_template`
 Empty-template initialization creates a deck with:
@@ -436,14 +449,26 @@ Preferred external identifier rules:
 - card and symbol detail payloads include both internal `id` and portable `cardId`/`symbolId`,
 - exports use only portable identifiers for deck content.
 
+V1 UX shaping rules for the API:
+- Deck detail payloads should include enough image-reference, link, and source metadata to support a deck-library-first UI without extra lookup endpoints for basic views.
+- Card and symbol detail flows should support bidirectional browsing between linked cards and linked symbols.
+- First-party entry mutation flows only need to create and edit `plain_text` and `markdown` entries, even though the underlying schema still supports `json`.
+- Source payloads must be sufficient for lightweight in-place visibility and editing rather than forcing a dedicated source-management screen.
+
 ## 10) Acceptance Criteria
 This spec is implemented correctly when:
+- choosing the built-in starter deck during onboarding creates a user-owned editable deck instance,
 - a user can initialize a deck from starter content or an empty template,
+- starter-content decks feel immediately usable because they include bundled symbols, links, entries, sources, and image references, even when the content is mock,
 - empty-template decks still create deterministic readings successfully,
 - symbols are independently viewable and linkable to multiple cards,
 - card and symbol information can be added as ordered entries instead of one fixed meaning field,
+- the first-party V1 editing experience supports `plain_text` and `markdown` entries without requiring direct `json` authoring,
+- sources are visible and lightly editable from deck-management flows without needing a separate source workspace,
 - deck exports preserve cards, symbols, links, entries, and source metadata,
+- V1 deck-management can expose basic import/export actions without requiring a full package review workflow,
 - importing that package creates a new owned deck without losing portable identifiers,
+- deck and card images are displayable in V1 without requiring image editing/upload,
 - past readings remain deterministic because `deckSpecVersion` only changes when the ordered card roster changes,
 - deck knowledge can evolve without invalidating old reading assignment records because those edits advance `knowledgeVersion`, not `deckSpecVersion`.
 

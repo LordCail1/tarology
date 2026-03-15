@@ -132,6 +132,7 @@ Execution sequencing:
   - full deck state should be exportable/importable for cloning and sharing
 - Canonical deck-knowledge schema/export spec added:
   - `docs/product/prd-16-deck-knowledge-schema-and-export.md` now defines user-owned deck instances, card/symbol knowledge entry shape, split `deckSpecVersion` vs `knowledgeVersion`, and the V1 JSON export/import package
+  - V1 UX defaults are now locked in that spec: onboarding creates a personal starter-deck copy, starter decks should feel substantial even with mock content, symbols are managed deck-library-first with bidirectional linking, entry authoring is layered, sources stay minimal-but-visible, import/export UI stays basic, and images are view-only in V1
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
@@ -169,6 +170,11 @@ Execution sequencing:
 - Interpretation is deck-knowledge-first; live web research is optional future enrichment rather than a baseline requirement.
 - Cards and symbols own extensible knowledge, and symbols are first-class deck entities that are independently viewable.
 - Decks may start from starter content or empty templates, and deck state must be exportable/importable for cloning or sharing.
+- Choosing the built-in starter deck during onboarding should create a user-owned editable deck instance rather than leaving users on a shared template row.
+- Starter-content decks should feel immediately usable, even if V1 temporarily relies on mock knowledge and image references.
+- Deck-management UX is deck-library-first with bidirectional card/symbol linking.
+- V1 first-party knowledge editing supports `plain_text` and `markdown`; `json` remains internal/import-facing.
+- Sources are minimal but visible in V1; import/export UI is basic; deck/card images are view-only.
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
 - Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
 - User default deck is captured during onboarding and can be overridden per reading.
@@ -202,8 +208,10 @@ Status note:
 Deck-knowledge pivot follow-ups:
 - Implement deck knowledge domain baseline.
   Acceptance: decks persist card information, symbols, symbol links, starter/empty initialization metadata, and attached knowledge references.
+  Guardrail: implement the owned-deck onboarding path, substantial starter-content path, layered entry model, and minimal-visible source support described in `prd-16`.
 - Implement deck-management surface baseline.
   Acceptance: users can browse decks/cards/symbols, edit card/symbol information, and inspect symbols independently from any specific card view.
+  Guardrail: keep the UI deck-library-first, expose basic import/export controls, and do not add V1 image editing/upload.
 - Add deck export/import baseline.
   Acceptance: full deck state can be exported and re-imported without losing card/symbol knowledge or links.
 
