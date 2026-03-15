@@ -46,6 +46,11 @@ Execution sequencing:
   - `GET /v1/readings` and `GET /v1/readings/:id` return durable history/detail state
   - `POST /v1/readings/:id/commands` supports idempotent, version-checked `archive`, `reopen`, and `delete`
   - lifecycle events and milestone snapshots support restore-from-history for reading state
+- API now has an OpenAI-first provider-connections baseline:
+  - Prisma/Postgres persists `provider_connections` and encrypted `provider_credentials`
+  - `GET /v1/provider-connections`, `POST /v1/provider-connections/api-key`, `POST /v1/provider-connections/provider-account/start`, `POST /v1/provider-connections/provider-account/complete`, `PATCH /v1/provider-connections/:id`, and `DELETE /v1/provider-connections/:id` are live behind session auth
+  - provider capability metadata is resolved server-side
+  - public OpenAI `api_key` mode is live, and internal OpenAI `provider_account` mode is gated by an allowlist
 - Product docs now align on a tarot-reader-first, deck-knowledge-first direction:
   - cards and symbols own extensible knowledge,
   - decks may start from starter content or empty templates,
@@ -161,6 +166,12 @@ Execution sequencing:
   - Google auth callback now provisions internal UUID-backed users before saving the session
   - `/reading` now gates on both auth and saved default deck, while `/onboarding` completes first-run deck selection
   - web regression coverage now includes onboarding redirects, onboarding completion, and profile/default-deck shell rendering
+- Provider-connections baseline branch:
+  - Prisma/Postgres now persists `provider_connections` and `provider_credentials`
+  - provider connection contracts now expose capability metadata, connection summaries, default selection, and the OpenAI-first `api_key` / allowlisted `provider_account` split
+  - API keys are encrypted at rest and never returned raw after creation
+  - internal OpenAI provider-account mode uses a session-bound challenge/complete flow and only appears for allowlisted accounts
+  - API Vitest now runs files sequentially to avoid shared test-database races across multiple e2e suites
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -200,6 +211,7 @@ Gate 0 is only complete when the app can create multiple readings, preserve card
 Status note:
 - Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
 - Queue items 3, 4, 6, and 7 are complete for DB-backed reading durability, lifecycle commands, restore projection, and multi-reading history.
+- Queue item 9 is complete for the OpenAI-first provider-connections baseline.
 - Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
 - Product pivot note: before the interpretation workflow is treated as complete, the app now needs a deck knowledge domain and deck-management surface that match the updated charter.
 - Short-term alignment follow-up: replace the web mock `paused` / `complete` reading status vocabulary with canonical lifecycle status before durable history wiring lands.
@@ -247,6 +259,7 @@ Deck-knowledge pivot follow-ups:
 
 9. Start provider-connections domain with capability model.
 - Acceptance: schema/API support provider type, credential mode (`api_key` or `provider_account`), status, default selection, and allowlisted internal OpenAI provider-account handling.
+  Status: complete for the OpenAI-first API baseline.
 
 10. Add interpretation request job model with cancellable state machine.
 - Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
