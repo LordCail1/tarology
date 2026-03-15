@@ -130,6 +130,26 @@ function normalizeKnowledgeSource(
   };
 }
 
+function ensureUniqueKnowledgeSourceIds(
+  sources: Array<Pick<KnowledgeSourceWriteDto, "sourceId">>,
+  message: string
+): void {
+  const seen = new Set<string>();
+
+  for (const source of sources) {
+    const sourceId = source.sourceId?.trim();
+    if (!sourceId) {
+      continue;
+    }
+
+    if (seen.has(sourceId)) {
+      throw new ConflictException(message);
+    }
+
+    seen.add(sourceId);
+  }
+}
+
 @Injectable()
 export class DecksService {
   constructor(
@@ -818,6 +838,11 @@ export class DecksService {
     deckId: string,
     sources: KnowledgeSourceWriteDto[]
   ): Promise<void> {
+    ensureUniqueKnowledgeSourceIds(
+      sources,
+      "Duplicate sourceId values are not allowed when replacing deck sources."
+    );
+
     await tx.knowledgeSource.deleteMany({ where: { deckId } });
 
     if (sources.length === 0) {
@@ -1290,10 +1315,12 @@ export class DecksService {
       symbolIds.add(symbol.symbolId);
     }
 
+    ensureUniqueKnowledgeSourceIds(
+      payload.knowledgeSources,
+      "Duplicate sourceId values are not allowed in import payload."
+    );
+
     const sourceIds = new Set(payload.knowledgeSources.map((source) => source.sourceId));
-    if (sourceIds.size !== payload.knowledgeSources.length) {
-      throw new ConflictException("Duplicate sourceId values are not allowed in import payload.");
-    }
 
     if (payload.cards.length !== TOTAL_TAROT_CARDS) {
       throw new BadRequestException(
