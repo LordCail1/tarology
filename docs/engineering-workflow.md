@@ -3,10 +3,31 @@
 ## Branching Model
 - Protected branch: `main`.
 - Every code change starts on a short-lived branch from `main`.
+- Parallel local implementation work uses dedicated Git worktrees, not multiple agents inside one shared checkout.
 - Branch naming:
   - `feature/<scope>-<short-description>`
   - `fix/<scope>-<short-description>`
   - `chore/<scope>-<short-description>`
+
+## Parallel Agent Worktrees
+Standard local model:
+- coordination lane in `/home/ram2c/gitclones/tarology`
+- one feature branch per dedicated worktree under `/home/ram2c/gitclones/.worktrees/tarology/<branch-name>`
+- one Codex implementation agent per feature worktree
+
+Primary workflow source:
+- use the global `$parallel-agent-worktrees` skill
+
+Preferred setup command:
+
+```bash
+git checkout main
+git pull --ff-only
+npm run git:worktree:add -- feature/<scope>-<short-description>
+```
+
+For Tarology-specific conventions and commands, use:
+- [`docs/parallel-agent-worktrees.md`](./parallel-agent-worktrees.md)
 
 ## Pull Request Rules
 - No direct pushes to `main`.
@@ -33,6 +54,9 @@
 npm run typecheck
 npm run build
 ```
+
+For local stack bring-up and manual smoke tests on `main`, use:
+- [`docs/local-dev-runbook.md`](./local-dev-runbook.md)
 
 ## Before Push / Before PR
 Before pushing a branch or opening a PR:
@@ -64,11 +88,13 @@ After a PR is merged:
 ```bash
 git checkout main
 git pull --ff-only
+git worktree prune
 npm run git:cleanup-local
 ```
 
 - `git checkout main` ensures the current branch is not a candidate for deletion.
 - `git pull --ff-only` updates the local merge base before cleanup.
+- `git worktree prune` clears stale worktree metadata after merged feature worktrees are removed.
 - `npm run git:cleanup-local` deletes local branches already merged into `main` and keeps `main`, `master`, and the current branch.
 - To preview the branches first, run `npm run git:cleanup-local -- --dry-run`.
 

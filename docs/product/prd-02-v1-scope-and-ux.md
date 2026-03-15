@@ -8,8 +8,15 @@ Coverage: sections 4 and 5
 - Google sign-in.
 - Provider connection management for LLM access:
   - user can add API keys,
-  - user can connect OAuth provider accounts where supported,
-  - user can keep one or both configured.
+  - user can connect provider-backed accounts where supported by a given provider/runtime,
+  - user can keep one or both configured where available.
+- Deck library and knowledge management:
+  - user can initialize a deck from starter content or an empty template,
+  - user can browse decks, cards, and symbols,
+  - user can add/edit card information,
+  - user can add/edit symbol information and link symbols to cards,
+  - user can browse symbols independently from cards,
+  - user can export/import private deck state for cloning or sharing.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
   - center: card fan + canvas with mode selection,
@@ -38,23 +45,27 @@ Coverage: sections 4 and 5
 ### 4.3 Model Provider Connections (V1)
 Supported credential modes:
 - `api_key`: user pastes provider API key (encrypted at rest).
-- `oauth`: user authorizes delegated provider access through OAuth/OIDC, if provider exposes this capability for third-party inference.
+- `provider_account`: user authenticates with a provider-backed account/subscription flow when the provider/runtime supports it for this product shape.
 
 Product requirement:
 - User can configure one or many provider connections.
 - User can set default provider/model per workspace.
 - User can override provider/model per interpretation request.
 - Provider connection auth is separate from app account auth (Google sign-in remains required for the app).
+- V1 provider connectivity is OpenAI-first.
+- Public hosted use centers on OpenAI `api_key` mode.
+- OpenAI `provider_account` mode is internal-only in V1 and visible only to allowlisted Tarology accounts.
 
 Important feasibility note (as of 2026-03-08):
-- Some providers document API-key auth for inference but may not expose delegated OAuth that lets a third-party app spend a user's consumer subscription directly.
-- OpenAI and Anthropic integrations should be implemented behind capability checks so product behavior matches current provider auth support at runtime.
-- The app must expose OAuth mode as capability-driven, not hardcoded to any one provider.
+- Some providers document API-key auth for inference but may not expose a supported provider-account flow that lets a third-party app use a user's subscription/account directly.
+- OpenAI should be implemented first behind capability checks so product behavior matches current provider auth support at runtime.
+- Provider-account mode must remain capability-driven and must not assume one fixed protocol such as OAuth.
 
 V1 support policy:
-- Ship API-key mode for providers where API keys are available.
-- Ship OAuth mode behind provider capability flags.
-- If provider OAuth delegation is unavailable, UI must say “Not available for this provider yet” and offer API key setup.
+- Ship OpenAI `api_key` mode as the public baseline.
+- Ship OpenAI `provider_account` mode only for allowlisted internal accounts in V1.
+- Future providers may add either `api_key` or `provider_account` support behind capability flags.
+- If provider-account mode is unavailable for a provider/runtime, UI must say “Not available for this provider yet” and offer API key setup when applicable.
 
 ## 5) UX Blueprint
 ### 5.1 Layout
@@ -75,20 +86,25 @@ V1 support policy:
   - left and right panels are desktop-resizable by drag handle.
   - panel width preference is persisted per user.
 
+### 5.1.1 Reading Lifecycle and Reader Labels
+- Canonical reading lifecycle is `active`, `archived`, or `deleted`.
+- `reopen` is an action that returns an archived reading to `active`; it is not a separate status.
+- Reader-facing organization states such as `completed` or custom labels may exist later, but they are not lifecycle and must not be treated as the source of truth for restore/history behavior.
+
 ### 5.2 Core Journey
 1. User logs in with Google.
-2. On first login, user selects a default tarot deck; preference is persisted.
-3. User starts a new reading, can override deck selection, and writes root question.
-4. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
-5. User draws cards; each draw reveals the pre-assigned card.
-6. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
-7. User requests interpretation for selected group under selected thread.
-8. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
-9. User can stop/cancel interpretation at any time from a visible control.
-10. System returns:
-  - beginner summary,
-  - “why” layer with card/symbol evidence,
-  - optional deep layer with citations.
-11. All meaningful actions persist continuously.
-12. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
-
+2. On first login, user selects or initializes a default tarot deck (starter-content or empty); preference is persisted.
+3. User may review/edit cards and symbols in that deck before beginning a reading.
+4. User starts a new reading, can override deck selection, and writes root question.
+5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
+6. User draws cards; each draw reveals the pre-assigned card.
+7. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
+8. User requests interpretation for selected group under selected thread.
+9. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
+10. User can stop/cancel interpretation at any time from a visible control.
+11. System returns:
+  - plain summary,
+  - “why” layer with card/symbol/deck-knowledge evidence,
+  - optional deep layer with attached knowledge references.
+12. All meaningful actions persist continuously.
+13. User returns later and sees exact reading state restored, including chosen deck and canvas mode.

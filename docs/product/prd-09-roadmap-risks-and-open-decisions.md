@@ -89,7 +89,7 @@ Gate 0 exit rule:
 3. Public randomness verification timing (V1.1 vs V2).
 4. Initial deck/art package licensing strategy.
 5. Data retention windows for sensitive reading text and generated artifacts.
-6. Provider-by-provider launch order for OAuth connections.
+6. Provider-by-provider launch order for future provider-account integrations.
 7. Default high-card warning threshold and initial token/runtime budget limits.
 8. Storyboard model/provider routing strategy per abstraction level.
 9. Subscription packaging details (plan tiers and usage pack denominations).

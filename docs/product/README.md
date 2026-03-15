@@ -1,7 +1,7 @@
 # Tarology Product Documentation Index
 
 Status: Active (modular PRD set)
-Last updated: 2026-03-08
+Last updated: 2026-03-15
 
 This index is the entrypoint for product requirements.
 

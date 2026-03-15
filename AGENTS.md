@@ -8,21 +8,25 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 3. Read `CHARTER.md` fully for global tie-breaker context.
 4. Read `PLAN.md` fully.
 5. Read `docs/engineering-workflow.md`.
-6. Read `docs/ci-cd-vercel.md`, `docs/codex-continuity-research.md`, and `docs/codex-code-review.md` when changing delivery, review, or handoff behavior.
-7. If there is any conflict, follow `CHARTER.md` as tie-breaker and update `PLAN.md` to reflect the chosen implementation path.
+6. Use the global `$parallel-agent-worktrees` skill and read `docs/parallel-agent-worktrees.md` when doing local feature implementation or parallel agent work.
+7. Read `docs/ci-cd-vercel.md`, `docs/codex-continuity-research.md`, and `docs/codex-code-review.md` when changing delivery, review, or handoff behavior.
+8. If there is any conflict, follow `CHARTER.md` as tie-breaker and update `PLAN.md` to reflect the chosen implementation path.
 
 ## 2) Product Intent (Non-Negotiable)
-- Beginner-first tarot reading experience.
+- Tarot-reader-first deck and reading workspace.
 - Card identity and reversal meaning are assigned once at reading creation.
 - Cards are not sampled at click/flip time.
+- Cards and symbols own extensible deck knowledge; live web research is optional future enrichment, not the V1 baseline.
 - Reading state must be durable and restorable.
 - Reading Studio side panels must support smooth expand/collapse animation and desktop drag-resize, with persisted user width preferences.
 - Reading canvas must be mode-capable with `freeform` and `grid` modes under one shared state/command model.
-- User default tarot deck must be captured at first-run onboarding, saved in preferences, and used as default for new readings with per-reading override.
+- Users must be able to initialize decks from starter content or empty templates, and the default deck must be captured at first-run onboarding for new readings with per-reading override.
+- Symbols are first-class deck entities, independently viewable, and linkable to cards.
+- Full deck state should be exportable/importable for cloning or sharing.
 - Interpretation flow supports large card sets, warning users for high-card runs and allowing explicit cancellation.
 - Model provider access must support both credential modes behind one interface:
   - `api_key`
-  - `oauth` (capability-driven per provider)
+  - `provider_account` (capability-driven per provider/runtime; internal OpenAI hosted mode is allowlisted in V1)
 - Symbolic expansion is sequenced after core reliability:
   - Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 - Persona/card voice framing is archetypal and interpretive (non-literal); outputs must never present certainty claims.
@@ -35,18 +39,27 @@ This file is the session bootstrap for any new Codex agent working in this repo.
   - `apps/web` = Next.js UI
   - `apps/api` = NestJS API
   - `packages/shared` = shared contracts/types
-- Keep module boundaries explicit in NestJS (`identity`, `provider-connections`, `reading-studio`, then `knowledge`, `profile`, `workflow` when added).
+- Keep module boundaries explicit in NestJS (`identity`, `provider-connections`, `profile`, `reading-studio`, then `knowledge`, `workflow`, and other support modules when added).
 - Design all boundaries so reading studio can be embedded into a bigger multi-page product later (notes mode/social surfaces).
 
 ## 4) Current Implementation Snapshot
-- Monorepo scaffold is in place.
-- API has a bootstrap `POST /v1/readings` path with seeded shuffle assignment and response contract.
-- UI has a minimal Reading Studio shell with collapsible sidebars and center-first layout.
-- Drag-resize sidebars, multi-mode canvas interactions, and deck preference flows are documented requirements but not fully implemented yet.
-- Persistence is currently in-memory for readings (not production-safe yet).
+- Monorepo scaffold is in place with `apps/web`, `apps/api`, and `packages/shared`.
+- API now has Postgres-backed auth/profile/preferences and reading durability baselines:
+  - Google session auth,
+  - persisted `users`, `auth_identities`, `profiles`, `user_preferences`, and seeded `decks`,
+  - `POST /v1/readings`, `GET /v1/readings`, `GET /v1/readings/:id`, and `POST /v1/readings/:id/commands`.
+- Reading creation is deterministic-at-creation and DB-backed, not in-memory.
+- UI now has a production-shaped Reading Studio shell with:
+  - collapsible and desktop-resizable sidebars,
+  - `freeform` / `grid` canvas modes,
+  - local layout/workspace persistence,
+  - auth gating and onboarding gating.
+- Important current limitation: the deck-management surface described in the product docs is not implemented yet; current deck handling is limited to the default-deck onboarding/catalog baseline.
+- Important current limitation: the visible Reading Studio history/workspace state is still seeded client-side and persisted in `localStorage`; the web shell has not yet been wired to the durable reading API for create/history/restore flows.
 - Product docs now include strategic post-core PRDs (`prd-11` through `prd-15`) and updated API/safety/roadmap guidance.
 - GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.
 - Required checks on `main`: `ci-checks`, `request-codex-review`.
+- Use `docs/local-dev-runbook.md` for the canonical local startup and smoke-test flow.
 - See `PLAN.md` for exact next backlog.
 
 ## 5) Engineering Rules
@@ -55,6 +68,10 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Prefer command-style mutation interfaces for meaningful state changes.
 - Keep shared contracts in `packages/shared` and import from there.
 - Do not commit directly on `main`; use branch + PR workflow.
+- For local parallel development, use one dedicated Git worktree per active feature branch under `/home/ram2c/gitclones/.worktrees/tarology/<branch-name>`.
+- Coordination/docs/merge work should stay in the primary repo checkout when practical; implementation work should happen in the feature worktree.
+- Before editing in a feature session, verify both `git rev-parse --show-toplevel` and `git branch --show-current`.
+- Do not run multiple implementation agents against the same worktree.
 - Before pushing or opening a PR, complete the `Before Push / Before PR` checklist in `docs/engineering-workflow.md`.
 - Every PR must include a Codex review trigger comment using `@codex review` (manual or auto workflow).
 - Run `npm run ci:checks` before ending a working session.

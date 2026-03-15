@@ -7,6 +7,8 @@ Start here:
 - [CHARTER.md](./CHARTER.md) - canonical product and engineering spec
 - [PLAN.md](./PLAN.md) - current implementation status and next queue
 - [AGENTS.md](./AGENTS.md) - Codex/new-session bootstrap instructions
+- [docs/parallel-agent-worktrees.md](./docs/parallel-agent-worktrees.md) - standard local workflow for parallel feature agents
+- [docs/local-dev-runbook.md](./docs/local-dev-runbook.md) - canonical local startup + smoke-test guide
 
 Current workspace layout:
 - `apps/web` - Next.js UI shell
@@ -21,12 +23,27 @@ Current deployment status:
   - seeded Thoth deck catalog entry + API deck spec manifest,
   - `/onboarding` first-run default deck selection,
   - `/reading` gating on authenticated session plus saved default deck.
+- Gate 0 reading durability baseline is also in the local repo now:
+  - DB-backed reading create/list/detail/command APIs,
+  - deterministic deck assignments stored in Postgres,
+  - archive/reopen/delete lifecycle commands with idempotency and version checks.
+- Current UI integration note:
+  - the Reading Studio shell is real and interactive,
+  - but its visible history/workspace restore path is still seeded client-side and persisted in browser `localStorage`,
+  - and the `New Reading` button in the shell is still disabled.
 
 Root scripts:
 - `npm run dev:web`
 - `npm run dev:api`
 - `npm run typecheck`
 - `npm run ci:checks`
+- `npm run git:worktree:add -- <branch-name>`
+- `npm run git:worktree:list`
+- `npm run git:worktree:prune`
+
+Recommended local startup path:
+- use [docs/local-dev-runbook.md](./docs/local-dev-runbook.md)
+- it covers database bring-up, API/web startup, auth prerequisites, current mock-vs-real behavior, and manual smoke tests
 
 Database local setup:
 - API requires `DATABASE_URL` in production and for local test/CI execution.
@@ -66,6 +83,7 @@ Deck assets:
 
 Delivery docs:
 - [docs/engineering-workflow.md](./docs/engineering-workflow.md)
+- [docs/parallel-agent-worktrees.md](./docs/parallel-agent-worktrees.md)
 - [docs/ci-cd-vercel.md](./docs/ci-cd-vercel.md)
 - [docs/codex-continuity-research.md](./docs/codex-continuity-research.md)
 - [docs/codex-code-review.md](./docs/codex-code-review.md)

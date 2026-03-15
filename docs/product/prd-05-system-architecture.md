@@ -5,20 +5,25 @@ Coverage: section 8
 
 ## 8) System Architecture
 ### 8.1 Repository Shape
-Monorepo:
+Current repo today:
 - `apps/web` (Next.js frontend)
 - `apps/api` (NestJS backend)
-- `apps/worker` (workflow workers)
 - `packages/shared` (types/contracts)
+
+Planned monorepo additions after core reliability:
+- `apps/worker` (workflow workers)
 - `packages/prompt-skills` (versioned AI skills)
 
-NestJS module boundaries (required):
-- `identity` (app auth/session/user)
-- `provider-connections` (LLM credentials + capability matrix)
-- `reading-studio` (readings, cards, threads, interpretations)
-- `knowledge` (retrieval caches, source metadata, citation policy)
-- `profile` (stats and progression)
-- `integration` (event publishing, webhooks, external ports)
+NestJS module boundaries over time (required):
+- implemented today:
+  - `identity` (app auth/session/user)
+  - `provider-connections` (LLM credentials + capability matrix scaffold)
+  - `profile` (profile and preferences)
+  - `reading-studio` (readings, cards, threads, interpretations)
+- planned later:
+  - `knowledge` (deck knowledge entries, starter content, source metadata, import/export policy)
+  - `workflow` / worker integration for durable AI jobs
+  - `integration` (event publishing, webhooks, external ports)
 
 Rule:
 - Modules communicate through explicit service interfaces and event contracts.
@@ -36,7 +41,7 @@ Rule:
 
 Frontend composition rules:
 - Build an App Shell that hosts feature “studios” as isolated route groups.
-- V1 ships `Reading Studio`.
+- V1 ships `Reading Studio` plus a deck-management surface.
 - Future studios (`Notes Studio`, `Social Studio`) plug into the same shell with independent state slices and APIs.
 - Shared UI primitives live in a neutral package; studio-specific components stay inside studio modules.
 
@@ -46,4 +51,3 @@ This satisfies scale/readiness goals and keeps domain logic centralized:
 - easier worker integration,
 - easier horizontal API scaling,
 - avoids frontend framework lock-in for core backend behavior.
-
