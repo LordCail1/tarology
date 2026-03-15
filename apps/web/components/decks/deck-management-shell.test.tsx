@@ -213,4 +213,65 @@ describe("DeckManagementShell", () => {
     expect(deckAfterDuplicate.knowledgeVersion).toBe(knowledgeVersionAfterFirstCreate);
     expect(deckAfterDuplicate.symbolCount).toBe(symbolCountAfterFirstCreate);
   });
+
+  it("rejects duplicate symbol linking without bumping persisted knowledge version", async () => {
+    render(
+      <DeckManagementShell
+        profile={profile}
+        preferences={preferences}
+        availableDecks={availableDecks}
+      />
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Thoth Tarot").length).toBeGreaterThan(0));
+
+    fireEvent.change(screen.getByPlaceholderText("Source title"), {
+      target: { value: "Baseline link check source" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Source" }));
+
+    await waitFor(() => expect(screen.getByText("Source added.")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /The Magician/ }));
+    const linkSelect = screen.getByText("Link existing symbol").closest("select");
+    expect(linkSelect).toBeTruthy();
+    fireEvent.change(linkSelect!, {
+      target: { value: "sun-disk" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /The Fool/ }));
+
+    const rawSnapshot = window.localStorage.getItem(buildDeckLibraryStorageKey(profile.userId));
+    expect(rawSnapshot).toBeTruthy();
+    const snapshotBeforeDuplicate = JSON.parse(rawSnapshot!);
+    const deckBeforeDuplicate = snapshotBeforeDuplicate.decks.find(
+      (candidate: { id: string }) => candidate.id === snapshotBeforeDuplicate.activeDeckId
+    );
+    const knowledgeVersionBeforeDuplicate = deckBeforeDuplicate.knowledgeVersion;
+    const foolSunDiskLinksBeforeDuplicate = deckBeforeDuplicate.cardSymbols.filter(
+      (link: { cardId: string; symbolId: string }) =>
+        link.cardId === "major:the-fool" && link.symbolId === "sun-disk"
+    ).length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Link" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Symbol is already linked to this card.")).toBeInTheDocument()
+    );
+    expect(screen.queryByText("Symbol linked to card.")).not.toBeInTheDocument();
+
+    const rawSnapshotAfterDuplicate = window.localStorage.getItem(
+      buildDeckLibraryStorageKey(profile.userId)
+    );
+    const snapshotAfterDuplicate = JSON.parse(rawSnapshotAfterDuplicate!);
+    const deckAfterDuplicate = snapshotAfterDuplicate.decks.find(
+      (candidate: { id: string }) => candidate.id === snapshotAfterDuplicate.activeDeckId
+    );
+    const foolSunDiskLinksAfterDuplicate = deckAfterDuplicate.cardSymbols.filter(
+      (link: { cardId: string; symbolId: string }) =>
+        link.cardId === "major:the-fool" && link.symbolId === "sun-disk"
+    ).length;
+
+    expect(deckAfterDuplicate.knowledgeVersion).toBe(knowledgeVersionBeforeDuplicate);
+    expect(foolSunDiskLinksAfterDuplicate).toBe(foolSunDiskLinksBeforeDuplicate);
+  });
 });

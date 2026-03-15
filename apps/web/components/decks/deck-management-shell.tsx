@@ -641,16 +641,33 @@ export function DeckManagementShell({
       return;
     }
 
+    const symbolExists = selectedDeck.symbols.some((symbol) => symbol.symbolId === linkSymbolId);
+
+    if (!symbolExists) {
+      setFlashMessage({
+        tone: "error",
+        text: "Selected symbol is no longer available in this deck.",
+      });
+      setLinkSymbolId("");
+      return;
+    }
+
+    const alreadyLinked = selectedDeck.cardSymbols.some(
+      (link) => link.cardId === selectedCard.cardId && link.symbolId === linkSymbolId
+    );
+
+    if (alreadyLinked) {
+      setFlashMessage({
+        tone: "error",
+        text: "Symbol is already linked to this card.",
+      });
+      setLinkSymbolId("");
+      return;
+    }
+
     updateSelectedDeck(
       (currentDeck) => {
         const nextDeck = withKnowledgeVersion(currentDeck);
-        const exists = nextDeck.cardSymbols.some(
-          (link) => link.cardId === selectedCard.cardId && link.symbolId === linkSymbolId
-        );
-
-        if (exists) {
-          return nextDeck;
-        }
 
         nextDeck.cardSymbols.push({
           id: createPortableId("link"),

@@ -164,4 +164,45 @@ describe("deck export/import helpers", () => {
 
     expect(importedEntry?.tags).toEqual(["starter", "focus"]);
   });
+
+  it("normalizes imported entry sourceIds to string arrays", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const firstCardEntryId = baseDocument.cardInformationEntries[0]?.entryId;
+    const firstSymbolEntryId = baseDocument.symbolInformationEntries[0]?.entryId;
+    const document = {
+      ...baseDocument,
+      cardInformationEntries: baseDocument.cardInformationEntries.map((entry, index) =>
+        index === 0
+          ? {
+              ...entry,
+              sourceIds: ["starter:thoth-bundle", 42, null] as unknown as string[],
+            }
+          : entry
+      ),
+      symbolInformationEntries: baseDocument.symbolInformationEntries.map((entry, index) =>
+        index === 0
+          ? {
+              ...entry,
+              sourceIds: undefined as unknown as string[],
+            }
+          : entry
+      ),
+    };
+
+    const snapshot = importDeckFromDocument(document, {
+      activeDeckId: deck.id,
+      decks: [deck],
+    });
+    const importedDeck = snapshot.decks.at(-1);
+    const importedCardEntry = importedDeck?.cardInformationEntries.find(
+      (entry) => entry.entryId === firstCardEntryId
+    );
+    const importedSymbolEntry = importedDeck?.symbolInformationEntries.find(
+      (entry) => entry.entryId === firstSymbolEntryId
+    );
+
+    expect(importedCardEntry?.sourceIds).toEqual(["starter:thoth-bundle"]);
+    expect(importedSymbolEntry?.sourceIds).toEqual([]);
+  });
 });

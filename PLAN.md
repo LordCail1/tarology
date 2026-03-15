@@ -177,6 +177,7 @@ Execution sequencing:
   - stale local snapshots now recover to a valid active deck when possible, empty libraries render an explicit recoverable state, and new source IDs are uniqued per deck
   - entry editing now refuses cross-subject saves, and deck export/import now preserves archived knowledge-entry state
   - deck export/import now preserves entry tags, and duplicate symbol submissions no longer churn `knowledgeVersion` or report false success
+  - import now normalizes malformed entry `sourceIds`, and duplicate card-symbol link attempts no longer churn `knowledgeVersion` or report false success
   - web regression coverage now includes the deck-management gate, local deck snapshot helpers, import/export helpers, and basic symbol-creation interaction
 
 ## Locked Product Decisions (Execution)
