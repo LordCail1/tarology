@@ -5,7 +5,16 @@ import type {
   DeckLibrarySnapshot,
   DeckCardEntry,
   DeckSymbolEntry,
+  DeckKnowledgeSourceKind,
 } from "./deck-management-types";
+
+const KNOWLEDGE_SOURCE_KINDS: DeckKnowledgeSourceKind[] = [
+  "reader_note",
+  "starter_content",
+  "imported_reference",
+  "manual_reference",
+  "external_enrichment",
+];
 
 function createPortableId(prefix: string): string {
   const token =
@@ -166,6 +175,16 @@ function assertUniqueIds(values: string[], label: string) {
   }
 }
 
+function assertKnowledgeSourceKind(value: unknown): DeckKnowledgeSourceKind {
+  assert(typeof value === "string", "Knowledge source kind must be a string.");
+  assert(
+    KNOWLEDGE_SOURCE_KINDS.includes(value as DeckKnowledgeSourceKind),
+    `Unsupported knowledge source kind "${String(value)}".`
+  );
+
+  return value as DeckKnowledgeSourceKind;
+}
+
 function importCardEntry(
   entry: DeckExportDocument["cardInformationEntries"][number],
   importedAt: string
@@ -323,7 +342,7 @@ export function importDeckFromDocument(
     knowledgeSources: document.knowledgeSources.map((source) => ({
       id: createPortableId("source"),
       sourceId: source.sourceId,
-      kind: source.kind,
+      kind: assertKnowledgeSourceKind(source.kind),
       title: source.title,
       capturedAt: source.capturedAt,
       author: toOptionalString(source.author),

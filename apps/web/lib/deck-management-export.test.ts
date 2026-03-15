@@ -251,4 +251,27 @@ describe("deck export/import helpers", () => {
       })
     ).toThrow(`Deck export contains duplicate symbol ID "${duplicateSymbolId}".`);
   });
+
+  it("rejects imported decks with unsupported knowledge source kinds", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const document = {
+      ...baseDocument,
+      knowledgeSources: baseDocument.knowledgeSources.map((source, index) =>
+        index === 0
+          ? {
+              ...source,
+              kind: null as unknown as typeof source.kind,
+            }
+          : source
+      ),
+    };
+
+    expect(() =>
+      importDeckFromDocument(document, {
+        activeDeckId: deck.id,
+        decks: [deck],
+      })
+    ).toThrow("Knowledge source kind must be a string.");
+  });
 });

@@ -179,6 +179,7 @@ Execution sequencing:
   - deck export/import now preserves entry tags, and duplicate symbol submissions no longer churn `knowledgeVersion` or report false success
   - import now normalizes malformed entry `sourceIds`, and duplicate card-symbol link attempts no longer churn `knowledgeVersion` or report false success
   - import now rejects duplicate `cardId` / `symbolId` values so malformed shared deck files cannot create unreachable deck records
+  - import now rejects malformed knowledge-source kinds so invalid shared deck files cannot crash the deck library surface on source rendering
   - web regression coverage now includes the deck-management gate, local deck snapshot helpers, import/export helpers, and basic symbol-creation interaction
 
 ## Locked Product Decisions (Execution)
