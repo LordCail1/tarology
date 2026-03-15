@@ -6,6 +6,7 @@ export type DeckInitializationMode =
   | "imported_clone";
 
 export type DeckEntryFormat = "plain_text" | "markdown";
+export type DeckStoredEntryFormat = DeckEntryFormat | "json";
 
 export type DeckKnowledgeSourceKind =
   | "reader_note"
@@ -61,8 +62,9 @@ export interface DeckEntryBase {
   id: string;
   entryId: string;
   label: string;
-  format: DeckEntryFormat;
+  format: DeckStoredEntryFormat;
   bodyText: string;
+  bodyJson: Record<string, unknown> | null;
   summary: string | null;
   tags: string[];
   sourceIds: string[];

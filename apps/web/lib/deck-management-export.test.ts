@@ -47,4 +47,68 @@ describe("deck export/import helpers", () => {
     expect(importedDeck?.symbols.length).toBeGreaterThan(0);
     expect(importedDeck?.originExportDigest).toMatch(/^digest:/);
   });
+
+  it("derives imported cardCount from the cards payload when export metadata is stale", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const document = {
+      ...buildDeckExportDocument(deck),
+      deck: {
+        ...buildDeckExportDocument(deck).deck,
+        cardCount: 12,
+      },
+    };
+
+    const snapshot = importDeckFromDocument(document, {
+      activeDeckId: deck.id,
+      decks: [deck],
+    });
+
+    expect(snapshot.decks.at(-1)?.cardCount).toBe(document.cards.length);
+  });
+
+  it("preserves imported json knowledge entries for later export", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const cardId = baseDocument.cards[0]?.cardId ?? "major:the-fool";
+    const jsonBody = {
+      motif: "sun-disk",
+      tones: ["clarity", "heat"],
+    };
+    const document = {
+      ...baseDocument,
+      cardInformationEntries: [
+        ...baseDocument.cardInformationEntries,
+        {
+          entryId: "json-outline",
+          cardId,
+          label: "json-outline",
+          format: "json" as const,
+          summary: "Structured import payload",
+          sourceIds: [],
+          sortOrder: 99,
+          bodyJson: jsonBody,
+        },
+      ],
+    };
+
+    const snapshot = importDeckFromDocument(document, {
+      activeDeckId: deck.id,
+      decks: [deck],
+    });
+    const importedDeck = snapshot.decks.at(-1);
+    const importedEntry = importedDeck?.cardInformationEntries.find(
+      (entry) => entry.entryId === "json-outline"
+    );
+
+    expect(importedEntry?.format).toBe("json");
+    expect(importedEntry?.bodyJson).toEqual(jsonBody);
+
+    const roundTrippedDocument = buildDeckExportDocument(importedDeck!);
+    const roundTrippedEntry = roundTrippedDocument.cardInformationEntries.find(
+      (entry) => entry.entryId === "json-outline"
+    );
+
+    expect(roundTrippedEntry?.format).toBe("json");
+    expect(roundTrippedEntry?.bodyJson).toEqual(jsonBody);
+  });
 });

@@ -172,6 +172,8 @@ Execution sequencing:
   - the web app seeds a substantial Thoth starter deck locally from the real deck summary, including 78 cards, starter symbols, links, entries, sources, and image references
   - cards and symbols can be browsed independently, symbols can be created and linked to cards, and layered entries can be added/edited/archive-soft-deleted in the UI
   - deck exports and imports now work as basic local JSON actions using the PRD 16 package shape
+  - local deck-library persistence is now scoped by authenticated `userId` so reader-authored deck knowledge cannot leak across accounts in the same browser
+  - import/export hardening now derives imported `cardCount` from the cards payload and preserves `json` knowledge entries as view-only imported records
   - web regression coverage now includes the deck-management gate, local deck snapshot helpers, import/export helpers, and basic symbol-creation interaction
 
 ## Locked Product Decisions (Execution)

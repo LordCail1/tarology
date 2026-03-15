@@ -222,6 +222,7 @@ function buildCardEntries(cards: DeckLibraryCard[]): DeckCardEntry[] {
         label: "core-theme",
         format: "plain_text",
         bodyText: `${card.name} is loaded here as starter-content mock knowledge. Treat it as a stable thematic anchor for the card rather than a final authoritative meaning.`,
+        bodyJson: null,
         summary: `Starter note for ${card.name}.`,
         tags: ["starter", "theme"],
         sourceIds: [STARTER_SOURCE_ID],
@@ -240,6 +241,7 @@ function buildCardEntries(cards: DeckLibraryCard[]): DeckCardEntry[] {
         label: "reader-angle",
         format: "markdown",
         bodyText: `- Notice how **${card.name}** changes tone depending on the question.\n- Track whether the symbol field feels clarifying, disruptive, or catalytic.\n- Use this as a reader-owned note slot once the starter bundle is no longer enough.`,
+        bodyJson: null,
         summary: `Reader-facing prompt for ${card.name}.`,
         tags: ["reader-note", "prompt"],
         sourceIds: [READER_SOURCE_ID],
@@ -280,6 +282,7 @@ function buildSymbolEntries(symbols: DeckLibrarySymbol[]): DeckSymbolEntry[] {
       index % 2 === 0
         ? `${symbol.name} is stored as a first-class deck symbol so the reader can track it across multiple cards and question contexts.`
         : `- ${symbol.name} is intentionally deck-scoped.\n- Use it to compare recurring appearances across linked cards.\n- Expand this note as your personal symbolic system evolves.`,
+    bodyJson: null,
     summary: `${symbol.name} starter motif.`,
     tags: ["symbol", "starter"],
     sourceIds: [STARTER_SOURCE_ID],

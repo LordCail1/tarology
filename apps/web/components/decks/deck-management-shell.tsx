@@ -39,6 +39,8 @@ interface EntryDraft {
   sourceId: string;
 }
 
+type EditableDeckEntry = (DeckCardEntry | DeckSymbolEntry) & { format: DeckEntryFormat };
+
 interface SourceDraft {
   title: string;
   url: string;
@@ -119,6 +121,16 @@ function activeEntriesForSubject(
     .sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
+function isEditableEntry(entry: DeckCardEntry | DeckSymbolEntry): entry is EditableDeckEntry {
+  return entry.format !== "json";
+}
+
+function entryBodyPreview(entry: DeckCardEntry | DeckSymbolEntry): string {
+  return entry.format === "json" && entry.bodyJson
+    ? JSON.stringify(entry.bodyJson, null, 2)
+    : entry.bodyText;
+}
+
 function cloneDeck(deck: DeckLibraryDeck): DeckLibraryDeck {
   return cloneDeckLibraryDeck(deck);
 }
@@ -164,9 +176,10 @@ export function DeckManagementShell({
   const dataSource = useMemo(
     () =>
       createLocalDeckManagementDataSource(
-        typeof window === "undefined" ? undefined : window.localStorage
+        typeof window === "undefined" ? undefined : window.localStorage,
+        profile.userId
       ),
-    []
+    [profile.userId]
   );
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [snapshot, setSnapshot] = useState<DeckLibrarySnapshot | null>(null);
@@ -371,6 +384,10 @@ export function DeckManagementShell({
   }
 
   function startEditingEntry(entry: DeckCardEntry | DeckSymbolEntry) {
+    if (!isEditableEntry(entry)) {
+      return;
+    }
+
     setEditingEntryId(entry.id);
     setEntryDraft({
       label: entry.label,
@@ -404,6 +421,7 @@ export function DeckManagementShell({
               label: entryDraft.label,
               format: entryDraft.format,
               bodyText: entryDraft.bodyText,
+              bodyJson: null,
               sourceIds,
               summary: entryDraft.bodyText.slice(0, 96),
               updatedAt: now,
@@ -419,6 +437,7 @@ export function DeckManagementShell({
             label: entryDraft.label,
             format: entryDraft.format,
             bodyText: entryDraft.bodyText,
+            bodyJson: null,
             summary: entryDraft.bodyText.slice(0, 96),
             tags: ["reader-note"],
             sourceIds,
@@ -443,6 +462,7 @@ export function DeckManagementShell({
             label: entryDraft.label,
             format: entryDraft.format,
             bodyText: entryDraft.bodyText,
+            bodyJson: null,
             sourceIds,
             summary: entryDraft.bodyText.slice(0, 96),
             updatedAt: now,
@@ -458,6 +478,7 @@ export function DeckManagementShell({
           label: entryDraft.label,
           format: entryDraft.format,
           bodyText: entryDraft.bodyText,
+          bodyJson: null,
           summary: entryDraft.bodyText.slice(0, 96),
           tags: ["reader-note"],
           sourceIds,
@@ -1170,18 +1191,27 @@ export function DeckManagementShell({
                         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)]">
                           {entry.label}
                         </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--color-ink)]">
-                          {entry.bodyText}
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                          {entry.format === "json" ? "Imported JSON entry" : entry.format.replace("_", " ")}
                         </p>
+                        <pre className="mt-2 whitespace-pre-wrap text-sm text-[var(--color-ink)] font-sans">
+                          {entryBodyPreview(entry)}
+                        </pre>
                       </div>
                       <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className={buttonClass}
-                          onClick={() => startEditingEntry(entry)}
-                        >
-                          Edit
-                        </button>
+                        {isEditableEntry(entry) ? (
+                          <button
+                            type="button"
+                            className={buttonClass}
+                            onClick={() => startEditingEntry(entry)}
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center rounded-lg border border-[var(--color-border)] px-3 py-2 text-xs text-[var(--color-muted)]">
+                            View only
+                          </span>
+                        )}
                         <button
                           type="button"
                           className={buttonClass}

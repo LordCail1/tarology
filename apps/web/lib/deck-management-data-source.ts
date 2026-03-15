@@ -3,6 +3,9 @@ import { cloneDeckLibraryDeck, createDeckFromSummary } from "./deck-management-t
 import type { DeckLibrarySnapshot } from "./deck-management-types";
 
 export const DECK_LIBRARY_STORAGE_KEY = "tarology.ui.deckLibrary.v1";
+export function buildDeckLibraryStorageKey(userId: string): string {
+  return `${DECK_LIBRARY_STORAGE_KEY}:${userId}`;
+}
 
 function cloneSnapshot(snapshot: DeckLibrarySnapshot): DeckLibrarySnapshot {
   return {
@@ -33,8 +36,11 @@ function buildSeedSnapshot(
 }
 
 export function createLocalDeckManagementDataSource(
-  storage: Storage | undefined
+  storage: Storage | undefined,
+  userId: string
 ): DeckManagementDataSource {
+  const storageKey = buildDeckLibraryStorageKey(userId);
+
   return {
     async loadLibrary(
       deckSummaries: DeckSummary[],
@@ -47,7 +53,7 @@ export function createLocalDeckManagementDataSource(
       }
 
       try {
-        const rawValue = storage.getItem(DECK_LIBRARY_STORAGE_KEY);
+        const rawValue = storage.getItem(storageKey);
         if (!rawValue) {
           return fallback;
         }
@@ -75,7 +81,7 @@ export function createLocalDeckManagementDataSource(
       }
 
       try {
-        storage.setItem(DECK_LIBRARY_STORAGE_KEY, JSON.stringify(snapshot));
+        storage.setItem(storageKey, JSON.stringify(snapshot));
       } catch {
         // Ignore storage write failures.
       }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createLocalDeckManagementDataSource } from "./deck-management-data-source";
+import {
+  buildDeckLibraryStorageKey,
+  createLocalDeckManagementDataSource,
+} from "./deck-management-data-source";
 
 const thothSummary = {
   id: "thoth",
@@ -13,7 +16,7 @@ const thothSummary = {
 
 describe("createLocalDeckManagementDataSource", () => {
   it("builds a substantial starter deck snapshot from the real deck summary list", async () => {
-    const dataSource = createLocalDeckManagementDataSource(undefined);
+    const dataSource = createLocalDeckManagementDataSource(undefined, "usr_123");
 
     const snapshot = await dataSource.loadLibrary([thothSummary], "thoth");
 
@@ -28,7 +31,7 @@ describe("createLocalDeckManagementDataSource", () => {
   it("restores a persisted snapshot when local storage already has one", async () => {
     const storage = window.localStorage;
     storage.setItem(
-      "tarology.ui.deckLibrary.v1",
+      buildDeckLibraryStorageKey("usr_123"),
       JSON.stringify({
         activeDeckId: "imported-1",
         decks: [
@@ -51,11 +54,45 @@ describe("createLocalDeckManagementDataSource", () => {
       })
     );
 
-    const dataSource = createLocalDeckManagementDataSource(storage);
+    const dataSource = createLocalDeckManagementDataSource(storage, "usr_123");
     const snapshot = await dataSource.loadLibrary([thothSummary], "thoth");
 
     expect(snapshot.activeDeckId).toBe("imported-1");
     expect(snapshot.decks[0].id).toBe("imported-1");
+    storage.clear();
+  });
+
+  it("keeps one reader's local deck library isolated from another reader on the same browser", async () => {
+    const storage = window.localStorage;
+    storage.setItem(
+      buildDeckLibraryStorageKey("usr_123"),
+      JSON.stringify({
+        activeDeckId: "reader-one-deck",
+        decks: [
+          {
+            ...thothSummary,
+            id: "reader-one-deck",
+            knowledgeVersion: 2,
+            initializationMode: "imported_clone",
+            initializerKey: null,
+            originExportDigest: "digest:one",
+            symbolCount: 0,
+            cards: [],
+            symbols: [],
+            cardSymbols: [],
+            knowledgeSources: [],
+            cardInformationEntries: [],
+            symbolInformationEntries: [],
+          },
+        ],
+      })
+    );
+
+    const readerTwoDataSource = createLocalDeckManagementDataSource(storage, "usr_456");
+    const snapshot = await readerTwoDataSource.loadLibrary([thothSummary], "thoth");
+
+    expect(snapshot.activeDeckId).toBe("thoth");
+    expect(snapshot.decks[0].id).toBe("thoth");
     storage.clear();
   });
 });

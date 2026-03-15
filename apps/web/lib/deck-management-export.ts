@@ -26,7 +26,7 @@ function digestValue(input: string): string {
 }
 
 function toCardEntryPayload(entry: DeckCardEntry): DeckExportDocument["cardInformationEntries"][number] {
-  return {
+  const payload = {
     entryId: entry.entryId,
     cardId: entry.cardId,
     label: entry.label,
@@ -34,14 +34,23 @@ function toCardEntryPayload(entry: DeckCardEntry): DeckExportDocument["cardInfor
     summary: entry.summary,
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
-    bodyText: entry.bodyText,
   };
+
+  return entry.format === "json"
+    ? {
+        ...payload,
+        bodyJson: entry.bodyJson,
+      }
+    : {
+        ...payload,
+        bodyText: entry.bodyText,
+      };
 }
 
 function toSymbolEntryPayload(
   entry: DeckSymbolEntry
 ): DeckExportDocument["symbolInformationEntries"][number] {
-  return {
+  const payload = {
     entryId: entry.entryId,
     symbolId: entry.symbolId,
     label: entry.label,
@@ -49,8 +58,17 @@ function toSymbolEntryPayload(
     summary: entry.summary,
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
-    bodyText: entry.bodyText,
   };
+
+  return entry.format === "json"
+    ? {
+        ...payload,
+        bodyJson: entry.bodyJson,
+      }
+    : {
+        ...payload,
+        bodyText: entry.bodyText,
+      };
 }
 
 export function buildDeckExportDocument(deck: DeckLibraryDeck): DeckExportDocument {
@@ -120,6 +138,113 @@ function toOptionalString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function toOptionalRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function toDisplayBodyText(bodyJson: Record<string, unknown>): string {
+  return JSON.stringify(bodyJson, null, 2);
+}
+
+function importCardEntry(
+  entry: DeckExportDocument["cardInformationEntries"][number],
+  importedAt: string
+): DeckCardEntry {
+  const bodyJson = toOptionalRecord(entry.bodyJson);
+
+  if (entry.format === "json") {
+    assert(bodyJson, "JSON card knowledge entries must include bodyJson.");
+
+    return {
+      id: createPortableId("entry"),
+      entryId: entry.entryId,
+      cardId: entry.cardId,
+      label: entry.label,
+      format: "json",
+      bodyText: toDisplayBodyText(bodyJson),
+      bodyJson,
+      summary: entry.summary,
+      tags: [],
+      sourceIds: entry.sourceIds,
+      sortOrder: entry.sortOrder,
+      archivedAt: null,
+      createdAt: importedAt,
+      updatedAt: importedAt,
+    };
+  }
+
+  assert(typeof entry.bodyText === "string", "Text card knowledge entries must include bodyText.");
+
+  return {
+    id: createPortableId("entry"),
+    entryId: entry.entryId,
+    cardId: entry.cardId,
+    label: entry.label,
+    format: entry.format === "markdown" ? "markdown" : "plain_text",
+    bodyText: entry.bodyText,
+    bodyJson: null,
+    summary: entry.summary,
+    tags: [],
+    sourceIds: entry.sourceIds,
+    sortOrder: entry.sortOrder,
+    archivedAt: null,
+    createdAt: importedAt,
+    updatedAt: importedAt,
+  };
+}
+
+function importSymbolEntry(
+  entry: DeckExportDocument["symbolInformationEntries"][number],
+  importedAt: string
+): DeckSymbolEntry {
+  const bodyJson = toOptionalRecord(entry.bodyJson);
+
+  if (entry.format === "json") {
+    assert(bodyJson, "JSON symbol knowledge entries must include bodyJson.");
+
+    return {
+      id: createPortableId("entry"),
+      entryId: entry.entryId,
+      symbolId: entry.symbolId,
+      label: entry.label,
+      format: "json",
+      bodyText: toDisplayBodyText(bodyJson),
+      bodyJson,
+      summary: entry.summary,
+      tags: [],
+      sourceIds: entry.sourceIds,
+      sortOrder: entry.sortOrder,
+      archivedAt: null,
+      createdAt: importedAt,
+      updatedAt: importedAt,
+    };
+  }
+
+  assert(
+    typeof entry.bodyText === "string",
+    "Text symbol knowledge entries must include bodyText."
+  );
+
+  return {
+    id: createPortableId("entry"),
+    entryId: entry.entryId,
+    symbolId: entry.symbolId,
+    label: entry.label,
+    format: entry.format === "markdown" ? "markdown" : "plain_text",
+    bodyText: entry.bodyText,
+    bodyJson: null,
+    summary: entry.summary,
+    tags: [],
+    sourceIds: entry.sourceIds,
+    sortOrder: entry.sortOrder,
+    archivedAt: null,
+    createdAt: importedAt,
+    updatedAt: importedAt,
+  };
+}
+
 export function importDeckFromDocument(
   document: DeckExportDocument,
   snapshot: DeckLibrarySnapshot
@@ -138,7 +263,7 @@ export function importDeckFromDocument(
     specVersion: document.deck.deckSpecVersion,
     previewImageUrl: document.deck.previewImageUrl,
     backImageUrl: document.deck.backImageUrl,
-    cardCount: document.deck.cardCount,
+    cardCount: document.cards.length,
     knowledgeVersion: document.deck.knowledgeVersion,
     initializationMode: "imported_clone",
     initializerKey: document.deck.initializerKey,
@@ -151,7 +276,7 @@ export function importDeckFromDocument(
       sortOrder: card.sortOrder,
       shortLabel: toOptionalString(card.shortLabel),
       faceImageUrl: toOptionalString(card.faceImageUrl),
-      metadataJson: (card.metadataJson as Record<string, unknown> | null | undefined) ?? null,
+      metadataJson: toOptionalRecord(card.metadataJson),
     })),
     symbols: document.symbols.map((symbol) => ({
       id: createPortableId("symbol"),
@@ -159,16 +284,14 @@ export function importDeckFromDocument(
       name: symbol.name,
       shortLabel: toOptionalString(symbol.shortLabel),
       description: toOptionalString(symbol.description),
-      metadataJson:
-        (symbol.metadataJson as Record<string, unknown> | null | undefined) ?? null,
+      metadataJson: toOptionalRecord(symbol.metadataJson),
     })),
     cardSymbols: document.cardSymbols.map((link) => ({
       id: createPortableId("link"),
       cardId: link.cardId,
       symbolId: link.symbolId,
       sortOrder: typeof link.sortOrder === "number" ? link.sortOrder : null,
-      placementHintJson:
-        (link.placementHintJson as Record<string, unknown> | null | undefined) ?? null,
+      placementHintJson: toOptionalRecord(link.placementHintJson),
       linkNote: toOptionalString(link.linkNote),
     })),
     knowledgeSources: document.knowledgeSources.map((source) => ({
@@ -183,43 +306,14 @@ export function importDeckFromDocument(
       citationText: toOptionalString(source.citationText),
       publishedAt: toOptionalString(source.publishedAt),
       rightsNote: toOptionalString(source.rightsNote),
-      metadataJson:
-        (source.metadataJson as Record<string, unknown> | null | undefined) ?? null,
+      metadataJson: toOptionalRecord(source.metadataJson),
     })),
-    cardInformationEntries: document.cardInformationEntries
-      .filter((entry) => typeof entry.bodyText === "string")
-      .map((entry) => ({
-        id: createPortableId("entry"),
-        entryId: entry.entryId,
-        cardId: entry.cardId,
-        label: entry.label,
-        format: entry.format === "markdown" ? "markdown" : "plain_text",
-        bodyText: entry.bodyText ?? "",
-        summary: entry.summary,
-        tags: [],
-        sourceIds: entry.sourceIds,
-        sortOrder: entry.sortOrder,
-        archivedAt: null,
-        createdAt: importedAt,
-        updatedAt: importedAt,
-      })),
-    symbolInformationEntries: document.symbolInformationEntries
-      .filter((entry) => typeof entry.bodyText === "string")
-      .map((entry) => ({
-        id: createPortableId("entry"),
-        entryId: entry.entryId,
-        symbolId: entry.symbolId,
-        label: entry.label,
-        format: entry.format === "markdown" ? "markdown" : "plain_text",
-        bodyText: entry.bodyText ?? "",
-        summary: entry.summary,
-        tags: [],
-        sourceIds: entry.sourceIds,
-        sortOrder: entry.sortOrder,
-        archivedAt: null,
-        createdAt: importedAt,
-        updatedAt: importedAt,
-      })),
+    cardInformationEntries: document.cardInformationEntries.map((entry) =>
+      importCardEntry(entry, importedAt)
+    ),
+    symbolInformationEntries: document.symbolInformationEntries.map((entry) =>
+      importSymbolEntry(entry, importedAt)
+    ),
   };
 
   return {
