@@ -137,7 +137,17 @@ function ensureUniqueKnowledgeSourceIds(
   const seen = new Set<string>();
 
   for (const source of sources) {
-    const sourceId = source.sourceId?.trim();
+    if (source.sourceId == null) {
+      continue;
+    }
+
+    if (typeof source.sourceId !== "string") {
+      throw new BadRequestException(
+        'Knowledge source field "sourceId" must be a string when provided.'
+      );
+    }
+
+    const sourceId = source.sourceId.trim();
     if (!sourceId) {
       continue;
     }

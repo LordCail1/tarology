@@ -209,6 +209,23 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects non-string knowledge source identifiers in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.knowledgeSources = [
+      {
+        ...payload.knowledgeSources[0],
+        sourceId: 123 as unknown as string,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects duplicate card-symbol links in import payloads", async () => {
     const { prisma, service } = createDecksService();
     const payload = buildValidImportPayload();
@@ -529,6 +546,46 @@ describe("DecksService", () => {
         ],
       })
     ).rejects.toThrow(ConflictException);
+
+    expect(tx.knowledgeSource.deleteMany).not.toHaveBeenCalled();
+    expect(tx.knowledgeSource.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string knowledge source identifiers when replacing deck sources", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      knowledgeSource: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedDeckSummary").mockResolvedValue({
+      id: "deck_owned_thoth",
+    });
+    vi.spyOn(service as any, "requireOwnedDeckDetail").mockResolvedValue({
+      id: "deck_owned_thoth",
+    });
+
+    await expect(
+      service.updateDeck("11111111-1111-1111-1111-111111111111", "deck_owned_thoth", {
+        sources: [
+          {
+            sourceId: 123 as unknown as string,
+            kind: "starter_content",
+            title: "Broken source",
+          },
+        ],
+      })
+    ).rejects.toThrow(BadRequestException);
 
     expect(tx.knowledgeSource.deleteMany).not.toHaveBeenCalled();
     expect(tx.knowledgeSource.createMany).not.toHaveBeenCalled();
