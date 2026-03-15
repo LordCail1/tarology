@@ -523,6 +523,25 @@ describe("ReadingStudioShell", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows a recoverable message when activating a reading fails", async () => {
+    mockStudioState.setActiveReadingOverride = async () => {
+      throw new Error("Unable to open that reading right now. Please try again.");
+    };
+
+    await renderHydratedShell();
+
+    fireEvent.click(screen.getByRole("button", { name: /Creative project momentum sprint/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Unable to open that reading right now. Please try again."
+      )
+    );
+    expect(
+      screen.getByRole("heading", { name: "Career realignment and confidence" })
+    ).toBeInTheDocument();
+  });
+
   it("drops stale persisted workspaces when newer optimistic actions already exist", async () => {
     const snapshot = cloneValue(readingStudioSeedSnapshot);
     const deferredPersistOne = createDeferred<ReadingStudioWorkspace>();
@@ -582,6 +601,43 @@ describe("ReadingStudioShell", () => {
       await deferredPersistTwo.promise;
     });
 
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("button", { name: "The Magician card" })).getByText("Rotation 30°")
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("keeps attempting persistence after a save and reload failure", async () => {
+    let persistAttemptCount = 0;
+
+    mockStudioState.applyWorkspaceActionOverride = async () => {
+      persistAttemptCount += 1;
+      throw new Error("Network unavailable");
+    };
+    mockStudioState.setActiveReadingOverride = async () => {
+      throw new Error("Unable to save the latest workspace change right now. Please try again.");
+    };
+
+    await renderHydratedShell();
+
+    const activeCard = screen.getByRole("button", { name: "The Magician card" });
+    dispatchMouseDrag(activeCard, { clientX: 50, clientY: 80 });
+    await waitFor(() => expect(activeCard).toHaveAttribute("aria-pressed", "true"));
+    persistAttemptCount = 0;
+
+    fireEvent.click(screen.getByRole("button", { name: "Rotate +15°" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Unable to save the latest workspace change right now. Please try again."
+      )
+    );
+    expect(persistAttemptCount).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Rotate +15°" }));
+
+    await waitFor(() => expect(persistAttemptCount).toBe(2));
     await waitFor(() =>
       expect(
         within(screen.getByRole("button", { name: "The Magician card" })).getByText("Rotation 30°")

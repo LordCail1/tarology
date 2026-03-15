@@ -154,6 +154,8 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   const [studioStatus, setStudioStatus] = useState<StudioStatus>("loading");
   const [studioErrorMessage, setStudioErrorMessage] = useState<string | null>(null);
   const [readingCreationErrorMessage, setReadingCreationErrorMessage] = useState<string | null>(null);
+  const [readingInteractionErrorMessage, setReadingInteractionErrorMessage] =
+    useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] =
@@ -319,6 +321,10 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   });
 
   const groupedReadings = groupReadingsByRecency(filteredReadings ?? []);
+  const inlineAlertMessages = [
+    readingInteractionErrorMessage,
+    readingCreationErrorMessage,
+  ].filter((message): message is string => Boolean(message));
 
   function upsertHistoryItem(
     currentHistory: ReadingHistoryItem[],
@@ -447,27 +453,41 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
 
     const requestId = readingActivationRequestIdRef.current + 1;
     readingActivationRequestIdRef.current = requestId;
-    const nextWorkspace = await dataSource.setActiveReading(readingId);
+    setReadingInteractionErrorMessage(null);
 
-    if (requestId !== readingActivationRequestIdRef.current) {
-      return;
-    }
+    try {
+      const nextWorkspace = await dataSource.setActiveReading(readingId);
 
-    setStudioSnapshot((current) => {
-      if (!current) {
-        return current;
+      if (requestId !== readingActivationRequestIdRef.current) {
+        return;
       }
 
-      return {
-        ...current,
-        activeReadingId: readingId,
-        workspaces: {
-          ...current.workspaces,
-          [readingId]: nextWorkspace,
-        },
-      };
-    });
-    setSelectedCardId(null);
+      setStudioSnapshot((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          activeReadingId: readingId,
+          workspaces: {
+            ...current.workspaces,
+            [readingId]: nextWorkspace,
+          },
+        };
+      });
+      setSelectedCardId(null);
+    } catch (error) {
+      if (requestId !== readingActivationRequestIdRef.current) {
+        return;
+      }
+
+      setReadingInteractionErrorMessage(
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "Unable to open that reading right now. Please try again."
+      );
+    }
   }
 
   function commitWorkspace(
@@ -511,6 +531,7 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
 
     const rootQuestion = promptedQuestion.trim().length > 0 ? promptedQuestion.trim() : "Untitled reading";
     setReadingCreationErrorMessage(null);
+    setReadingInteractionErrorMessage(null);
 
     try {
       const nextWorkspace = await dataSource.createReading(rootQuestion);
@@ -541,11 +562,13 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
       return;
     }
 
+    setReadingInteractionErrorMessage(null);
     const baseVersion = activeWorkspace.reading.version;
     const optimisticWorkspace = applyWorkspaceAction(activeWorkspace, action);
     commitWorkspace(optimisticWorkspace);
 
     persistChainRef.current = persistChainRef.current
+      .catch(() => undefined)
       .then(async () => {
         const persistedWorkspace = await dataSource.applyWorkspaceAction(
           optimisticWorkspace.reading.id,
@@ -558,8 +581,16 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
         });
       })
       .catch(async () => {
-        const reloadedWorkspace = await dataSource.setActiveReading(optimisticWorkspace.reading.id);
-        commitWorkspace(reloadedWorkspace);
+        try {
+          const reloadedWorkspace = await dataSource.setActiveReading(optimisticWorkspace.reading.id);
+          commitWorkspace(reloadedWorkspace);
+        } catch (error) {
+          setReadingInteractionErrorMessage(
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message
+              : "Unable to save the latest workspace change right now. Please try again."
+          );
+        }
       });
   }
 
@@ -606,14 +637,15 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           <p className="mt-3 text-sm text-[var(--color-muted)]">
             Your workspace is ready. Create a reading to load durable history and canvas state.
           </p>
-          {readingCreationErrorMessage ? (
+          {inlineAlertMessages.map((message, index) => (
             <p
+              key={`empty-alert-${index}`}
               role="alert"
               className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100"
             >
-              {readingCreationErrorMessage}
+              {message}
             </p>
-          ) : null}
+          ))}
           <button
             type="button"
             className="mt-6 inline-flex items-center justify-center rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-black transition hover:brightness-110"
@@ -730,14 +762,19 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           onOpenMobileAnalysisDrawer={() => setPanelOpen("right", true)}
           onNewReading={() => void handleNewReading()}
         />
-        {readingCreationErrorMessage ? (
+        {inlineAlertMessages.length > 0 ? (
           <div className="mx-auto w-full max-w-[1500px] px-4 pt-4 lg:px-8">
-            <p
-              role="alert"
-              className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100"
-            >
-              {readingCreationErrorMessage}
-            </p>
+            <div className="flex flex-col gap-3">
+              {inlineAlertMessages.map((message, index) => (
+                <p
+                  key={`workspace-alert-${index}`}
+                  role="alert"
+                  className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+                >
+                  {message}
+                </p>
+              ))}
+            </div>
           </div>
         ) : null}
         <CanvasPanel

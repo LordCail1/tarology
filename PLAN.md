@@ -163,6 +163,8 @@ Execution sequencing:
   - create-reading failures now surface as a recoverable in-studio alert instead of leaving unhandled promise rejections with no user feedback
   - reading activation now ignores out-of-order fetch completions so slower history loads cannot flip the UI back to a stale selection
   - queued persistence responses now skip stale lower-version commits so older server responses cannot roll back newer optimistic canvas edits
+  - reading activation failures now surface as recoverable inline alerts instead of unhandled rejections when a selected reading cannot be fetched
+  - workspace persistence chains now self-heal after a failed save-plus-reload path so later user actions still attempt API persistence
 - Reading durability/history backend branch:
   - Prisma/Postgres now replaces the in-memory reading map for the canonical create/read path
   - shared reading contracts now include lifecycle status, summaries/details, history filters, and command envelopes
