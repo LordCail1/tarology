@@ -25,6 +25,46 @@ function cloneSnapshot(snapshot: DeckLibrarySnapshot): DeckLibrarySnapshot {
   };
 }
 
+function isValidDeckArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function isValidPersistedDeck(deck: unknown): deck is DeckLibrarySnapshot["decks"][number] {
+  if (!deck || typeof deck !== "object") {
+    return false;
+  }
+
+  const candidate = deck as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.cardCount === "number" &&
+    typeof candidate.knowledgeVersion === "number" &&
+    typeof candidate.symbolCount === "number" &&
+    isValidDeckArray(candidate.cards) &&
+    isValidDeckArray(candidate.symbols) &&
+    isValidDeckArray(candidate.cardSymbols) &&
+    isValidDeckArray(candidate.knowledgeSources) &&
+    isValidDeckArray(candidate.cardInformationEntries) &&
+    isValidDeckArray(candidate.symbolInformationEntries)
+  );
+}
+
+function isValidPersistedSnapshot(value: unknown): value is DeckLibrarySnapshot {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.activeDeckId === "string" &&
+    Array.isArray(candidate.decks) &&
+    candidate.decks.length > 0 &&
+    candidate.decks.every(isValidPersistedDeck)
+  );
+}
+
 export interface DeckManagementDataSource {
   loadLibrary(deckSummaries: DeckSummary[], defaultDeckId: string | null): Promise<DeckLibrarySnapshot>;
   saveLibrary(snapshot: DeckLibrarySnapshot): Promise<void>;
@@ -65,8 +105,8 @@ export function createLocalDeckManagementDataSource(
           return fallback;
         }
 
-        const parsed = JSON.parse(rawValue) as DeckLibrarySnapshot;
-        if (!parsed.decks?.length) {
+        const parsed = JSON.parse(rawValue) as unknown;
+        if (!isValidPersistedSnapshot(parsed)) {
           return fallback;
         }
 

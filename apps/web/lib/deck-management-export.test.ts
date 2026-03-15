@@ -274,4 +274,58 @@ describe("deck export/import helpers", () => {
       })
     ).toThrow("Knowledge source kind must be a string.");
   });
+
+  it("rejects imported decks with card-symbol links that reference missing cards", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const document = {
+      ...baseDocument,
+      cardSymbols: [
+        ...baseDocument.cardSymbols,
+        {
+          cardId: "major:missing-card",
+          symbolId: baseDocument.symbols[0]!.symbolId,
+          sortOrder: 99,
+          placementHintJson: null,
+          linkNote: null,
+        },
+      ],
+    };
+
+    expect(() =>
+      importDeckFromDocument(document, {
+        activeDeckId: deck.id,
+        decks: [deck],
+      })
+    ).toThrow('Deck export references missing card ID "major:missing-card" in cardSymbols.');
+  });
+
+  it("rejects imported decks with symbol entries that reference missing symbols", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const baseDocument = buildDeckExportDocument(deck);
+    const document = {
+      ...baseDocument,
+      symbolInformationEntries: [
+        ...baseDocument.symbolInformationEntries,
+        {
+          entryId: "orphan-symbol-entry",
+          symbolId: "missing-symbol",
+          label: "reader-note",
+          format: "plain_text" as const,
+          summary: null,
+          tags: [],
+          sourceIds: [],
+          sortOrder: 99,
+          bodyText: "orphaned symbol note",
+        },
+      ],
+    };
+
+    expect(() =>
+      importDeckFromDocument(document, {
+        activeDeckId: deck.id,
+        decks: [deck],
+      })
+    ).toThrow('Deck export references missing symbol ID "missing-symbol" in symbolInformationEntries.');
+  });
 });

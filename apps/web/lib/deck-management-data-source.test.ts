@@ -129,4 +129,39 @@ describe("createLocalDeckManagementDataSource", () => {
     expect(snapshot.decks[0].id).toBe("thoth");
     storage.clear();
   });
+
+  it("falls back to the seeded snapshot when persisted deck data is structurally incomplete", async () => {
+    const storage = window.localStorage;
+    storage.setItem(
+      buildDeckLibraryStorageKey("usr_123"),
+      JSON.stringify({
+        activeDeckId: "corrupted-deck",
+        decks: [
+          {
+            ...thothSummary,
+            id: "corrupted-deck",
+            knowledgeVersion: 1,
+            initializationMode: "imported_clone",
+            initializerKey: null,
+            originExportDigest: "digest:bad",
+            symbolCount: 0,
+            cards: null,
+            symbols: [],
+            cardSymbols: [],
+            knowledgeSources: [],
+            cardInformationEntries: [],
+            symbolInformationEntries: [],
+          },
+        ],
+      })
+    );
+
+    const dataSource = createLocalDeckManagementDataSource(storage, "usr_123");
+    const snapshot = await dataSource.loadLibrary([thothSummary], "thoth");
+
+    expect(snapshot.activeDeckId).toBe("thoth");
+    expect(snapshot.decks[0].id).toBe("thoth");
+    expect(snapshot.decks[0].cards).toHaveLength(78);
+    storage.clear();
+  });
 });

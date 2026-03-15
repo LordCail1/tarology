@@ -185,6 +185,37 @@ function assertKnowledgeSourceKind(value: unknown): DeckKnowledgeSourceKind {
   return value as DeckKnowledgeSourceKind;
 }
 
+function assertDeckReferences(
+  document: DeckExportDocument,
+  cardIds: Set<string>,
+  symbolIds: Set<string>
+) {
+  for (const link of document.cardSymbols) {
+    assert(
+      cardIds.has(link.cardId),
+      `Deck export references missing card ID "${link.cardId}" in cardSymbols.`
+    );
+    assert(
+      symbolIds.has(link.symbolId),
+      `Deck export references missing symbol ID "${link.symbolId}" in cardSymbols.`
+    );
+  }
+
+  for (const entry of document.cardInformationEntries) {
+    assert(
+      cardIds.has(entry.cardId),
+      `Deck export references missing card ID "${entry.cardId}" in cardInformationEntries.`
+    );
+  }
+
+  for (const entry of document.symbolInformationEntries) {
+    assert(
+      symbolIds.has(entry.symbolId),
+      `Deck export references missing symbol ID "${entry.symbolId}" in symbolInformationEntries.`
+    );
+  }
+}
+
 function importCardEntry(
   entry: DeckExportDocument["cardInformationEntries"][number],
   importedAt: string
@@ -297,6 +328,9 @@ export function importDeckFromDocument(
     document.symbols.map((symbol) => symbol.symbolId),
     "symbol"
   );
+  const cardIds = new Set(document.cards.map((card) => card.cardId));
+  const symbolIds = new Set(document.symbols.map((symbol) => symbol.symbolId));
+  assertDeckReferences(document, cardIds, symbolIds);
 
   const importedAt = new Date().toISOString();
   const serializedDocument = JSON.stringify(document);
