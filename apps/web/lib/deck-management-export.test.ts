@@ -111,4 +111,31 @@ describe("deck export/import helpers", () => {
     expect(roundTrippedEntry?.format).toBe("json");
     expect(roundTrippedEntry?.bodyJson).toEqual(jsonBody);
   });
+
+  it("round-trips archived entry state through export and import", () => {
+    const deck = createThothStarterDeck(thothSummary);
+    const archivedAt = "2026-03-15T18:00:00.000Z";
+
+    deck.cardInformationEntries[0] = {
+      ...deck.cardInformationEntries[0],
+      archivedAt,
+    };
+
+    const document = buildDeckExportDocument(deck);
+    const exportedEntry = document.cardInformationEntries.find(
+      (entry) => entry.entryId === deck.cardInformationEntries[0]?.entryId
+    );
+
+    expect(exportedEntry?.archivedAt).toBe(archivedAt);
+
+    const snapshot = importDeckFromDocument(document, {
+      activeDeckId: deck.id,
+      decks: [deck],
+    });
+    const importedEntry = snapshot.decks
+      .at(-1)
+      ?.cardInformationEntries.find((entry) => entry.entryId === deck.cardInformationEntries[0]?.entryId);
+
+    expect(importedEntry?.archivedAt).toBe(archivedAt);
+  });
 });

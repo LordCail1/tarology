@@ -165,6 +165,7 @@ export interface DeckExportDocument {
     summary: string | null;
     sourceIds: string[];
     sortOrder: number;
+    archivedAt?: string | null;
     bodyText?: string | null;
     bodyJson?: Record<string, unknown> | null;
   }>;
@@ -176,6 +177,7 @@ export interface DeckExportDocument {
     summary: string | null;
     sourceIds: string[];
     sortOrder: number;
+    archivedAt?: string | null;
     bodyText?: string | null;
     bodyJson?: Record<string, unknown> | null;
   }>;

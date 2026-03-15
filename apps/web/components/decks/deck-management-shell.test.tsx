@@ -121,4 +121,41 @@ describe("DeckManagementShell", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to Reading" })).toBeInTheDocument();
   });
+
+  it("refuses to save an entry edit after the reader switches to a different subject", async () => {
+    render(
+      <DeckManagementShell
+        profile={profile}
+        preferences={preferences}
+        availableDecks={availableDecks}
+      />
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Thoth Tarot").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Edit" }).length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]!);
+    fireEvent.change(screen.getByPlaceholderText("Write the layered knowledge entry here"), {
+      target: { value: "Cross-subject edit attempt" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /The Magician/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Editing context changed. Start a new entry for the current selection.")
+      ).toBeInTheDocument()
+    );
+
+    expect(screen.queryByText("Cross-subject edit attempt")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /The Fool/ }));
+
+    expect(
+      screen.getByText(/The Fool is loaded here as starter-content mock knowledge\./)
+    ).toBeInTheDocument();
+  });
 });

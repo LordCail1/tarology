@@ -34,6 +34,7 @@ function toCardEntryPayload(entry: DeckCardEntry): DeckExportDocument["cardInfor
     summary: entry.summary,
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
+    archivedAt: entry.archivedAt,
   };
 
   return entry.format === "json"
@@ -58,6 +59,7 @@ function toSymbolEntryPayload(
     summary: entry.summary,
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
+    archivedAt: entry.archivedAt,
   };
 
   return entry.format === "json"
@@ -169,7 +171,7 @@ function importCardEntry(
       tags: [],
       sourceIds: entry.sourceIds,
       sortOrder: entry.sortOrder,
-      archivedAt: null,
+      archivedAt: toOptionalString(entry.archivedAt),
       createdAt: importedAt,
       updatedAt: importedAt,
     };
@@ -189,7 +191,7 @@ function importCardEntry(
     tags: [],
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
-    archivedAt: null,
+    archivedAt: toOptionalString(entry.archivedAt),
     createdAt: importedAt,
     updatedAt: importedAt,
   };
@@ -216,7 +218,7 @@ function importSymbolEntry(
       tags: [],
       sourceIds: entry.sourceIds,
       sortOrder: entry.sortOrder,
-      archivedAt: null,
+      archivedAt: toOptionalString(entry.archivedAt),
       createdAt: importedAt,
       updatedAt: importedAt,
     };
@@ -239,7 +241,7 @@ function importSymbolEntry(
     tags: [],
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
-    archivedAt: null,
+    archivedAt: toOptionalString(entry.archivedAt),
     createdAt: importedAt,
     updatedAt: importedAt,
   };

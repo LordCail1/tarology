@@ -175,6 +175,7 @@ Execution sequencing:
   - local deck-library persistence is now scoped by authenticated `userId` so reader-authored deck knowledge cannot leak across accounts in the same browser
   - import/export hardening now derives imported `cardCount` from the cards payload and preserves `json` knowledge entries as view-only imported records
   - stale local snapshots now recover to a valid active deck when possible, empty libraries render an explicit recoverable state, and new source IDs are uniqued per deck
+  - entry editing now refuses cross-subject saves, and deck export/import now preserves archived knowledge-entry state
   - web regression coverage now includes the deck-management gate, local deck snapshot helpers, import/export helpers, and basic symbol-creation interaction
 
 ## Locked Product Decisions (Execution)

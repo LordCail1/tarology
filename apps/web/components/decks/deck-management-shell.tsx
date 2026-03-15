@@ -431,6 +431,27 @@ export function DeckManagementShell({
       return;
     }
 
+    const editingEntryStillMatchesCurrentSubject =
+      !editingEntryId ||
+      (selectedSubject.kind === "card"
+        ? selectedDeck.cardInformationEntries.some(
+            (entry) =>
+              entry.id === editingEntryId && entry.cardId === selectedSubject.cardId
+          )
+        : selectedDeck.symbolInformationEntries.some(
+            (entry) =>
+              entry.id === editingEntryId && entry.symbolId === selectedSubject.symbolId
+          ));
+
+    if (!editingEntryStillMatchesCurrentSubject) {
+      resetEntryDraft();
+      setFlashMessage({
+        tone: "error",
+        text: "Editing context changed. Start a new entry for the current selection.",
+      });
+      return;
+    }
+
     const now = createNow();
     const entryIdBase = slugify(entryDraft.label) || "note";
 
@@ -441,7 +462,8 @@ export function DeckManagementShell({
 
         if (selectedSubject.kind === "card") {
           const existingIndex = nextDeck.cardInformationEntries.findIndex(
-            (entry) => entry.id === editingEntryId
+            (entry) =>
+              entry.id === editingEntryId && entry.cardId === selectedSubject.cardId
           );
 
           if (existingIndex >= 0) {
@@ -482,7 +504,8 @@ export function DeckManagementShell({
         }
 
         const existingIndex = nextDeck.symbolInformationEntries.findIndex(
-          (entry) => entry.id === editingEntryId
+          (entry) =>
+            entry.id === editingEntryId && entry.symbolId === selectedSubject.symbolId
         );
 
         if (existingIndex >= 0) {
