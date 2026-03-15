@@ -187,6 +187,20 @@ function requireImportEntrySourceIds(
   return sourceIds;
 }
 
+function requireImportKnowledgeSourceIds(
+  sources: Array<Pick<KnowledgeSourceWriteDto, "sourceId">>
+): string[] {
+  return sources.map((source) => {
+    if (typeof source.sourceId !== "string" || source.sourceId.trim().length === 0) {
+      throw new BadRequestException(
+        'Imported knowledge sources must provide a non-empty string "sourceId".'
+      );
+    }
+
+    return source.sourceId.trim();
+  });
+}
+
 function ensureUniqueScopedEntryIds<
   TEntry extends { entryId: string },
   TScope extends string,
@@ -900,6 +914,53 @@ export class DecksService {
       "Duplicate sourceId values are not allowed when replacing deck sources."
     );
 
+    const nextSourceIds = new Set(
+      sources
+        .map((source) => (typeof source.sourceId === "string" ? source.sourceId.trim() : null))
+        .filter((sourceId): sourceId is string => Boolean(sourceId))
+    );
+
+    const [cardEntries, symbolEntries] = await Promise.all([
+      tx.cardInformationEntry.findMany({
+        where: {
+          card: {
+            deckId,
+          },
+        },
+        select: {
+          sourceIds: true,
+        },
+      }),
+      tx.symbolInformationEntry.findMany({
+        where: {
+          symbol: {
+            deckId,
+          },
+        },
+        select: {
+          sourceIds: true,
+        },
+      }),
+    ]);
+
+    const missingSourceIds = new Set<string>();
+
+    for (const entry of [...cardEntries, ...symbolEntries]) {
+      for (const sourceId of entry.sourceIds) {
+        if (!nextSourceIds.has(sourceId)) {
+          missingSourceIds.add(sourceId);
+        }
+      }
+    }
+
+    if (missingSourceIds.size > 0) {
+      throw new BadRequestException(
+        `Cannot remove in-use sourceIds from deck sources: ${Array.from(missingSourceIds)
+          .sort()
+          .join(", ")}.`
+      );
+    }
+
     await tx.knowledgeSource.deleteMany({ where: { deckId } });
 
     if (sources.length === 0) {
@@ -1388,12 +1449,12 @@ export class DecksService {
       symbolIds.add(symbol.symbolId);
     }
 
+    const sourceIds = new Set(requireImportKnowledgeSourceIds(payload.knowledgeSources));
+
     ensureUniqueKnowledgeSourceIds(
       payload.knowledgeSources,
       "Duplicate sourceId values are not allowed in import payload."
     );
-
-    const sourceIds = new Set(payload.knowledgeSources.map((source) => source.sourceId));
 
     if (payload.cards.length !== TOTAL_TAROT_CARDS) {
       throw new BadRequestException(

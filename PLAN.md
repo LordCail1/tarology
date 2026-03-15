@@ -214,7 +214,7 @@ Status note:
 Deck-knowledge pivot follow-ups:
 - Implement deck knowledge domain baseline.
   Acceptance: decks persist card information, symbols, symbol links, starter/empty initialization metadata, and attached knowledge references.
-  Status: complete for backend/domain/contracts baseline in this branch; import validation now rejects malformed entry `sourceIds`, malformed `sourceId` values, duplicate `sourceId` values, duplicate card-symbol links, and duplicate per-parent entry IDs before DB writes, and card/symbol entry updates now reject non-string `sourceIds` elements before validation queries. Durable verification still needs a stable Postgres run in CI or against a real local Postgres service.
+  Status: complete for backend/domain/contracts baseline in this branch; import validation now rejects malformed entry `sourceIds`, missing/blank/malformed `sourceId` values, duplicate `sourceId` values, duplicate card-symbol links, and duplicate per-parent entry IDs before DB writes, card/symbol entry updates reject non-string `sourceIds` elements before validation queries, and deck-source replacement now fails fast if existing entries still reference sourceIds that would be removed. Durable verification still needs a stable Postgres run in CI or against a real local Postgres service.
 - Implement deck-management surface baseline.
   Acceptance: users can browse decks/cards/symbols, edit card/symbol information, and inspect symbols independently from any specific card view.
 - Add deck export/import baseline.

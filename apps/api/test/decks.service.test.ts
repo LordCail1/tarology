@@ -226,6 +226,23 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects import knowledge sources without a non-empty sourceId", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.knowledgeSources = [
+      {
+        ...payload.knowledgeSources[0],
+        sourceId: "   ",
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects duplicate card-symbol links in import payloads", async () => {
     const { prisma, service } = createDecksService();
     const payload = buildValidImportPayload();
@@ -514,6 +531,12 @@ describe("DecksService", () => {
         deleteMany: vi.fn(),
         createMany: vi.fn(),
       },
+      cardInformationEntry: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      symbolInformationEntry: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       deck: {
         update: vi.fn(),
       },
@@ -559,6 +582,12 @@ describe("DecksService", () => {
         deleteMany: vi.fn(),
         createMany: vi.fn(),
       },
+      cardInformationEntry: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      symbolInformationEntry: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       deck: {
         update: vi.fn(),
       },
@@ -587,6 +616,54 @@ describe("DecksService", () => {
       })
     ).rejects.toThrow(BadRequestException);
 
+    expect(tx.knowledgeSource.deleteMany).not.toHaveBeenCalled();
+    expect(tx.knowledgeSource.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects replacing deck sources when existing entries still reference removed sourceIds", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      knowledgeSource: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      cardInformationEntry: {
+        findMany: vi.fn().mockResolvedValue([{ sourceIds: ["source-in-use"] }]),
+      },
+      symbolInformationEntry: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedDeckSummary").mockResolvedValue({
+      id: "deck_owned_thoth",
+    });
+    vi.spyOn(service as any, "requireOwnedDeckDetail").mockResolvedValue({
+      id: "deck_owned_thoth",
+    });
+
+    await expect(
+      service.updateDeck("11111111-1111-1111-1111-111111111111", "deck_owned_thoth", {
+        sources: [
+          {
+            sourceId: "replacement-source",
+            kind: "starter_content",
+            title: "Replacement",
+          },
+        ],
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.cardInformationEntry.findMany).toHaveBeenCalled();
+    expect(tx.symbolInformationEntry.findMany).toHaveBeenCalled();
     expect(tx.knowledgeSource.deleteMany).not.toHaveBeenCalled();
     expect(tx.knowledgeSource.createMany).not.toHaveBeenCalled();
   });
