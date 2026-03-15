@@ -115,7 +115,7 @@ function normalizeKnowledgeSource(
   return {
     id: randomUUID(),
     deckId: "",
-    sourceId: source.sourceId ?? randomUUID(),
+    sourceId: normalizeMutableKnowledgeSourceId(source.sourceId),
     kind: source.kind,
     title: source.title,
     capturedAt: toDateOrNull(source.capturedAt) ?? new Date(),
@@ -128,6 +128,37 @@ function normalizeKnowledgeSource(
     metadataJson:
       source.metadataJson === undefined ? Prisma.JsonNull : toJson(source.metadataJson),
   };
+}
+
+function normalizeMutableKnowledgeSourceId(sourceId: unknown): string {
+  if (sourceId == null) {
+    return randomUUID();
+  }
+
+  if (typeof sourceId !== "string") {
+    throw new BadRequestException(
+      'Knowledge source field "sourceId" must be a string when provided.'
+    );
+  }
+
+  const trimmedSourceId = sourceId.trim();
+  if (trimmedSourceId.length === 0) {
+    throw new BadRequestException(
+      'Knowledge source field "sourceId" must be a non-empty string when provided.'
+    );
+  }
+
+  return trimmedSourceId;
+}
+
+function normalizeImportedKnowledgeSourceId(sourceId: unknown): string {
+  if (typeof sourceId !== "string" || sourceId.trim().length === 0) {
+    throw new BadRequestException(
+      'Imported knowledge sources must provide a non-empty string "sourceId".'
+    );
+  }
+
+  return sourceId.trim();
 }
 
 function ensureUniqueKnowledgeSourceIds(
@@ -149,7 +180,9 @@ function ensureUniqueKnowledgeSourceIds(
 
     const sourceId = source.sourceId.trim();
     if (!sourceId) {
-      continue;
+      throw new BadRequestException(
+        'Knowledge source field "sourceId" must be a non-empty string when provided.'
+      );
     }
 
     if (seen.has(sourceId)) {
@@ -190,15 +223,7 @@ function requireImportEntrySourceIds(
 function requireImportKnowledgeSourceIds(
   sources: Array<Pick<KnowledgeSourceWriteDto, "sourceId">>
 ): string[] {
-  return sources.map((source) => {
-    if (typeof source.sourceId !== "string" || source.sourceId.trim().length === 0) {
-      throw new BadRequestException(
-        'Imported knowledge sources must provide a non-empty string "sourceId".'
-      );
-    }
-
-    return source.sourceId.trim();
-  });
+  return sources.map((source) => normalizeImportedKnowledgeSourceId(source.sourceId));
 }
 
 function ensureUniqueScopedEntryIds<
@@ -801,7 +826,7 @@ export class DecksService {
         data: payload.knowledgeSources.map((source) => ({
           id: randomUUID(),
           deckId,
-          sourceId: source.sourceId,
+          sourceId: normalizeImportedKnowledgeSourceId(source.sourceId),
           kind: source.kind,
           title: source.title,
           capturedAt: new Date(source.capturedAt),

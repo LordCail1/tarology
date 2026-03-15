@@ -243,6 +243,87 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("stores trimmed knowledge source identifiers during import", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.knowledgeSources = [
+      {
+        ...payload.knowledgeSources[0],
+        sourceId: " source-1 ",
+      },
+    ];
+    payload.cardInformationEntries = [
+      {
+        entryId: "entry-card-1",
+        cardId: payload.cards[0].cardId,
+        label: "core-theme",
+        format: "plain_text",
+        bodyText: "A note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: ["source-1"],
+        sortOrder: 0,
+      },
+    ];
+
+    const tx = {
+      deck: {
+        create: vi.fn(),
+      },
+      card: {
+        createMany: vi.fn(),
+        findMany: vi
+          .fn()
+          .mockResolvedValue(payload.cards.map((card) => ({ id: `card-row-${card.cardId}`, cardId: card.cardId }))),
+      },
+      knowledgeSource: {
+        createMany: vi.fn(),
+      },
+      symbol: {
+        createMany: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      cardInformationEntry: {
+        createMany: vi.fn(),
+      },
+      symbolInformationEntry: {
+        createMany: vi.fn(),
+      },
+      cardSymbol: {
+        createMany: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedDeckSummary").mockResolvedValue({
+      id: "deck-imported-1",
+      name: "Imported Thoth",
+      description: "Imported deck payload",
+      deckSpecVersion: "thoth-v1",
+      knowledgeVersion: 1,
+      initializationMode: "imported_clone",
+      initializerKey: "thoth",
+      previewImageUrl: null,
+      backImageUrl: null,
+      cardCount: TOTAL_TAROT_CARDS,
+      _count: { symbols: 0 },
+    });
+
+    await service.importDeck("11111111-1111-1111-1111-111111111111", payload);
+
+    expect(tx.knowledgeSource.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          sourceId: "source-1",
+        }),
+      ],
+    });
+  });
+
   it("rejects duplicate card-symbol links in import payloads", async () => {
     const { prisma, service } = createDecksService();
     const payload = buildValidImportPayload();
@@ -616,6 +697,54 @@ describe("DecksService", () => {
       })
     ).rejects.toThrow(BadRequestException);
 
+    expect(tx.knowledgeSource.deleteMany).not.toHaveBeenCalled();
+    expect(tx.knowledgeSource.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects blank knowledge source identifiers when replacing deck sources", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      knowledgeSource: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      cardInformationEntry: {
+        findMany: vi.fn(),
+      },
+      symbolInformationEntry: {
+        findMany: vi.fn(),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedDeckSummary").mockResolvedValue({
+      id: "deck_owned_thoth",
+    });
+    vi.spyOn(service as any, "requireOwnedDeckDetail").mockResolvedValue({
+      id: "deck_owned_thoth",
+    });
+
+    await expect(
+      service.updateDeck("11111111-1111-1111-1111-111111111111", "deck_owned_thoth", {
+        sources: [
+          {
+            sourceId: "   ",
+            kind: "starter_content",
+            title: "Broken source",
+          },
+        ],
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.cardInformationEntry.findMany).not.toHaveBeenCalled();
+    expect(tx.symbolInformationEntry.findMany).not.toHaveBeenCalled();
     expect(tx.knowledgeSource.deleteMany).not.toHaveBeenCalled();
     expect(tx.knowledgeSource.createMany).not.toHaveBeenCalled();
   });
