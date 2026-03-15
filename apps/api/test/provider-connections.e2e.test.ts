@@ -160,10 +160,11 @@ describe("Provider connections API", () => {
       .expect(200);
 
     expect(listResponse.body.connections).toHaveLength(2);
-    expect(
-      listResponse.body.connections.filter((connection: { isDefault: boolean }) => connection.isDefault)
-    ).toHaveLength(1);
-    expect(listResponse.body.connections[0].id).toBe(secondCreate.body.connection.id);
+    const defaultConnections = listResponse.body.connections.filter(
+      (connection: { isDefault: boolean }) => connection.isDefault
+    );
+    expect(defaultConnections).toHaveLength(1);
+    expect(defaultConnections[0].id).toBe(secondCreate.body.connection.id);
 
     await closeTrackedApp(app);
   }, 15_000);
