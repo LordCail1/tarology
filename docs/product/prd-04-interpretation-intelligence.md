@@ -12,7 +12,7 @@ Use hybrid orchestration:
 
 ### 7.2 Specialist Passes (Core V1)
 - Card Symbol Pass: symbols/motifs for each selected card.
-- Card Meaning Pass: upright/reversed semantics in beginner language.
+- Card Knowledge Pass: card-level information, authored notes, and upright/reversed semantics in plain register by default.
 - Cross-Card Pattern Pass: overlaps, tensions, and narrative arc.
 - Question Alignment Pass: maps synthesis to active thread question.
 - Citation/Safety Pass: validates source support and policy compliance.
@@ -33,7 +33,7 @@ Use hybrid orchestration:
 
 ### 7.4 “Reader Skills” Library (Founder comment integration)
 To make output feel natural and human-like without fake certainty, maintain versioned reusable “skills” (prompt modules):
-- `beginner_clarity`
+- `plain_register_clarity`
 - `symbol_to_theme_mapping`
 - `cross_card_synthesis`
 - `balanced_alternative_reading`
@@ -44,33 +44,33 @@ To make output feel natural and human-like without fake certainty, maintain vers
 
 Each interpretation stores `skillsVersion` for reproducibility.
 
-### 7.5 Knowledge and Research Policy (Founder requirement)
-V1 policy is web-first per interpretation request:
-- Every interpretation runs live web research for selected cards and key symbols.
-- Source quality filtering is mandatory.
-- Citations are mandatory for factual/context claims.
-- Symbolic claims must still include provenance to either web evidence or internal canonical metadata.
+### 7.5 Deck Knowledge and Enrichment Policy
+V1 policy is deck-knowledge-first:
+- Every interpretation begins from the selected deck's stored card information and linked symbol information.
+- Card and symbol information are extensible knowledge fields, not a single fixed “meaning” string.
+- Citations/knowledge references are mandatory for factual or contextual claims, whether those references point to deck-authored entries, starter content, or imported supporting sources.
+- Live web research is not part of the core V1 interpretation contract.
 
-Caching policy:
-- Cache retrieval evidence and structured extracts for speed and consistency.
-- Cached evidence accelerates subsequent runs but does not disable live web pass in V1.
+Starter-content policy:
+- Users may initialize a deck from starter content or from an empty template.
+- The product must support shipping at least one default deck path with preloaded card/symbol knowledge.
+- Until curated production data is ready, starter-content paths may use mock data.
 
-Evolution path:
-- Build an internal curated knowledge pack from reviewed/cached evidence over time.
-- For high-card interpretation requests, prefer curated evidence + selective web expansion once curated coverage becomes available.
-- Shift to `curated-first` or `hybrid` once coverage and quality benchmarks are met.
+External enrichment policy:
+- Future external research/import flows must attach their results to deck knowledge instead of leaving them ephemeral at interpretation time.
+- Any later web enrichment should be explicit, optional, and reviewable.
 
-### 7.6 Source Quality Tiers
-- Tier 1: official docs, peer-reviewed publications, museums/institutions, public records.
-- Tier 2: reputable publishers and established technical/editorial sources.
-- Tier 3: commercial blogs (only if Tier 1/2 unavailable).
-- Tier 4: user-generated sources (last resort, clearly labeled).
+### 7.6 Knowledge Priority Tiers
+- Tier 1: current deck's card information, symbol information, and explicit reader-authored notes.
+- Tier 2: vetted starter content bundled with the deck template.
+- Tier 3: imported or attached supporting sources saved into the deck knowledge base.
+- Tier 4: optional future external enrichment awaiting review or consolidation.
 
 ### 7.7 Interpretation Output Layers
 Every interpretation must render three visible layers:
-1. Beginner Summary.
-2. Why This Pattern (card and symbol evidence).
-3. Deep Dive (optional, citations and alternative reading).
+1. Plain Summary.
+2. Why This Pattern (card, symbol, and deck-knowledge evidence).
+3. Deep Dive (optional, attached knowledge references and alternative reading).
 
 Post-core modules reuse this foundation:
 - Visual Storytelling renders scenes from these same evidence layers.
@@ -82,7 +82,7 @@ Engineering maintains a stable structured contract that includes:
 - request context (`readingId`, `questionId`, `groupId`, `stateVersion`),
 - user-facing interpretation layers,
 - uncertainty note,
-- citation objects with source metadata,
+- citation/reference objects with source metadata,
 - safety flags,
 - model and skills version metadata,
 - `registerMode` (`plain` | `esoteric`).
@@ -110,7 +110,7 @@ Stop/cancel rule:
 
 ### 7.10 Dual Register Rule
 All symbolic outputs support explicit register mode:
-- `plain` (default): beginner-first phrasing.
+- `plain` (default): plain-language phrasing.
 - `esoteric`: advanced symbolic vocabulary.
 
 Constraint:

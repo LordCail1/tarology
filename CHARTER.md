@@ -1,7 +1,7 @@
 # Tarology v2 Charter and Execution Spec
 
 Status: Draft v0.3  
-Last updated: 2026-03-13  
+Last updated: 2026-03-15  
 Owner: Product + Engineering  
 Purpose: Canonical map for all contributors (human and AI) building Tarology v2.
 
@@ -22,7 +22,7 @@ This version merges:
 5. Persistence model uses hot projection + append-only event log + snapshots.
 6. AI interpretation runs asynchronously in durable workflows with retries and tracing.
 7. Interpretation orchestration is hybrid: one orchestrator with bounded parallel specialist passes.
-8. V1 interpretation is web-first for card and symbol research on every request (founder requirement), with caching and provenance.
+8. V1 interpretation is deck-knowledge-first: cards and symbols own extensible information inside a deck, and live web research is optional enrichment rather than a baseline requirement.
 9. Safety posture is reflective guidance, not directives or certainty claims.
 10. V1 app auth is Google only, server-side sessions, provider subject (`sub`) as external identity anchor.
 11. Model access supports user-managed provider connections in two modes: `api_key` and `provider_account`; V1 is OpenAI-first, with public API-key access and an allowlisted internal OpenAI subscription-backed mode.
@@ -30,7 +30,7 @@ This version merges:
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
 15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
-16. Users choose a default tarot deck during first-time onboarding; new readings use this default unless the user explicitly overrides deck selection before creation.
+16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
 17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
 19. Symbolic outputs support dual register (`plain` default, `esoteric` optional) with semantic parity.
@@ -41,36 +41,39 @@ This version merges:
 24. Persona implementation remains provider-agnostic; no OpenClaw lock-in.
 
 ## 1) Product Vision
-Tarology helps beginners receive and explore tarot readings through high-quality AI symbolic synthesis.
+Tarology helps tarot readers build, interpret, and evolve deck-specific symbolic knowledge through high-quality AI synthesis.
 
-The app is not a random card game UI. It is a guided reflective workspace where users can:
+The app is not a random card game UI. It is a guided reflective workspace and deck-intelligence studio where users can:
 - ask a main question,
 - branch into sub-questions,
 - pull and organize cards visually,
+- inspect and enrich card and symbol knowledge,
 - request interpretations for card groups,
 >By default if ever the person doesn't actually select any cards to group together to have an interpretation, then by default the selection is just all of the cards. This makes sense if you think about it because at our reading the typical way of doing one is the person just makes an interpretation by using all of what's on the table.
-- review evidence and sources,
+- review grounded deck knowledge and attached sources,
 - continue readings later with full state restored.
+- export deck state for sharing or cloning.
 
 ## 2) Primary User and Jobs-To-Be-Done
-Primary user: beginner tarot seeker.
-- Has little or no tarot background.
-- Wants meaningful interpretation without memorizing card symbolism.
-- Needs clarity and context while exploring personal questions.
+Primary user: tarot reader.
+- Maintains or develops personal deck knowledge.
+- Wants AI to synthesize from cards and symbols without replacing reader judgment.
+- Needs control over deck-specific context, symbols, and interpretation framing.
 
-Secondary user: intermediate reader.
-- Uses AI as a synthesis assistant, not as an authority.
+Secondary user: serious learner / deck builder.
+- Uses AI as a structured synthesis assistant while building a personal symbolic system.
 
 Primary JTBD:
-- “Help me understand what these cards could mean for my question, in clear language, with enough evidence that I can trust the interpretation process.”
+- “Help me synthesize what these cards and symbols could mean for this question using the deck knowledge I trust, in clear language I can work with.”
 
 ## 3) Product Principles
-1. Beginner-first: default responses are clear, concise, and non-jargon.
+1. Reader-first: plain register is default, but the product serves tarot practice rather than entry-level simplification.
 2. Deterministic reading state: card identity is fixed at reading creation.
-3. Explainable AI: every synthesis ties to cards, symbols, and cited sources.
-4. Threaded inquiry: users can branch questions without losing context.
-5. Durable by default: acknowledged state changes must survive refresh/crash.
-6. Reflective safety: suggestions are reflective, never prescriptive directives.
+3. Deck-owned knowledge: cards and symbols hold extensible information inside the deck rather than relying on live web fetches at interpretation time.
+4. Explainable AI: every synthesis ties to cards, symbols, and stored deck knowledge or attached sources.
+5. Threaded inquiry: users can branch questions without losing context.
+6. Durable by default: acknowledged state changes must survive refresh/crash.
+7. Reflective safety: suggestions are reflective, never prescriptive directives.
 
 ## 4) V1 Scope
 ### 4.1 In Scope
@@ -79,6 +82,13 @@ Primary JTBD:
   - user can add API keys,
   - user can connect provider-backed accounts where supported by a given provider/runtime,
   - user can keep one or both configured where available.
+- Deck library and knowledge management:
+  - user can initialize a deck from starter content or an empty template,
+  - user can browse decks, cards, and symbols,
+  - user can add/edit card information,
+  - user can add/edit symbol information and link symbols to cards,
+  - user can browse symbols independently from cards,
+  - user can export/import private deck state for cloning or sharing.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
   - center: card fan + canvas with mode selection,
@@ -150,20 +160,21 @@ V1 support policy:
 
 ### 5.2 Core Journey
 1. User logs in with Google.
-2. On first login, user selects a default tarot deck; preference is persisted.
-3. User starts a new reading, can override deck selection, and writes root question.
-4. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
-5. User draws cards; each draw reveals the pre-assigned card.
-6. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
-7. User requests interpretation for selected group under selected thread.
-8. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
-9. User can stop/cancel interpretation at any time from a visible control.
-10. System returns:
-  - beginner summary,
-  - “why” layer with card/symbol evidence,
-  - optional deep layer with citations.
-11. All meaningful actions persist continuously.
-12. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
+2. On first login, user selects or initializes a default tarot deck (starter-content or empty); preference is persisted.
+3. User may review/edit cards and symbols in that deck before beginning a reading.
+4. User starts a new reading, can override deck selection, and writes root question.
+5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
+6. User draws cards; each draw reveals the pre-assigned card.
+7. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
+8. User requests interpretation for selected group under selected thread.
+9. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
+10. User can stop/cancel interpretation at any time from a visible control.
+11. System returns:
+  - plain summary,
+  - “why” layer with card/symbol/deck-knowledge evidence,
+  - optional deep layer with attached knowledge references.
+12. All meaningful actions persist continuously.
+13. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
 
 ## 6) Deterministic Deck and Randomness
 ### 6.1 Hard Rule
@@ -199,14 +210,14 @@ Use hybrid orchestration:
 
 ### 7.2 Specialist Passes
 - Card Symbol Pass: symbols/motifs for each selected card.
-- Card Meaning Pass: upright/reversed semantics in beginner language.
+- Card Knowledge Pass: card-level information, authored notes, and upright/reversed semantics in plain register by default.
 - Cross-Card Pattern Pass: overlaps, tensions, and narrative arc.
 - Question Alignment Pass: maps synthesis to active thread question.
 - Citation/Safety Pass: validates source support and policy compliance.
 
 ### 7.3 “Reader Skills” Library (Founder comment integration)
 To make output feel natural and human-like without fake certainty, maintain versioned reusable “skills” (prompt modules):
-- `beginner_clarity`
+- `plain_register_clarity`
 - `symbol_to_theme_mapping`
 - `cross_card_synthesis`
 - `balanced_alternative_reading`
@@ -216,32 +227,32 @@ To make output feel natural and human-like without fake certainty, maintain vers
 Each interpretation stores `skillsVersion` for reproducibility.
 
 ### 7.4 Knowledge and Research Policy (Founder requirement)
-V1 policy is web-first per interpretation request:
-- Every interpretation runs live web research for selected cards and key symbols.
-- Source quality filtering is mandatory.
-- Citations are mandatory for factual/context claims.
-- Symbolic claims must still include provenance to either web evidence or internal canonical metadata.
+V1 policy is deck-knowledge-first:
+- Every interpretation begins from the selected deck's stored card information and linked symbol information.
+- Card and symbol information are extensible knowledge fields, not a single fixed “meaning” string.
+- Citations/knowledge references are mandatory for factual or contextual claims, whether those references point to deck-authored entries, starter content, or imported supporting sources.
+- Live web research is not part of the core V1 interpretation contract.
 
-Caching policy:
-- Cache retrieval evidence and structured extracts for speed and consistency.
-- Cached evidence accelerates subsequent runs but does not disable live web pass in V1.
+Starter-content policy:
+- Users may initialize a deck from starter content or from an empty template.
+- The product must support shipping at least one default deck path with preloaded card/symbol knowledge.
+- Until curated production data is ready, starter-content paths may use mock data.
 
-Evolution path:
-- Build an internal curated knowledge pack from reviewed/cached evidence over time.
-- For high-card interpretation requests, prefer curated evidence + selective web expansion once curated coverage becomes available.
-- Shift to “curated-first, web-enrichment-optional” in V1.1 or V2 when coverage is proven.
+External enrichment policy:
+- Future external research/import flows must attach their results to deck knowledge instead of leaving them ephemeral at interpretation time.
+- Any later web enrichment should be explicit, optional, and reviewable.
 
-### 7.5 Source Quality Tiers
-- Tier 1: official docs, peer-reviewed publications, museums/institutions, public records.
-- Tier 2: reputable publishers and established technical/editorial sources.
-- Tier 3: commercial blogs (only if Tier 1/2 unavailable).
-- Tier 4: user-generated sources (last resort, clearly labeled).
+### 7.5 Knowledge Priority Tiers
+- Tier 1: current deck's card information, symbol information, and explicit reader-authored notes.
+- Tier 2: vetted starter content bundled with the deck template.
+- Tier 3: imported or attached supporting sources saved into the deck knowledge base.
+- Tier 4: optional future external enrichment awaiting review or consolidation.
 
 ### 7.6 Interpretation Output Layers
 Every interpretation must render three visible layers:
-1. Beginner Summary.
-2. Why This Pattern (card and symbol evidence).
-3. Deep Dive (optional, citations and alternative reading).
+1. Plain Summary.
+2. Why This Pattern (card, symbol, and deck-knowledge evidence).
+3. Deep Dive (optional, attached knowledge references and alternative reading).
 
 ### 7.7 Output Contract (Owned by Engineering)
 Founder requested engineering ownership for payload details. Engineering must maintain a stable structured contract that includes, at minimum:
@@ -274,7 +285,7 @@ Stop/cancel rule:
 - Final state must be explicit (`cancelled_by_user`) and persisted with partial artifacts if available.
 
 Future curated-data alignment:
-- Planner must support source strategy switching (`web_first`, `curated_first`, `hybrid`) without API redesign.
+- Planner must support knowledge strategy switching (`deck_only`, `deck_plus_imported`, `external_enrichment`) without API redesign.
 
 ## 8) System Architecture
 ### 8.1 Repository Shape
@@ -294,7 +305,7 @@ NestJS module boundaries over time (required):
   - `profile` (profile and preferences)
   - `reading-studio` (readings, cards, threads, interpretations)
 - planned later:
-  - `knowledge` (retrieval caches, source metadata, citation policy)
+  - `knowledge` (deck knowledge entries, starter content, source metadata, import/export policy)
   - `workflow` / worker integration for durable AI jobs
   - `integration` (event publishing, webhooks, external ports)
 
@@ -314,7 +325,7 @@ Rule:
 
 Frontend composition rules:
 - Build an App Shell that hosts feature “studios” as isolated route groups.
-- V1 ships `Reading Studio`.
+- V1 ships `Reading Studio` plus a deck-management surface.
 - Future studios (`Notes Studio`, `Social Studio`) plug into the same shell with independent state slices and APIs.
 - Shared UI primitives live in a neutral package; studio-specific components stay inside studio modules.
 
@@ -335,6 +346,11 @@ Core entities:
 - `provider_credentials`
 - `decks`
 - `cards`
+- `symbols`
+- `card_symbols`
+- `card_information_entries`
+- `symbol_information_entries`
+- `deck_exports`
 - `readings`
 - `reading_cards` (fixed assignment metadata only)
 - `question_threads`
@@ -346,32 +362,48 @@ Core entities:
 - `citation_sources`
 - `reading_events` (append-only)
 - `reading_snapshots`
-- `knowledge_documents` (cached/reviewed evidence)
+- `knowledge_sources` (starter/imported supporting sources)
 - `profile_stats`
 
 Data invariants:
 - `reading_cards` assignment is immutable for `cardId` and `assignedReversal` after creation.
 - visual `rotationDeg` is mutable and independent from reversal meaning.
 - mutable workspace state persists through semantic events/projections; it must not rewrite the immutable assignment identity stored in `reading_cards`.
+- card and symbol information are extensible knowledge records, not a single fixed meaning field.
+- symbols are deck-scoped first-class entities, independently viewable, and may be linked to multiple cards.
+- decks may be initialized from starter content or empty templates.
+- deck exports must preserve cards, symbols, knowledge entries, and card-symbol links.
 - each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
 - each reading stores active `canvasMode` and mode-switch history as semantic events.
 - reading lifecycle status is limited to `active`, `archived`, and `deleted`; `reopened` is an event/action, not a persisted status value.
 - reader-defined organization states (for example `completed` or custom labels) belong to a separate label/tag layer and must not replace canonical lifecycle status in persistence or API contracts.
 - each interpretation request stores frozen target context.
+- each interpretation request prefers deck-owned knowledge over external retrieval and stores planner metadata describing the chosen knowledge strategy.
 - provider credentials are never returned in raw form after initial save.
 - provider-account tokens or session artifacts are encrypted/handled according to provider policy when that mode is enabled.
-- each interpretation request stores planner metadata (`cardCount`, `mode`, `sourceStrategy`, `estimateSnapshot`).
+- each interpretation request stores planner metadata (`cardCount`, `mode`, `knowledgeStrategy`, `estimateSnapshot`).
 
 ## 10) API Design (V1)
 ### 10.1 API Style
 Command-oriented mutation API with idempotency.
 
 ### 10.2 Minimum Endpoints
+- `POST /v1/decks`
 - `POST /v1/readings`
+- `GET /v1/decks/{id}`
+- `PATCH /v1/decks/{id}`
+- `POST /v1/decks/{id}/initialize`
 - `GET /v1/readings`
 - `GET /v1/readings/{id}`
 - `POST /v1/readings/{id}/commands`
 - `GET /v1/decks`
+- `GET /v1/cards/{id}`
+- `PATCH /v1/cards/{id}`
+- `GET /v1/symbols`
+- `POST /v1/symbols`
+- `PATCH /v1/symbols/{id}`
+- `POST /v1/decks/{id}/export`
+- `POST /v1/decks/import`
 - `POST /v1/interpretations`
 - `GET /v1/interpretations/{id}`
 - `POST /v1/interpretations/estimate`
@@ -505,6 +537,7 @@ Do not ship:
 Future-compatible profile requirement:
 - Profile metrics must be source-aware so future modules can contribute without coupling.
 - Example metric namespaces:
+  - `deck.*` from Deck Studio / deck management
   - `reading.*` from Reading Studio
   - `notes.*` from Notes Studio (future)
   - `social.*` from Social Studio (future)
@@ -524,10 +557,10 @@ Reliability targets:
 - cancel acknowledgement latency p95 < 2s for queued/running interpretation jobs.
 
 Quality targets:
-- beginner clarity >= 4.2/5.
-- expert groundedness >= 4.0/5.
+- plain-register clarity >= 4.2/5.
+- tarot-reader groundedness >= 4.0/5.
 - overclaim violations < 0.5% on safety red-team set.
-- citation coverage >= 95% for enriched answers.
+- knowledge-reference coverage >= 95% for answers that surface factual/contextual support.
 - high-card warning display coverage = 100% when threshold is exceeded.
 
 Security targets:
@@ -548,7 +581,7 @@ Maintain 200-300 benchmark cases:
 ### 15.2 Human Review
 - Weekly blind A/B sample review.
 - Monthly full benchmark sweep.
-- Include both beginner and expert raters.
+- Include both practicing tarot readers and serious learners.
 
 ### 15.3 Automated Gates
 - deterministic deck replay tests,
@@ -600,8 +633,8 @@ Weeks 5-6:
 
 Weeks 7-8:
 - interpretation workflow MVP,
-- web-first research,
-- citation persistence,
+- deck-knowledge retrieval and attribution,
+- starter-content and attached-source persistence,
 - uncertainty rendering,
 - high-card estimate + warning UX,
 - stop/cancel control and workflow cancellation path.

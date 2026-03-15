@@ -13,17 +13,20 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 8. If there is any conflict, follow `CHARTER.md` as tie-breaker and update `PLAN.md` to reflect the chosen implementation path.
 
 ## 2) Product Intent (Non-Negotiable)
-- Beginner-first tarot reading experience.
+- Tarot-reader-first deck and reading workspace.
 - Card identity and reversal meaning are assigned once at reading creation.
 - Cards are not sampled at click/flip time.
+- Cards and symbols own extensible deck knowledge; live web research is optional future enrichment, not the V1 baseline.
 - Reading state must be durable and restorable.
 - Reading Studio side panels must support smooth expand/collapse animation and desktop drag-resize, with persisted user width preferences.
 - Reading canvas must be mode-capable with `freeform` and `grid` modes under one shared state/command model.
-- User default tarot deck must be captured at first-run onboarding, saved in preferences, and used as default for new readings with per-reading override.
+- Users must be able to initialize decks from starter content or empty templates, and the default deck must be captured at first-run onboarding for new readings with per-reading override.
+- Symbols are first-class deck entities, independently viewable, and linkable to cards.
+- Full deck state should be exportable/importable for cloning or sharing.
 - Interpretation flow supports large card sets, warning users for high-card runs and allowing explicit cancellation.
 - Model provider access must support both credential modes behind one interface:
   - `api_key`
-  - `oauth` (capability-driven per provider)
+  - `provider_account` (capability-driven per provider/runtime; internal OpenAI hosted mode is allowlisted in V1)
 - Symbolic expansion is sequenced after core reliability:
   - Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 - Persona/card voice framing is archetypal and interpretive (non-literal); outputs must never present certainty claims.
@@ -51,6 +54,7 @@ This file is the session bootstrap for any new Codex agent working in this repo.
   - `freeform` / `grid` canvas modes,
   - local layout/workspace persistence,
   - auth gating and onboarding gating.
+- Important current limitation: the deck-management surface described in the product docs is not implemented yet; current deck handling is limited to the default-deck onboarding/catalog baseline.
 - Important current limitation: the visible Reading Studio history/workspace state is still seeded client-side and persisted in `localStorage`; the web shell has not yet been wired to the durable reading API for create/history/restore flows.
 - Product docs now include strategic post-core PRDs (`prd-11` through `prd-15`) and updated API/safety/roadmap guidance.
 - GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.

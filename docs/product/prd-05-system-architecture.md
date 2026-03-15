@@ -21,7 +21,7 @@ NestJS module boundaries over time (required):
   - `profile` (profile and preferences)
   - `reading-studio` (readings, cards, threads, interpretations)
 - planned later:
-  - `knowledge` (retrieval caches, source metadata, citation policy)
+  - `knowledge` (deck knowledge entries, starter content, source metadata, import/export policy)
   - `workflow` / worker integration for durable AI jobs
   - `integration` (event publishing, webhooks, external ports)
 
@@ -41,7 +41,7 @@ Rule:
 
 Frontend composition rules:
 - Build an App Shell that hosts feature “studios” as isolated route groups.
-- V1 ships `Reading Studio`.
+- V1 ships `Reading Studio` plus a deck-management surface.
 - Future studios (`Notes Studio`, `Social Studio`) plug into the same shell with independent state slices and APIs.
 - Shared UI primitives live in a neutral package; studio-specific components stay inside studio modules.
 

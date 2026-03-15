@@ -10,6 +10,13 @@ Coverage: sections 4 and 5
   - user can add API keys,
   - user can connect provider-backed accounts where supported by a given provider/runtime,
   - user can keep one or both configured where available.
+- Deck library and knowledge management:
+  - user can initialize a deck from starter content or an empty template,
+  - user can browse decks, cards, and symbols,
+  - user can add/edit card information,
+  - user can add/edit symbol information and link symbols to cards,
+  - user can browse symbols independently from cards,
+  - user can export/import private deck state for cloning or sharing.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
   - center: card fan + canvas with mode selection,
@@ -86,17 +93,18 @@ V1 support policy:
 
 ### 5.2 Core Journey
 1. User logs in with Google.
-2. On first login, user selects a default tarot deck; preference is persisted.
-3. User starts a new reading, can override deck selection, and writes root question.
-4. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
-5. User draws cards; each draw reveals the pre-assigned card.
-6. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
-7. User requests interpretation for selected group under selected thread.
-8. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
-9. User can stop/cancel interpretation at any time from a visible control.
-10. System returns:
-  - beginner summary,
-  - “why” layer with card/symbol evidence,
-  - optional deep layer with citations.
-11. All meaningful actions persist continuously.
-12. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
+2. On first login, user selects or initializes a default tarot deck (starter-content or empty); preference is persisted.
+3. User may review/edit cards and symbols in that deck before beginning a reading.
+4. User starts a new reading, can override deck selection, and writes root question.
+5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
+6. User draws cards; each draw reveals the pre-assigned card.
+7. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
+8. User requests interpretation for selected group under selected thread.
+9. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
+10. User can stop/cancel interpretation at any time from a visible control.
+11. System returns:
+  - plain summary,
+  - “why” layer with card/symbol/deck-knowledge evidence,
+  - optional deep layer with attached knowledge references.
+12. All meaningful actions persist continuously.
+13. User returns later and sees exact reading state restored, including chosen deck and canvas mode.

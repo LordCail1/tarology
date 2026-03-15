@@ -72,4 +72,4 @@ Add specialist pass:
 - `% fusion sessions entering dialogue mode`
 - dialogue continuation depth with no safety violation
 - boundary intervention rate
-- user-reported beginner clarity after dialogue
+- user-reported plain-register clarity after dialogue

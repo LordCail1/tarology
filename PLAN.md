@@ -4,7 +4,7 @@ Last updated: 2026-03-15 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
-Ship a reliable V1 foundation for Tarology v2 that matches the charter: deterministic-at-creation card assignment, durable reading state, modular NestJS architecture, and an interpretation pipeline that can scale from small card groups to high-card runs with warning and cancellation controls.
+Ship a reliable V1 foundation for Tarology v2 that matches the charter: deterministic-at-creation card assignment, deck-owned knowledge, durable reading state, modular NestJS architecture, and an interpretation pipeline that can scale from small card groups to high-card runs with warning and cancellation controls.
 
 Execution sequencing:
 - Reach a durable multi-reading MVP first.
@@ -46,6 +46,11 @@ Execution sequencing:
   - `GET /v1/readings` and `GET /v1/readings/:id` return durable history/detail state
   - `POST /v1/readings/:id/commands` supports idempotent, version-checked `archive`, `reopen`, and `delete`
   - lifecycle events and milestone snapshots support restore-from-history for reading state
+- Product docs now align on a tarot-reader-first, deck-knowledge-first direction:
+  - cards and symbols own extensible knowledge,
+  - decks may start from starter content or empty templates,
+  - symbols are first-class and independently viewable,
+  - live web research is no longer a baseline V1 interpretation requirement
 - Vercel currently deploys only the Next.js web app; the NestJS API is not yet publicly hosted.
 - Current documentation now aligns on delaying full-stack hosting until the durable reading MVP is complete.
 
@@ -117,6 +122,12 @@ Execution sequencing:
   - public hosted use centers on `api_key`
   - hosted `provider_account` mode is internal-only and limited to allowlisted Tarology accounts in V1
   - future providers stay possible behind the same provider-connection boundary
+- Deck-knowledge pivot resolved:
+  - product posture is tarot-reader-first rather than entry-level-first
+  - interpretation is deck-knowledge-first rather than web-research-first
+  - decks may be initialized from starter content or empty templates
+  - symbols are first-class deck entities and independently viewable
+  - full deck state should be exportable/importable for cloning and sharing
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
@@ -125,9 +136,6 @@ Execution sequencing:
   - conceptual data model docs now distinguish immutable `reading_cards` assignment from mutable workspace state persisted via semantic events/projections
   - lifecycle event docs now align with the actual reading status vocabulary (`archived`, `reopened`, `deleted`) instead of the obsolete `reading.completed` label
   - charter and governance docs now point contributors to the real repo gate, `npm run ci:checks`, and the current Gate 0.5 deployment sequence
-- Temporary product decision worklog:
-  - `docs/product/open-decisions-worklog.md` now tracks the three active strategy questions that may require multiple discussion rounds and intermediate commits
-  - this file is intentionally non-canonical and must be deleted after its outcomes are folded into the charter/PRDs/plan
 - Reading Studio frontend scaffold branch:
   - desktop sidebar drag-resize now works with persisted widths and keyboard fallback
   - history is grouped by recency with explicit active-reading restore behavior
@@ -152,7 +160,11 @@ Execution sequencing:
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
 - App auth is Google-first for V1.
+- Product posture is tarot-reader-first with `plain` register as the default presentation mode.
 - Provider connectivity is OpenAI-first in V1, with public `api_key` mode plus an allowlisted internal OpenAI `provider_account` mode.
+- Interpretation is deck-knowledge-first; live web research is optional future enrichment rather than a baseline requirement.
+- Cards and symbols own extensible knowledge, and symbols are first-class deck entities that are independently viewable.
+- Decks may start from starter content or empty templates, and deck state must be exportable/importable for cloning or sharing.
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
 - Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
 - User default deck is captured during onboarding and can be overridden per reading.
@@ -179,8 +191,17 @@ Status note:
 - Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
 - Queue items 3, 4, 6, and 7 are complete for DB-backed reading durability, lifecycle commands, restore projection, and multi-reading history.
 - Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
+- Product pivot note: before the interpretation workflow is treated as complete, the app now needs a deck knowledge domain and deck-management surface that match the updated charter.
 - Short-term alignment follow-up: replace the web mock `paused` / `complete` reading status vocabulary with canonical lifecycle status before durable history wiring lands.
 - Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
+
+Deck-knowledge pivot follow-ups:
+- Implement deck knowledge domain baseline.
+  Acceptance: decks persist card information, symbols, symbol links, starter/empty initialization metadata, and attached knowledge references.
+- Implement deck-management surface baseline.
+  Acceptance: users can browse decks/cards/symbols, edit card/symbol information, and inspect symbols independently from any specific card view.
+- Add deck export/import baseline.
+  Acceptance: full deck state can be exported and re-imported without losing card/symbol knowledge or links.
 
 1. Implement profile shell baseline.
 - Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
@@ -274,6 +295,7 @@ Status note:
 - Durable workflow engine selection for V1 infrastructure.
 - API hosting target for post-MVP dogfooding deployment.
 - Onboarding register choice (`plain` only vs optional `esoteric` picker).
+- Concrete schema shape for card/symbol knowledge entries and deck export package format.
 - Pricing/package shape for subscription and usage packs.
 - Data retention windows for generated artifacts and dialogue logs.
 
@@ -303,6 +325,8 @@ export TEST_DATABASE_URL="$DATABASE_URL"
 npm run prisma:seed --workspace @tarology/api
 npm run ci:checks
 sed -n '1,220p' docs/product/README.md
+sed -n '1,220p' docs/product/prd-04-interpretation-intelligence.md
+sed -n '1,220p' docs/product/prd-06-data-model-and-api.md
 sed -n '1,260p' PLAN.md
 ```
 

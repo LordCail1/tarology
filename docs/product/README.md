@@ -1,7 +1,7 @@
 # Tarology Product Documentation Index
 
 Status: Active (modular PRD set)
-Last updated: 2026-03-13
+Last updated: 2026-03-15
 
 This index is the entrypoint for product requirements.
 
@@ -14,11 +14,6 @@ Migration note:
 2. Update the smallest relevant PRD file(s) instead of editing one giant document.
 3. If a requirement spans multiple areas, update all affected PRDs and keep terms consistent.
 4. Keep `PLAN.md` aligned with any changed requirement or sequencing.
-
-Temporary working note:
-- [Open Decisions Worklog](./open-decisions-worklog.md)
-  - Use this only for in-progress product decisions that may span multiple sessions.
-  - Fold final outcomes back into the charter/PRDs and then delete the worklog.
 
 ## PRD Map
 - [PRD 01 - Product Foundation](./prd-01-product-foundation.md)

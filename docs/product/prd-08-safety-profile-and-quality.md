@@ -81,6 +81,7 @@ Do not ship:
 Future-compatible profile requirement:
 - Profile metrics must be source-aware so future modules can contribute without coupling.
 - Example metric namespaces:
+  - `deck.*` from Deck Studio / deck management
   - `reading.*` from Reading Studio
   - `story.*` from Visual Storytelling
   - `fusion.*` from Fusion Lab
@@ -100,19 +101,19 @@ Reliability targets:
 - command write success >= 99.9%.
 - restore success >= 99.9% in crash/refresh harness.
 - duplicate visible interpretation failures < 0.1%.
-- provider token refresh success >= 99.5% (for enabled OAuth providers).
+- provider-account auth/session renewal success >= 99.5% (for enabled provider-account modes).
 - cancellation endpoints are idempotent and auditable.
 
 Quality targets:
-- beginner clarity >= 4.2/5.
-- expert groundedness >= 4.0/5.
+- plain-register clarity >= 4.2/5.
+- tarot-reader groundedness >= 4.0/5.
 - overclaim violations < 0.5% on safety red-team set.
-- citation coverage >= 95% for enriched answers.
+- knowledge-reference coverage >= 95% for answers that surface factual/contextual support.
 - high-card warning display coverage = 100% when threshold is exceeded.
 - dual-register semantic parity pass rate >= 99% in test suite.
 
 Security targets:
-- provider API keys and OAuth tokens encrypted at rest using managed KMS keys.
+- provider API keys and provider-account tokens/session artifacts encrypted at rest using managed KMS keys.
 - no plaintext credential logging.
 - credential access paths fully audited.
 - private share links are revocable and time-bound.
@@ -133,7 +134,7 @@ Maintain benchmark cases for:
 ### 15.2 Human Review
 - Weekly blind A/B sample review.
 - Monthly full benchmark sweep.
-- Include both beginner and expert raters.
+- Include both practicing tarot readers and serious learners.
 
 ### 15.3 Automated Gates
 - deterministic deck replay tests,
