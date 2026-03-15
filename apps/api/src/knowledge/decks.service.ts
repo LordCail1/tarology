@@ -213,17 +213,78 @@ function requireImportEntrySourceIds(
   sourceIds: unknown,
   message: string
 ): string[] {
-  if (!Array.isArray(sourceIds) || sourceIds.some((sourceId) => typeof sourceId !== "string")) {
+  if (!Array.isArray(sourceIds)) {
     throw new BadRequestException(message);
   }
 
-  return sourceIds;
+  return normalizeEntrySourceIds(
+    sourceIds,
+    message,
+    'Imported knowledge entry field "sourceIds" must contain only non-empty strings.'
+  );
 }
 
 function requireImportKnowledgeSourceIds(
   sources: Array<Pick<KnowledgeSourceWriteDto, "sourceId">>
 ): string[] {
   return sources.map((source) => normalizeImportedKnowledgeSourceId(source.sourceId));
+}
+
+function normalizeEntrySourceIds(
+  sourceIds: unknown,
+  typeMessage: string,
+  blankMessage: string
+): string[] {
+  if (
+    !Array.isArray(sourceIds) ||
+    sourceIds.some((sourceId) => typeof sourceId !== "string")
+  ) {
+    throw new BadRequestException(typeMessage);
+  }
+
+  const normalizedSourceIds = sourceIds.map((sourceId) => sourceId.trim());
+  if (normalizedSourceIds.some((sourceId) => sourceId.length === 0)) {
+    throw new BadRequestException(blankMessage);
+  }
+
+  return normalizedSourceIds;
+}
+
+function normalizeKnowledgeEntryLabel(label: unknown): string {
+  if (typeof label !== "string" || label.trim().length === 0) {
+    throw new BadRequestException('Knowledge entry field "label" must be a non-empty string.');
+  }
+
+  return label.trim();
+}
+
+function validateImportedCardRecord(card: ImportDeckRequest["cards"][number]): void {
+  if (typeof card.cardId !== "string" || card.cardId.trim().length === 0) {
+    throw new BadRequestException('Imported cards must provide a non-empty string "cardId".');
+  }
+  if (typeof card.name !== "string" || card.name.trim().length === 0) {
+    throw new BadRequestException('Imported cards must provide a non-empty string "name".');
+  }
+  if (!Number.isInteger(card.sortOrder)) {
+    throw new BadRequestException('Imported cards must provide an integer "sortOrder".');
+  }
+}
+
+function normalizeKnowledgeEntryWrite(entry: KnowledgeEntryWriteDto): KnowledgeEntryWriteDto {
+  ensureExclusiveEntryBody(entry);
+
+  return {
+    ...entry,
+    label: normalizeKnowledgeEntryLabel(entry.label),
+    sourceIds:
+      entry.sourceIds == null
+        ? []
+        : normalizeEntrySourceIds(
+            entry.sourceIds,
+            'Knowledge entry field "sourceIds" must be an array of strings when provided.',
+            'Knowledge entry field "sourceIds" must contain only non-empty strings.'
+          ),
+  };
 }
 
 function ensureUniqueScopedEntryIds<
@@ -882,7 +943,10 @@ export class DecksService {
             entry.bodyJson === null ? Prisma.JsonNull : toJson(entry.bodyJson),
           summary: entry.summary,
           tags: entry.tags,
-          sourceIds: entry.sourceIds,
+          sourceIds: requireImportEntrySourceIds(
+            entry.sourceIds,
+            'Imported card information entry field "sourceIds" must be an array of strings.'
+          ),
           sortOrder: entry.sortOrder,
           archivedAt: toDateOrNull(entry.archivedAt),
         })),
@@ -902,7 +966,10 @@ export class DecksService {
             entry.bodyJson === null ? Prisma.JsonNull : toJson(entry.bodyJson),
           summary: entry.summary,
           tags: entry.tags,
-          sourceIds: entry.sourceIds,
+          sourceIds: requireImportEntrySourceIds(
+            entry.sourceIds,
+            'Imported symbol information entry field "sourceIds" must be an array of strings.'
+          ),
           sortOrder: entry.sortOrder,
           archivedAt: toDateOrNull(entry.archivedAt),
         })),
@@ -1011,21 +1078,22 @@ export class DecksService {
     cardRecordId: string,
     entries: KnowledgeEntryWriteDto[]
   ): Promise<void> {
-    await this.assertValidSourceIds(tx, deckId, entries);
+    const normalizedEntries = entries.map((entry) => normalizeKnowledgeEntryWrite(entry));
+
+    await this.assertValidSourceIds(tx, deckId, normalizedEntries);
 
     await tx.cardInformationEntry.deleteMany({
       where: { cardRecordId },
     });
 
-    if (entries.length > 0) {
+    if (normalizedEntries.length > 0) {
       await tx.cardInformationEntry.createMany({
-        data: entries.map((entry) => {
-          ensureExclusiveEntryBody(entry);
+        data: normalizedEntries.map((entry) => {
           return {
             id: randomUUID(),
             cardRecordId,
             entryId: entry.entryId?.trim() || randomUUID(),
-            label: entry.label.trim(),
+            label: entry.label,
             format: entry.format,
             bodyText: entry.bodyText ?? null,
             bodyJson:
@@ -1051,21 +1119,22 @@ export class DecksService {
     symbolRecordId: string,
     entries: KnowledgeEntryWriteDto[]
   ): Promise<void> {
-    await this.assertValidSourceIds(tx, deckId, entries);
+    const normalizedEntries = entries.map((entry) => normalizeKnowledgeEntryWrite(entry));
+
+    await this.assertValidSourceIds(tx, deckId, normalizedEntries);
 
     await tx.symbolInformationEntry.deleteMany({
       where: { symbolRecordId },
     });
 
-    if (entries.length > 0) {
+    if (normalizedEntries.length > 0) {
       await tx.symbolInformationEntry.createMany({
-        data: entries.map((entry) => {
-          ensureExclusiveEntryBody(entry);
+        data: normalizedEntries.map((entry) => {
           return {
             id: randomUUID(),
             symbolRecordId,
             entryId: entry.entryId?.trim() || randomUUID(),
-            label: entry.label.trim(),
+            label: entry.label,
             format: entry.format,
             bodyText: entry.bodyText ?? null,
             bodyJson:
@@ -1179,18 +1248,12 @@ export class DecksService {
             if (entry.sourceIds == null) {
               return [];
             }
-            if (
-              !Array.isArray(entry.sourceIds) ||
-              entry.sourceIds.some((sourceId) => typeof sourceId !== "string")
-            ) {
-              throw new BadRequestException(
-                'Knowledge entry field "sourceIds" must be an array of strings when provided.'
-              );
-            }
-
-            return entry.sourceIds;
+            return normalizeEntrySourceIds(
+              entry.sourceIds,
+              'Knowledge entry field "sourceIds" must be an array of strings when provided.',
+              'Knowledge entry field "sourceIds" must contain only non-empty strings.'
+            );
           })
-          .filter((sourceId) => sourceId.trim().length > 0)
       )
     );
 
@@ -1460,6 +1523,7 @@ export class DecksService {
 
     const cardIds = new Set<string>();
     for (const card of payload.cards) {
+      validateImportedCardRecord(card);
       if (cardIds.has(card.cardId)) {
         throw new ConflictException(`Duplicate cardId "${card.cardId}" in import payload.`);
       }
