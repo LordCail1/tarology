@@ -18,8 +18,8 @@ interface HistoryRailProps {
 const filterLabels: Record<ReadingHistoryFilter, string> = {
   all: "All",
   active: "Active",
-  paused: "Paused",
-  complete: "Complete",
+  archived: "Archived",
+  deleted: "Deleted",
 };
 
 export function HistoryRail({
@@ -34,7 +34,7 @@ export function HistoryRail({
   onStatusFilterChange,
   onReadingSelect,
 }: HistoryRailProps) {
-  const filterOrder: ReadingHistoryFilter[] = ["all", "active", "paused", "complete"];
+  const filterOrder: ReadingHistoryFilter[] = ["all", "active", "archived"];
   const filteredCount = groupedReadings.reduce((count, group) => count + group.items.length, 0);
   const initials = profile.displayName
     .split(/\s+/)

@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -15,7 +16,7 @@ import { CanvasPanel } from "./canvas-panel";
 import { HistoryRail } from "./history-rail";
 import { ReadingStudioTopbar } from "./reading-studio-topbar";
 import { applyLayoutAction, applyWorkspaceAction } from "../../lib/reading-studio-actions";
-import { createLocalReadingStudioDataSource } from "../../lib/reading-studio-data-source";
+import { createApiReadingStudioDataSource } from "../../lib/reading-studio-api-data-source";
 import { groupReadingsByRecency } from "../../lib/group-readings-by-recency";
 import {
   RESIZE_KEYBOARD_STEP_PX,
@@ -28,6 +29,7 @@ import type {
   AnalysisTab,
   PanelSide,
   ReadingHistoryFilter,
+  ReadingHistoryItem,
   ReadingStudioLayoutPreferences,
   ReadingStudioSnapshot,
   ReadingStudioWorkspace,
@@ -52,6 +54,8 @@ interface ReadingStudioShellProps {
   profile: ProfileShellDto;
   preferences: UserPreferencesDto;
 }
+
+type StudioStatus = "loading" | "ready" | "error";
 const railContextIcons: Record<PanelSide, string[]> = {
   left: ["R", "Q", "F"],
   right: ["T", "I", "C"],
@@ -136,22 +140,26 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   );
   const dataSource = useMemo(
     () =>
-      createLocalReadingStudioDataSource(
-        typeof window === "undefined" ? undefined : window.localStorage
+      createApiReadingStudioDataSource(
+        typeof window === "undefined" ? undefined : window.localStorage,
+        preferences
       ),
-    []
+    [preferences]
   );
 
   const [viewportWidth, setViewportWidth] = useState(() => getViewportWidth());
   const [layoutPreferences, setLayoutPreferences] =
     useState<ReadingStudioLayoutPreferences | null>(null);
   const [studioSnapshot, setStudioSnapshot] = useState<ReadingStudioSnapshot | null>(null);
+  const [studioStatus, setStudioStatus] = useState<StudioStatus>("loading");
+  const [studioErrorMessage, setStudioErrorMessage] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] =
     useState<ReadingHistoryFilter>("all");
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("threads");
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const persistChainRef = useRef(Promise.resolve());
   const supportsPointerEvents =
     typeof window !== "undefined" && "PointerEvent" in window;
 
@@ -159,17 +167,34 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
     let cancelled = false;
 
     async function hydrateStudio() {
-      const [loadedLayoutPreferences, loadedStudioSnapshot] = await Promise.all([
-        preferenceAdapter.readLayoutPreferences(),
-        dataSource.loadStudio(),
-      ]);
+      setStudioStatus("loading");
+      setStudioErrorMessage(null);
 
-      if (cancelled) {
-        return;
+      try {
+        const [loadedLayoutPreferences, loadedStudioSnapshot] = await Promise.all([
+          preferenceAdapter.readLayoutPreferences(),
+          dataSource.loadStudio(),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setLayoutPreferences(loadedLayoutPreferences);
+        setStudioSnapshot(loadedStudioSnapshot);
+        setStudioStatus("ready");
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setStudioErrorMessage(
+          error instanceof Error && error.message.trim().length > 0
+            ? error.message
+            : "Unable to load your readings right now. Please try again."
+        );
+        setStudioStatus("error");
       }
-
-      setLayoutPreferences(loadedLayoutPreferences);
-      setStudioSnapshot(loadedStudioSnapshot);
     }
 
     void hydrateStudio();
@@ -272,7 +297,10 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   }, [layoutPreferences, preferenceAdapter, resizeState, viewportWidth]);
 
   const isDesktop = isDesktopViewport(viewportWidth);
-  const activeWorkspace = studioSnapshot?.workspaces[studioSnapshot.activeReadingId] ?? null;
+  const activeWorkspace =
+    studioSnapshot?.activeReadingId
+      ? studioSnapshot.workspaces[studioSnapshot.activeReadingId] ?? null
+      : null;
   const activeReading = activeWorkspace?.reading ?? null;
 
   const normalizedQuery = historySearchQuery.trim().toLowerCase();
@@ -289,6 +317,17 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   });
 
   const groupedReadings = groupReadingsByRecency(filteredReadings ?? []);
+
+  function upsertHistoryItem(
+    currentHistory: ReadingHistoryItem[],
+    nextItem: ReadingHistoryItem
+  ): ReadingHistoryItem[] {
+    const remaining = currentHistory.filter((item) => item.id !== nextItem.id);
+    return [nextItem, ...remaining].sort(
+      (left, right) =>
+        new Date(right.updatedAtIso).getTime() - new Date(left.updatedAtIso).getTime()
+    );
+  }
 
   function updateLayoutPreferences(
     nextLayoutPreferences: ReadingStudioLayoutPreferences,
@@ -400,11 +439,10 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   }
 
   async function activateReading(readingId: string) {
-    if (!studioSnapshot || !activeWorkspace || readingId === studioSnapshot.activeReadingId) {
+    if (!studioSnapshot || readingId === studioSnapshot.activeReadingId) {
       return;
     }
 
-    await dataSource.saveWorkspace(activeWorkspace.reading.id, activeWorkspace);
     const nextWorkspace = await dataSource.setActiveReading(readingId);
 
     setStudioSnapshot((current) => {
@@ -417,7 +455,6 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
         activeReadingId: readingId,
         workspaces: {
           ...current.workspaces,
-          [activeWorkspace.reading.id]: activeWorkspace,
           [readingId]: nextWorkspace,
         },
       };
@@ -426,24 +463,42 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   }
 
   function commitWorkspace(nextWorkspace: ReadingStudioWorkspace) {
-    if (!studioSnapshot) {
-      return;
-    }
-
     setStudioSnapshot((current) => {
-      if (!current) {
+      if (!current || !current.activeReadingId) {
         return current;
       }
 
       return {
         ...current,
+        history: upsertHistoryItem(current.history, nextWorkspace.reading),
         workspaces: {
           ...current.workspaces,
           [current.activeReadingId]: nextWorkspace,
         },
       };
     });
-    void dataSource.saveWorkspace(nextWorkspace.reading.id, nextWorkspace);
+  }
+
+  async function handleNewReading() {
+    const promptedQuestion = window.prompt("Root question for the new reading", "");
+    if (promptedQuestion === null) {
+      return;
+    }
+
+    const rootQuestion = promptedQuestion.trim().length > 0 ? promptedQuestion.trim() : "Untitled reading";
+
+    const nextWorkspace = await dataSource.createReading(rootQuestion);
+    setStudioSnapshot((current) => {
+      return {
+        activeReadingId: nextWorkspace.reading.id,
+        history: upsertHistoryItem(current?.history ?? [], nextWorkspace.reading),
+        workspaces: {
+          ...(current?.workspaces ?? {}),
+          [nextWorkspace.reading.id]: nextWorkspace,
+        },
+      };
+    });
+    setSelectedCardId(null);
   }
 
   function dispatchWorkspaceAction(
@@ -453,10 +508,43 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
       return;
     }
 
-    commitWorkspace(applyWorkspaceAction(activeWorkspace, action));
+    const baseVersion = activeWorkspace.reading.version;
+    const optimisticWorkspace = applyWorkspaceAction(activeWorkspace, action);
+    commitWorkspace(optimisticWorkspace);
+
+    persistChainRef.current = persistChainRef.current
+      .then(async () => {
+        const persistedWorkspace = await dataSource.applyWorkspaceAction(
+          optimisticWorkspace.reading.id,
+          baseVersion,
+          action
+        );
+
+        commitWorkspace(persistedWorkspace);
+      })
+      .catch(async () => {
+        const reloadedWorkspace = await dataSource.setActiveReading(optimisticWorkspace.reading.id);
+        commitWorkspace(reloadedWorkspace);
+      });
   }
 
-  if (!layoutPreferences || !activeWorkspace || !activeReading || !studioSnapshot) {
+  if (studioStatus === "error") {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 py-10">
+        <section className="surface w-full rounded-2xl p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+            Tarology v2
+          </p>
+          <h1 className="mt-2 text-2xl text-[var(--color-ink)]">Unable to load studio</h1>
+          <p className="mt-3 text-sm text-[var(--color-muted)]">
+            {studioErrorMessage ?? "Loading your durable reading workspace failed."}
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!layoutPreferences || !studioSnapshot || studioStatus === "loading") {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 py-10">
         <section className="surface w-full rounded-2xl p-8 text-center">
@@ -467,6 +555,29 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           <p className="mt-3 text-sm text-[var(--color-muted)]">
             Restoring your reading workspace and saved layout.
           </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!activeWorkspace || !activeReading || studioSnapshot.history.length === 0) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-2xl items-center justify-center px-4 py-10">
+        <section className="surface w-full rounded-2xl p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+            Tarology v2
+          </p>
+          <h1 className="mt-2 text-2xl text-[var(--color-ink)]">Start your first reading</h1>
+          <p className="mt-3 text-sm text-[var(--color-muted)]">
+            Your workspace is ready. Create a reading to load durable history and canvas state.
+          </p>
+          <button
+            type="button"
+            className="mt-6 inline-flex items-center justify-center rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-black transition hover:brightness-110"
+            onClick={() => void handleNewReading()}
+          >
+            New Reading
+          </button>
         </section>
       </main>
     );
@@ -529,7 +640,7 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
                 profile={profile}
                 preferences={preferences}
                 groupedReadings={groupedReadings}
-                activeReadingId={studioSnapshot.activeReadingId}
+                activeReadingId={activeReading.id}
                 searchQuery={historySearchQuery}
                 statusFilter={historyStatusFilter}
                 totalCount={studioSnapshot.history.length}
@@ -574,7 +685,7 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           onToggleDesktopAnalysisPanel={() => togglePanel("right")}
           onOpenMobileHistoryDrawer={() => setPanelOpen("left", true)}
           onOpenMobileAnalysisDrawer={() => setPanelOpen("right", true)}
-          onNewReading={() => undefined}
+          onNewReading={() => void handleNewReading()}
         />
         <CanvasPanel
           workspace={activeWorkspace}

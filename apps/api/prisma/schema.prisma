@@ -99,6 +99,13 @@ model ReadingCard {
   deckIndex         Int      @map("deck_index")
   cardId            String   @map("card_id")
   assignedReversal  Boolean  @map("assigned_reversal")
+  isFaceUp          Boolean  @default(false) @map("is_face_up")
+  rotationDeg       Int      @default(0) @map("rotation_deg")
+  freeformXPx       Int      @default(0) @map("freeform_x_px")
+  freeformYPx       Int      @default(0) @map("freeform_y_px")
+  freeformStackOrder Int     @default(0) @map("freeform_stack_order")
+  gridColumn        Int      @default(0) @map("grid_column")
+  gridRow           Int      @default(0) @map("grid_row")
   createdAt         DateTime @map("created_at") @db.Timestamptz(6)
   reading           Reading  @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 

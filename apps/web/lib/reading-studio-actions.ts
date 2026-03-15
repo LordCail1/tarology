@@ -15,6 +15,14 @@ function normalizeRotation(nextRotationDeg: number): number {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+function buildNextWorkspaceMetadata(current: ReadingStudioWorkspace) {
+  return {
+    ...current.reading,
+    version: current.reading.version + 1,
+    updatedAtIso: new Date().toISOString(),
+  };
+}
+
 export function applyLayoutAction(
   current: ReadingStudioLayoutPreferences,
   action: Extract<
@@ -61,6 +69,10 @@ export function applyWorkspaceAction(
     case "workspace.modeSwitched":
       return {
         ...current,
+        reading: {
+          ...buildNextWorkspaceMetadata(current),
+          canvasMode: action.mode,
+        },
         canvas: {
           ...current.canvas,
           activeMode: action.mode,
@@ -69,6 +81,7 @@ export function applyWorkspaceAction(
     case "workspace.cardMoved":
       return {
         ...current,
+        reading: buildNextWorkspaceMetadata(current),
         canvas: {
           ...current.canvas,
           cards: current.canvas.cards.map((card) => {
@@ -99,6 +112,7 @@ export function applyWorkspaceAction(
     case "workspace.cardRotated":
       return {
         ...current,
+        reading: buildNextWorkspaceMetadata(current),
         canvas: {
           ...current.canvas,
           cards: current.canvas.cards.map((card) =>
@@ -114,6 +128,7 @@ export function applyWorkspaceAction(
     case "workspace.cardFlipped":
       return {
         ...current,
+        reading: buildNextWorkspaceMetadata(current),
         canvas: {
           ...current.canvas,
           cards: current.canvas.cards.map((card) =>

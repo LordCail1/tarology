@@ -3,7 +3,107 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { READING_STUDIO_ACTIVE_READING_STORAGE_KEY } from "../../lib/reading-studio-data-source";
 import { READING_STUDIO_LAYOUT_STORAGE_KEY } from "../../lib/reading-studio-preferences";
+import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
+import { readingStudioSeedSnapshot } from "../../lib/reading-studio-mock";
+import type {
+  ReadingStudioSnapshot,
+  ReadingStudioWorkspace,
+} from "../../lib/reading-studio-types";
 import { ReadingStudioShell } from "./reading-studio-shell";
+
+const mockStudioState = vi.hoisted(() => ({
+  snapshot: null as ReadingStudioSnapshot | null,
+}));
+
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function upsertWorkspace(snapshot: ReadingStudioSnapshot, workspace: ReadingStudioWorkspace) {
+  snapshot.workspaces[workspace.reading.id] = cloneValue(workspace);
+  snapshot.history = [
+    workspace.reading,
+    ...snapshot.history.filter((reading) => reading.id !== workspace.reading.id),
+  ].sort(
+    (left, right) =>
+      new Date(right.updatedAtIso).getTime() - new Date(left.updatedAtIso).getTime()
+  );
+}
+
+vi.mock("../../lib/reading-studio-api-data-source", () => ({
+  createApiReadingStudioDataSource: (storage: Storage | undefined) => ({
+    async loadStudio() {
+      const snapshot = cloneValue(
+        mockStudioState.snapshot ?? cloneValue(readingStudioSeedSnapshot)
+      );
+      const persistedActiveReadingId =
+        storage?.getItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY) ?? null;
+      const activeReadingId =
+        (persistedActiveReadingId && snapshot.workspaces[persistedActiveReadingId]
+          ? persistedActiveReadingId
+          : snapshot.activeReadingId) ??
+        snapshot.history[0]?.id ??
+        null;
+
+      if (!activeReadingId) {
+        return {
+          activeReadingId: null,
+          history: [],
+          workspaces: {},
+        };
+      }
+
+      storage?.setItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY, activeReadingId);
+
+      return {
+        activeReadingId,
+        history: snapshot.history,
+        workspaces: {
+          [activeReadingId]: cloneValue(snapshot.workspaces[activeReadingId]),
+        },
+      };
+    },
+    async setActiveReading(readingId: string) {
+      const snapshot = mockStudioState.snapshot ?? cloneValue(readingStudioSeedSnapshot);
+      mockStudioState.snapshot = snapshot;
+      snapshot.activeReadingId = readingId;
+      storage?.setItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY, readingId);
+      return cloneValue(snapshot.workspaces[readingId]);
+    },
+    async createReading(rootQuestion: string) {
+      const snapshot = mockStudioState.snapshot ?? cloneValue(readingStudioSeedSnapshot);
+      mockStudioState.snapshot = snapshot;
+      const template = cloneValue(
+        snapshot.workspaces[snapshot.activeReadingId ?? snapshot.history[0]?.id ?? "rdg_001"]
+      );
+      const readingId = `rdg_test_${snapshot.history.length + 1}`;
+      const nextWorkspace: ReadingStudioWorkspace = {
+        ...template,
+        reading: {
+          ...template.reading,
+          id: readingId,
+          title: rootQuestion,
+          version: 1,
+          createdAtLabel: "Just now",
+          updatedAtIso: "2026-03-15T12:00:00.000Z",
+        },
+      };
+      upsertWorkspace(snapshot, nextWorkspace);
+      snapshot.activeReadingId = readingId;
+      storage?.setItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY, readingId);
+      return cloneValue(nextWorkspace);
+    },
+    async applyWorkspaceAction(readingId: string, _currentVersion: number, action: never) {
+      const snapshot = mockStudioState.snapshot ?? cloneValue(readingStudioSeedSnapshot);
+      mockStudioState.snapshot = snapshot;
+      const workspace = snapshot.workspaces[readingId];
+      const nextWorkspace = applyWorkspaceAction(workspace, action);
+      upsertWorkspace(snapshot, nextWorkspace);
+      snapshot.activeReadingId = readingId;
+      return cloneValue(nextWorkspace);
+    },
+  }),
+}));
 
 const profileFixture = {
   userId: "usr_123",
@@ -65,6 +165,7 @@ describe("ReadingStudioShell", () => {
     window.localStorage.clear();
     setViewportWidth(1440);
     vi.restoreAllMocks();
+    mockStudioState.snapshot = cloneValue(readingStudioSeedSnapshot);
   });
 
   it("renders the hydrated shell with grouped history, topbar, canvas, and analysis tabs", async () => {
