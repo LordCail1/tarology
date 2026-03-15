@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, type Card as CardRecord, type Symbol as SymbolRecord } from "@prisma/client";
 import { createHash, randomUUID } from "node:crypto";
+import { TOTAL_TAROT_CARDS } from "@tarology/shared";
 import type {
   CardDetail,
   CreateDeckRequest,
@@ -1290,6 +1291,16 @@ export class DecksService {
     }
 
     const sourceIds = new Set(payload.knowledgeSources.map((source) => source.sourceId));
+    if (sourceIds.size !== payload.knowledgeSources.length) {
+      throw new ConflictException("Duplicate sourceId values are not allowed in import payload.");
+    }
+
+    if (payload.cards.length !== TOTAL_TAROT_CARDS) {
+      throw new BadRequestException(
+        `Imported decks must contain exactly ${TOTAL_TAROT_CARDS} cards.`
+      );
+    }
+
     const sortedCardOrders = payload.cards
       .map((card) => card.sortOrder)
       .sort((left, right) => left - right);

@@ -1,5 +1,6 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
+import { TOTAL_TAROT_CARDS, type ImportDeckRequest } from "@tarology/shared";
 import { DecksService } from "../src/knowledge/decks.service.js";
 
 function createDecksService() {
@@ -20,6 +21,56 @@ function createDecksService() {
 
   const service = new DecksService(prisma as never, starterDeckTemplatesService as never);
   return { prisma, starterDeckTemplatesService, service };
+}
+
+function buildValidImportPayload(): ImportDeckRequest {
+  return {
+    format: "tarology.deck.export",
+    version: 1,
+    exportedAt: "2026-03-15T00:00:00.000Z",
+    deck: {
+      name: "Imported Thoth",
+      description: "Imported deck payload",
+      deckSpecVersion: "thoth-v1",
+      knowledgeVersion: 1,
+      initializationMode: "starter_content",
+      initializerKey: "thoth",
+      previewImageUrl: null,
+      backImageUrl: null,
+      cardCount: TOTAL_TAROT_CARDS,
+      originExportDigest: null,
+      exportNotes: null,
+    },
+    cards: Array.from({ length: TOTAL_TAROT_CARDS }, (_, index) => ({
+      cardId: `card-${index + 1}`,
+      name: `Card ${index + 1}`,
+      sortOrder: index,
+      shortLabel: null,
+      faceImageUrl: null,
+      metadataJson: null,
+    })),
+    symbols: [],
+    cardSymbols: [],
+    knowledgeSources: [
+      {
+        id: "source-record-1",
+        deckId: "deck-export",
+        sourceId: "source-1",
+        kind: "starter_content",
+        title: "Starter source",
+        capturedAt: "2026-03-15T00:00:00.000Z",
+        author: null,
+        publisher: null,
+        url: null,
+        citationText: null,
+        publishedAt: null,
+        rightsNote: null,
+        metadataJson: null,
+      },
+    ],
+    cardInformationEntries: [],
+    symbolInformationEntries: [],
+  };
 }
 
 describe("DecksService", () => {
@@ -126,6 +177,34 @@ describe("DecksService", () => {
         symbolInformationEntries: [],
       } as any)
     ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects import payloads that do not contain a full tarot roster", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.cards = payload.cards.slice(0, TOTAL_TAROT_CARDS - 1);
+    payload.deck.cardCount = payload.cards.length;
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate knowledge source identifiers in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.knowledgeSources.push({
+      ...payload.knowledgeSources[0],
+      id: "source-record-2",
+    });
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(ConflictException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
