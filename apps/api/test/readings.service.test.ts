@@ -14,18 +14,22 @@ const user: AuthenticatedUser = {
   avatarUrl: null,
 };
 
-const deckCatalog = {
-  requireDeck: vi.fn().mockResolvedValue({
+const decksService = {
+  requireDeckForReading: vi.fn().mockResolvedValue({
     summary: {
-      id: "thoth",
+      id: "deck_thoth_owned",
       name: "Thoth Tarot",
       description: "Deck",
       specVersion: "thoth-v1",
+      knowledgeVersion: 1,
+      initializationMode: "starter_content" as const,
+      initializerKey: "thoth",
       previewImageUrl: "/images/cards/thoth/TheSun.jpg",
       backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
       cardCount: 78,
+      symbolCount: 8,
     },
-    spec: THOTH_DECK_SPEC,
+    cardIds: [...THOTH_DECK_SPEC.cardIds],
   }),
 };
 
@@ -80,7 +84,7 @@ function createService(defaultDeckId: string | null) {
 
   const service = new ReadingsService(
     prisma as never,
-    deckCatalog as never,
+    decksService as never,
     readingsRepository as never,
     readingEventsRepository as never,
     readingSnapshotsRepository as never,
@@ -105,14 +109,14 @@ describe("ReadingsService", () => {
       user,
       {
         rootQuestion: "What should I focus on?",
-        deckId: "thoth",
+        deckId: "deck_thoth_owned",
         deckSpecVersion: "thoth-v1",
       },
       "create-reading-explicit"
     );
 
     expect(result.created).toBe(true);
-    expect(result.response.deckId).toBe("thoth");
+    expect(result.response.deckId).toBe("deck_thoth_owned");
     expect(result.response.deckSpecVersion).toBe("thoth-v1");
     expect(result.response.assignments).toHaveLength(78);
     expect(new Set(result.response.assignments.map((assignment) => assignment.cardId)).size).toBe(
@@ -126,7 +130,7 @@ describe("ReadingsService", () => {
   });
 
   it("falls back to the saved default deck when no explicit deck is passed", async () => {
-    const { prisma, service } = createService("thoth");
+    const { prisma, service } = createService("deck_thoth_owned");
 
     const result = await service.createReading(
       user,
@@ -141,7 +145,7 @@ describe("ReadingsService", () => {
       where: { userId: user.userId },
       select: { defaultDeckId: true },
     });
-    expect(result.response.deckId).toBe("thoth");
+    expect(result.response.deckId).toBe("deck_thoth_owned");
   });
 
   it("returns a conflict when there is no explicit or saved default deck", async () => {
@@ -170,7 +174,7 @@ describe("ReadingsService", () => {
       id: "reading-1",
       ownerUserId: user.userId,
       rootQuestion: "What remains idempotent?",
-      deckId: "thoth",
+      deckId: "deck_thoth_owned",
       deckSpecVersion: "thoth-v1",
       shuffleAlgorithmVersion: "tarology-shuffle-v1",
       seedCommitment: "seed-commitment",
@@ -232,7 +236,7 @@ describe("ReadingsService", () => {
         },
         $transaction: vi.fn(async (callback: (tx: unknown) => Promise<void>) => callback({})),
       } as never,
-      deckCatalog as never,
+      decksService as never,
       readingsRepository as never,
       {
         append: vi.fn(),

@@ -1,8 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma, User } from "@prisma/client";
+import { DecksService } from "../knowledge/decks.service.js";
 
 @Injectable()
 export class ProfileBootstrapService {
+  constructor(private readonly decksService: DecksService) {}
+
   async ensureUserShell(
     tx: Prisma.TransactionClient,
     user: Pick<User, "id">,
@@ -31,5 +34,7 @@ export class ProfileBootstrapService {
         userId: user.id,
       },
     });
+
+    await this.decksService.ensureStarterDeckForUser(tx, user.id);
   }
 }

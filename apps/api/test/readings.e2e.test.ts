@@ -12,6 +12,7 @@ import {
   TEST_USER,
   configureApiTestEnvironment,
   createTestPrisma,
+  ensureOwnedStarterDeck,
   ensureThothDeck,
   resetDatabase,
 } from "./test-environment.js";
@@ -46,6 +47,8 @@ async function createAuthorizedApp(user: AuthenticatedUser): Promise<INestApplic
 }
 
 const openApps: INestApplication[] = [];
+let testUserDeckId = "";
+let otherUserDeckId = "";
 
 async function closeTrackedApp(app: INestApplication): Promise<void> {
   const index = openApps.indexOf(app);
@@ -65,6 +68,8 @@ describe("Reading durability and history API", () => {
     const prisma = await createTestPrisma();
     await resetDatabase(prisma);
     await ensureThothDeck(prisma);
+    testUserDeckId = await ensureOwnedStarterDeck(prisma, TEST_USER);
+    otherUserDeckId = await ensureOwnedStarterDeck(prisma, OTHER_TEST_USER);
     await prisma.$disconnect();
   });
 
@@ -85,7 +90,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "create-persisted-reading")
       .send({
         rootQuestion: "What continues after a reset?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
         canvasMode: "grid",
       })
@@ -102,7 +107,7 @@ describe("Reading durability and history API", () => {
     expect(detailResponse.body).toMatchObject({
       readingId: createResponse.body.readingId,
       rootQuestion: "What continues after a reset?",
-      deckId: "thoth",
+      deckId: testUserDeckId,
       deckSpecVersion: "thoth-v1",
       canvasMode: "grid",
       status: "active",
@@ -121,7 +126,7 @@ describe("Reading durability and history API", () => {
 
     const requestBody = {
       rootQuestion: "What should stay stable?",
-      deckId: "thoth",
+      deckId: testUserDeckId,
       deckSpecVersion: "thoth-v1",
     };
 
@@ -163,7 +168,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "first-reading")
       .send({
         rootQuestion: "First reading",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);
@@ -173,7 +178,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "second-reading")
       .send({
         rootQuestion: "Second reading",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);
@@ -187,7 +192,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "other-user-reading")
       .send({
         rootQuestion: "Other user reading",
-        deckId: "thoth",
+        deckId: otherUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);
@@ -214,7 +219,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "archive-reopen-reading")
       .send({
         rootQuestion: "How does this evolve?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);
@@ -280,7 +285,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "delete-target")
       .send({
         rootQuestion: "What should end cleanly?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);
@@ -366,7 +371,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "private-reading")
       .send({
         rootQuestion: "Who can see this?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);
@@ -390,7 +395,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "private-command-target")
       .send({
         rootQuestion: "Who should be able to reuse this command?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
       })
       .expect(201);

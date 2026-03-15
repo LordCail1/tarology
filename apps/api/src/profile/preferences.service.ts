@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { DeckSummary } from "@tarology/shared";
 import type {
   GetPreferencesResponse,
   UserPreferencesDto,
@@ -15,7 +16,17 @@ export class PreferencesService {
   async getPreferences(userId: string): Promise<GetPreferencesResponse> {
     const preference = await this.prisma.userPreference.findUnique({
       where: { userId },
-      include: { defaultDeck: true },
+      include: {
+        defaultDeck: {
+          include: {
+            _count: {
+              select: {
+                symbols: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!preference) {
@@ -32,7 +43,7 @@ export class PreferencesService {
       where: { id: defaultDeckId },
     });
 
-    if (!deck) {
+    if (!deck || deck.ownerUserId !== userId) {
       throw new NotFoundException(`Deck "${defaultDeckId}" is not available.`);
     }
 
@@ -52,7 +63,15 @@ export class PreferencesService {
         onboardingCompletedAt: existing.onboardingCompletedAt ?? new Date(),
       },
       include: {
-        defaultDeck: true,
+        defaultDeck: {
+          include: {
+            _count: {
+              select: {
+                symbols: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -70,26 +89,39 @@ export class PreferencesService {
         id: string;
         name: string;
         description: string | null;
-        specVersion: string;
-        previewImageUrl: string;
-        backImageUrl: string;
+        deckSpecVersion: string;
+        knowledgeVersion: number;
+        initializationMode: string;
+        initializerKey: string | null;
+        previewImageUrl: string | null;
+        backImageUrl: string | null;
         cardCount: number;
+        _count?: {
+          symbols: number;
+        };
       } | null;
     }
   ): UserPreferencesDto {
+    const defaultDeck: DeckSummary | null = preference.defaultDeck
+      ? {
+          id: preference.defaultDeck.id,
+          name: preference.defaultDeck.name,
+          description: preference.defaultDeck.description,
+          specVersion: preference.defaultDeck.deckSpecVersion,
+          knowledgeVersion: preference.defaultDeck.knowledgeVersion,
+          initializationMode:
+            preference.defaultDeck.initializationMode as DeckSummary["initializationMode"],
+          initializerKey: preference.defaultDeck.initializerKey,
+          previewImageUrl: preference.defaultDeck.previewImageUrl,
+          backImageUrl: preference.defaultDeck.backImageUrl,
+          cardCount: preference.defaultDeck.cardCount,
+          symbolCount: preference.defaultDeck._count?.symbols ?? 0,
+        }
+      : null;
+
     return {
       defaultDeckId: preference.defaultDeckId,
-      defaultDeck: preference.defaultDeck
-        ? {
-            id: preference.defaultDeck.id,
-            name: preference.defaultDeck.name,
-            description: preference.defaultDeck.description,
-            specVersion: preference.defaultDeck.specVersion,
-            previewImageUrl: preference.defaultDeck.previewImageUrl,
-            backImageUrl: preference.defaultDeck.backImageUrl,
-            cardCount: preference.defaultDeck.cardCount,
-          }
-        : null,
+      defaultDeck,
       onboardingComplete: preference.onboardingCompletedAt !== null,
       updatedAt: preference.updatedAt.toISOString(),
     };

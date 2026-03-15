@@ -21,8 +21,8 @@ import type {
   ReadingListStatusFilter,
 } from "@tarology/shared";
 import { PrismaService } from "../database/prisma.service.js";
+import { DecksService } from "../knowledge/decks.service.js";
 import { toCreateReadingResponse, toReadingDetail, toReadingSummary } from "./reading-contract.mapper.js";
-import { DeckCatalogService } from "./deck-catalog.service.js";
 import { applyReadingEvent } from "./domain/reading-projector.js";
 import {
   READING_ARCHIVED_EVENT,
@@ -112,8 +112,8 @@ export class ReadingsService {
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
-    @Inject(DeckCatalogService)
-    private readonly deckCatalogService: DeckCatalogService,
+    @Inject(DecksService)
+    private readonly decksService: DecksService,
     @Inject(ReadingsRepository)
     private readonly readingsRepository: ReadingsRepository,
     @Inject(ReadingEventsRepository)
@@ -160,14 +160,14 @@ export class ReadingsService {
       );
     }
 
-    const deck = await this.deckCatalogService.requireDeck(resolvedDeckId);
+    const deck = await this.decksService.requireDeckForReading(user.userId, resolvedDeckId);
     if (normalizedRequest.deckSpecVersion !== deck.summary.specVersion) {
       throw new ConflictException(
         `Deck spec version "${normalizedRequest.deckSpecVersion}" does not match deck "${resolvedDeckId}".`
       );
     }
 
-    const builtAssignment = buildDeterministicCardAssignment(deck.spec.cardIds);
+    const builtAssignment = buildDeterministicCardAssignment(deck.cardIds);
     const readingId = randomUUID();
     const createdAt = new Date();
 

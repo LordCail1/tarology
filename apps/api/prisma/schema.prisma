@@ -10,6 +10,26 @@ enum AuthProvider {
   google
 }
 
+enum DeckInitializationMode {
+  starter_content
+  empty_template
+  imported_clone
+}
+
+enum KnowledgeEntryFormat {
+  plain_text
+  markdown
+  json
+}
+
+enum KnowledgeSourceKind {
+  reader_note
+  starter_content
+  imported_reference
+  manual_reference
+  external_enrichment
+}
+
 model User {
   id             String         @id @default(uuid())
   email          String         @unique
@@ -18,6 +38,8 @@ model User {
   authIdentities AuthIdentity[]
   profile        Profile?
   preferences    UserPreference?
+  ownedDecks     Deck[]         @relation("OwnedDecks")
+  deckExports    DeckExport[]   @relation("DeckExports")
 }
 
 model AuthIdentity {
@@ -46,16 +68,29 @@ model Profile {
 }
 
 model Deck {
-  id             String           @id
-  name           String
-  description    String?
-  specVersion    String
-  previewImageUrl String
-  backImageUrl   String
-  cardCount      Int
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  userPreferences UserPreference[]
+  id               String                 @id @default(uuid())
+  ownerUserId      String?
+  name             String
+  description      String?
+  deckSpecVersion  String
+  knowledgeVersion Int                    @default(1)
+  initializationMode DeckInitializationMode
+  initializerKey   String?
+  originExportDigest String?
+  previewImageUrl  String?
+  backImageUrl     String?
+  cardCount        Int
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  ownerUser        User?                  @relation("OwnedDecks", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  userPreferences  UserPreference[]
+  cards            Card[]
+  symbols          Symbol[]
+  cardSymbols      CardSymbol[]
+  knowledgeSources KnowledgeSource[]
+  deckExports      DeckExport[]
+
+  @@index([ownerUserId, updatedAt(sort: Desc)])
 }
 
 model UserPreference {
@@ -68,6 +103,143 @@ model UserPreference {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   defaultDeck          Deck?    @relation(fields: [defaultDeckId], references: [id], onDelete: SetNull)
 }
+
+model Card {
+  id                 String                 @id @default(uuid())
+  deckId             String
+  cardId             String
+  name               String
+  shortLabel         String?
+  sortOrder          Int
+  faceImageUrl       String?
+  metadataJson       Json?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  deck               Deck                   @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  informationEntries CardInformationEntry[]
+  cardSymbols        CardSymbol[]
+
+  @@unique([deckId, cardId])
+  @@unique([deckId, sortOrder])
+  @@index([deckId, sortOrder])
+}
+
+model Symbol {
+  id                 String                   @id @default(uuid())
+  deckId             String
+  symbolId           String
+  name               String
+  shortLabel         String?
+  description        String?
+  metadataJson       Json?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  deck               Deck                     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  informationEntries SymbolInformationEntry[]
+  cardSymbols        CardSymbol[]
+
+  @@unique([deckId, symbolId])
+  @@index([deckId, name])
+}
+
+model CardSymbol {
+  id                String   @id @default(uuid())
+  deckId            String
+  cardRecordId      String
+  symbolRecordId    String
+  sortOrder         Int?
+  placementHintJson Json?
+  linkNote          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deck              Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  card              Card     @relation(fields: [cardRecordId], references: [id], onDelete: Cascade)
+  symbol            Symbol   @relation(fields: [symbolRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([cardRecordId, symbolRecordId])
+  @@index([deckId, sortOrder])
+}
+
+model CardInformationEntry {
+  id           String               @id @default(uuid())
+  cardRecordId String
+  entryId      String
+  label        String
+  format       KnowledgeEntryFormat
+  bodyText     String?
+  bodyJson     Json?
+  summary      String?
+  tags         String[]             @default([])
+  sourceIds    String[]             @default([])
+  sortOrder    Int
+  archivedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  card         Card                 @relation(fields: [cardRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([cardRecordId, entryId])
+  @@index([cardRecordId, sortOrder])
+}
+
+model SymbolInformationEntry {
+  id             String               @id @default(uuid())
+  symbolRecordId String
+  entryId        String
+  label          String
+  format         KnowledgeEntryFormat
+  bodyText       String?
+  bodyJson       Json?
+  summary        String?
+  tags           String[]             @default([])
+  sourceIds      String[]             @default([])
+  sortOrder      Int
+  archivedAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  symbol         Symbol               @relation(fields: [symbolRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([symbolRecordId, entryId])
+  @@index([symbolRecordId, sortOrder])
+}
+
+model KnowledgeSource {
+  id           String              @id @default(uuid())
+  deckId       String
+  sourceId     String
+  kind         KnowledgeSourceKind
+  title        String
+  capturedAt   DateTime
+  author       String?
+  publisher    String?
+  url          String?
+  citationText String?
+  publishedAt  DateTime?
+  rightsNote   String?
+  metadataJson Json?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deck         Deck                @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, sourceId])
+  @@index([deckId, kind])
+}
+
+model DeckExport {
+  id             String   @id @default(uuid())
+  deckId         String
+  exporterUserId String
+  format         String
+  version        Int
+  digest         String
+  payload        Json
+  createdAt      DateTime @default(now())
+  deck           Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  exporterUser   User     @relation("DeckExports", fields: [exporterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, digest])
+  @@index([deckId, createdAt(sort: Desc)])
+}
+
 model Reading {
   id                      String                  @id @db.Uuid
   ownerUserId             String                  @map("owner_user_id")

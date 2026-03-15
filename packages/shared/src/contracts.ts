@@ -3,6 +3,17 @@ export const SHUFFLE_ALGORITHM_VERSION = "seeded-fisher-yates-v1";
 
 export type AppAuthProvider = "google";
 export type CanvasMode = "freeform" | "grid";
+export type DeckInitializationMode =
+  | "starter_content"
+  | "empty_template"
+  | "imported_clone";
+export type KnowledgeEntryFormat = "plain_text" | "markdown" | "json";
+export type KnowledgeSourceKind =
+  | "reader_note"
+  | "starter_content"
+  | "imported_reference"
+  | "manual_reference"
+  | "external_enrichment";
 export type ReadingLifecycleStatus = "active" | "archived" | "deleted";
 export type ReadingListStatusFilter = "all" | "active" | "archived";
 export type ReadingCommandType =
@@ -37,13 +48,276 @@ export interface DeckSummary {
   name: string;
   description: string | null;
   specVersion: string;
-  previewImageUrl: string;
-  backImageUrl: string;
+  knowledgeVersion: number;
+  initializationMode: DeckInitializationMode;
+  initializerKey: string | null;
+  previewImageUrl: string | null;
+  backImageUrl: string | null;
   cardCount: number;
+  symbolCount: number;
 }
 
 export interface GetDecksResponse {
   decks: DeckSummary[];
+}
+
+export interface KnowledgeSourceDto {
+  id: string;
+  deckId: string;
+  sourceId: string;
+  kind: KnowledgeSourceKind;
+  title: string;
+  capturedAt: string;
+  author: string | null;
+  publisher: string | null;
+  url: string | null;
+  citationText: string | null;
+  publishedAt: string | null;
+  rightsNote: string | null;
+  metadataJson: unknown | null;
+}
+
+export interface KnowledgeSourceWriteDto {
+  sourceId?: string;
+  kind: KnowledgeSourceKind;
+  title: string;
+  capturedAt?: string;
+  author?: string | null;
+  publisher?: string | null;
+  url?: string | null;
+  citationText?: string | null;
+  publishedAt?: string | null;
+  rightsNote?: string | null;
+  metadataJson?: unknown | null;
+}
+
+export interface KnowledgeEntryDto {
+  id: string;
+  entryId: string;
+  label: string;
+  format: KnowledgeEntryFormat;
+  bodyText: string | null;
+  bodyJson: unknown | null;
+  summary: string | null;
+  tags: string[];
+  sourceIds: string[];
+  sortOrder: number;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeEntryWriteDto {
+  entryId?: string;
+  label: string;
+  format: KnowledgeEntryFormat;
+  bodyText?: string | null;
+  bodyJson?: unknown | null;
+  summary?: string | null;
+  tags?: string[];
+  sourceIds?: string[];
+  sortOrder: number;
+  archived?: boolean;
+}
+
+export interface CardSummaryDto {
+  id: string;
+  deckId: string;
+  cardId: string;
+  name: string;
+  shortLabel: string | null;
+  sortOrder: number;
+  faceImageUrl: string | null;
+  metadataJson: unknown | null;
+  entryCount: number;
+  linkedSymbolCount: number;
+}
+
+export interface SymbolSummaryDto {
+  id: string;
+  deckId: string;
+  symbolId: string;
+  name: string;
+  shortLabel: string | null;
+  description: string | null;
+  metadataJson: unknown | null;
+  entryCount: number;
+  linkedCardCount: number;
+}
+
+export interface DeckDetail extends DeckSummary {
+  sources: KnowledgeSourceDto[];
+  cards: CardSummaryDto[];
+  symbols: SymbolSummaryDto[];
+}
+
+export interface GetDeckResponse {
+  deck: DeckDetail;
+}
+
+export interface CreateDeckRequest {
+  initializationMode: Exclude<DeckInitializationMode, "imported_clone">;
+  initializerKey: string;
+  name?: string;
+  description?: string | null;
+}
+
+export interface CreateDeckResponse {
+  deck: DeckSummary;
+}
+
+export interface UpdateDeckRequest {
+  name?: string;
+  description?: string | null;
+  sources?: KnowledgeSourceWriteDto[];
+}
+
+export interface UpdateDeckResponse {
+  deck: DeckDetail;
+}
+
+export interface CardDetail extends CardSummaryDto {
+  entries: KnowledgeEntryDto[];
+  linkedSymbols: SymbolSummaryDto[];
+}
+
+export interface GetCardResponse {
+  card: CardDetail;
+}
+
+export interface UpdateCardRequest {
+  name?: string;
+  shortLabel?: string | null;
+  metadataJson?: unknown | null;
+  linkedSymbolIds?: string[];
+  entries?: KnowledgeEntryWriteDto[];
+}
+
+export interface UpdateCardResponse {
+  card: CardDetail;
+}
+
+export interface SymbolDetail extends SymbolSummaryDto {
+  entries: KnowledgeEntryDto[];
+  linkedCards: CardSummaryDto[];
+}
+
+export interface GetSymbolsResponse {
+  symbols: SymbolSummaryDto[];
+}
+
+export interface GetSymbolResponse {
+  symbol: SymbolDetail;
+}
+
+export interface CreateSymbolRequest {
+  deckId: string;
+  symbolId?: string;
+  name: string;
+  shortLabel?: string | null;
+  description?: string | null;
+  metadataJson?: unknown | null;
+  linkedCardIds?: string[];
+  entries?: KnowledgeEntryWriteDto[];
+}
+
+export interface CreateSymbolResponse {
+  symbol: SymbolDetail;
+}
+
+export interface UpdateSymbolRequest {
+  name?: string;
+  shortLabel?: string | null;
+  description?: string | null;
+  metadataJson?: unknown | null;
+  linkedCardIds?: string[];
+  entries?: KnowledgeEntryWriteDto[];
+}
+
+export interface UpdateSymbolResponse {
+  symbol: SymbolDetail;
+}
+
+export interface DeckExportDeckPayload {
+  name: string;
+  description: string | null;
+  deckSpecVersion: string;
+  knowledgeVersion: number;
+  initializationMode: DeckInitializationMode;
+  initializerKey: string | null;
+  previewImageUrl: string | null;
+  backImageUrl: string | null;
+  cardCount: number;
+  originExportDigest?: string | null;
+  exportNotes?: string | null;
+}
+
+export interface DeckExportCardPayload {
+  cardId: string;
+  name: string;
+  sortOrder: number;
+  shortLabel: string | null;
+  faceImageUrl: string | null;
+  metadataJson: unknown | null;
+}
+
+export interface DeckExportSymbolPayload {
+  symbolId: string;
+  name: string;
+  shortLabel: string | null;
+  description: string | null;
+  metadataJson: unknown | null;
+}
+
+export interface DeckExportCardSymbolPayload {
+  cardId: string;
+  symbolId: string;
+  sortOrder: number | null;
+  placementHintJson: unknown | null;
+  linkNote: string | null;
+}
+
+export interface DeckExportKnowledgeEntryPayload {
+  entryId: string;
+  label: string;
+  format: KnowledgeEntryFormat;
+  bodyText: string | null;
+  bodyJson: unknown | null;
+  summary: string | null;
+  tags: string[];
+  sourceIds: string[];
+  sortOrder: number;
+  archivedAt: string | null;
+}
+
+export interface DeckExportCardKnowledgeEntryPayload
+  extends DeckExportKnowledgeEntryPayload {
+  cardId: string;
+}
+
+export interface DeckExportSymbolKnowledgeEntryPayload
+  extends DeckExportKnowledgeEntryPayload {
+  symbolId: string;
+}
+
+export interface DeckExportEnvelope {
+  format: "tarology.deck.export";
+  version: 1;
+  exportedAt: string;
+  deck: DeckExportDeckPayload;
+  cards: DeckExportCardPayload[];
+  symbols: DeckExportSymbolPayload[];
+  cardSymbols: DeckExportCardSymbolPayload[];
+  knowledgeSources: KnowledgeSourceDto[];
+  cardInformationEntries: DeckExportCardKnowledgeEntryPayload[];
+  symbolInformationEntries: DeckExportSymbolKnowledgeEntryPayload[];
+}
+
+export type ExportDeckResponse = DeckExportEnvelope;
+export type ImportDeckRequest = DeckExportEnvelope;
+
+export interface ImportDeckResponse {
+  deck: DeckSummary;
 }
 
 export interface ProfileShellDto {

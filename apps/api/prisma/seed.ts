@@ -10,10 +10,15 @@ const prisma = new PrismaClient({
 
 const THOTH_DECK = {
   id: "thoth",
+  ownerUserId: null,
   name: "Thoth Tarot",
   description:
-    "The Aleister Crowley Thoth Tarot deck with richly layered esoteric symbolism.",
-  specVersion: "thoth-v1",
+    "Legacy shared starter source for the Aleister Crowley Thoth Tarot deck.",
+  deckSpecVersion: "thoth-v1",
+  knowledgeVersion: 1,
+  initializationMode: "starter_content" as const,
+  initializerKey: "thoth",
+  originExportDigest: null,
   previewImageUrl: "/images/cards/thoth/TheSun.jpg",
   backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
   cardCount: 78,

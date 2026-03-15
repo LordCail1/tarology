@@ -41,6 +41,11 @@ Execution sequencing:
   - desktop sidebar drag-resize with smooth motion,
   - multi-mode canvas architecture (`freeform`, `grid`),
   - first-run default deck selection + per-reading override.
+- Deck knowledge backend baseline is now implemented in this branch:
+  - decks are user-owned instances rather than shared editable catalog rows,
+  - cards, symbols, card-symbol links, knowledge entries, knowledge sources, and deck exports/imports all have API/storage contracts,
+  - profile bootstrap now provisions a personal starter Thoth deck so onboarding/default-deck flows keep working during the pivot,
+  - reading creation now resolves owned deck instances and shuffles their stable ordered card IDs.
 - API now has a DB-backed reading durability baseline:
   - `POST /v1/readings` persists deterministic assignments in PostgreSQL via Prisma
   - `GET /v1/readings` and `GET /v1/readings/:id` return durable history/detail state
@@ -160,6 +165,13 @@ Execution sequencing:
   - Google auth callback now provisions internal UUID-backed users before saving the session
   - `/reading` now gates on both auth and saved default deck, while `/onboarding` completes first-run deck selection
   - web regression coverage now includes onboarding redirects, onboarding completion, and profile/default-deck shell rendering
+- Knowledge-domain baseline branch:
+  - Prisma/Postgres now models owned decks, cards, symbols, card-symbol links, ordered card/symbol knowledge entries, deck knowledge sources, and export records
+  - a new Nest `knowledge` module now serves deck/card/symbol CRUD plus export/import endpoints behind session auth
+  - starter-vs-empty deck initialization is code-level and Thoth starter content now includes mock-but-substantial symbols, sources, and layered knowledge entries
+  - profile bootstrap now provisions a personal starter Thoth deck and preferences can only target owned deck instances
+  - reading creation now validates owned deck instances and shuffles deck-owned card IDs instead of relying on the legacy shared deck catalog service
+  - shared contracts now include deck detail, card detail, symbol detail, source/entry write payloads, and deck export/import envelopes
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -202,6 +214,7 @@ Status note:
 Deck-knowledge pivot follow-ups:
 - Implement deck knowledge domain baseline.
   Acceptance: decks persist card information, symbols, symbol links, starter/empty initialization metadata, and attached knowledge references.
+  Status: complete for backend/domain/contracts baseline in this branch; durable verification still needs a stable Postgres run in CI or against a real local Postgres service.
 - Implement deck-management surface baseline.
   Acceptance: users can browse decks/cards/symbols, edit card/symbol information, and inspect symbols independently from any specific card view.
 - Add deck export/import baseline.
@@ -313,6 +326,7 @@ Deck-knowledge pivot follow-ups:
 - The durable backend currently covers reading lifecycle and immutable card assignment state; canvas/question mutation durability still needs to be added without breaking restore compatibility.
 - The current deck catalog is intentionally narrow: only the built-in Thoth deck is selectable, and card-image filename normalization is still deferred.
 - Deck assets are temporarily sourced from `tarology_old` with project-owner approval; broader licensing policy still needs a durable product decision.
+- Local WSL2 validation with `@prisma/adapter-pg` against `prisma dev` TCP URLs was unstable in this session; DB-backed API verification should be re-run against CI or a stable local Postgres service before merge.
 
 ## Next Agent Start Commands
 ```bash
