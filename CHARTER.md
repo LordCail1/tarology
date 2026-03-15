@@ -30,7 +30,7 @@ This version merges:
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
 15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
-16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
+16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, the built-in starter path creates a user-owned editable deck instance, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
 17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
 19. Symbolic outputs support dual register (`plain` default, `esoteric` optional) with semantic parity.
@@ -84,11 +84,15 @@ Primary JTBD:
   - user can keep one or both configured where available.
 - Deck library and knowledge management:
   - user can initialize a deck from starter content or an empty template,
+  - choosing the built-in starter deck creates a personal editable deck copy rather than leaving the user on a shared template row,
   - user can browse decks, cards, and symbols,
   - user can add/edit card information,
   - user can add/edit symbol information and link symbols to cards,
-  - user can browse symbols independently from cards,
-  - user can export/import private deck state for cloning or sharing.
+  - user can browse symbols independently from cards, with bidirectional card/symbol linking in the UI,
+  - user can export/import private deck state for cloning or sharing,
+  - first-party V1 knowledge editing focuses on layered `plain_text` and `markdown` entries,
+  - sources remain minimal but visible inside deck-management flows,
+  - deck/card images are viewable in V1 but not yet user-editable.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
   - center: card fan + canvas with mode selection,
@@ -160,7 +164,7 @@ V1 support policy:
 
 ### 5.2 Core Journey
 1. User logs in with Google.
-2. On first login, user selects or initializes a default tarot deck (starter-content or empty); preference is persisted.
+2. On first login, user selects or initializes a default tarot deck (starter-content or empty); choosing the built-in starter deck creates a personal owned copy and the preference is persisted.
 3. User may review/edit cards and symbols in that deck before beginning a reading.
 4. User starts a new reading, can override deck selection, and writes root question.
 5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
@@ -237,6 +241,7 @@ Starter-content policy:
 - Users may initialize a deck from starter content or from an empty template.
 - The product must support shipping at least one default deck path with preloaded card/symbol knowledge.
 - Until curated production data is ready, starter-content paths may use mock data.
+- The built-in starter path should still feel immediately usable by shipping symbols, links, entries, sources, and image references even when the content is mock.
 
 External enrichment policy:
 - Future external research/import flows must attach their results to deck knowledge instead of leaving them ephemeral at interpretation time.

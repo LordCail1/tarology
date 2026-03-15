@@ -21,7 +21,9 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Reading Studio side panels must support smooth expand/collapse animation and desktop drag-resize, with persisted user width preferences.
 - Reading canvas must be mode-capable with `freeform` and `grid` modes under one shared state/command model.
 - Users must be able to initialize decks from starter content or empty templates, and the default deck must be captured at first-run onboarding for new readings with per-reading override.
+- Choosing the built-in starter deck should create a user-owned editable deck instance; starter-content decks should feel substantial even when V1 relies on mock knowledge and image references.
 - Symbols are first-class deck entities, independently viewable, and linkable to cards.
+- Deck-management UX is deck-library-first with bidirectional card/symbol linking; first-party V1 editing focuses on layered `plain_text` and `markdown` entries, with sources minimal-but-visible and images view-only.
 - Full deck state should be exportable/importable for cloning or sharing.
 - Interpretation flow supports large card sets, warning users for high-card runs and allowing explicit cancellation.
 - Model provider access must support both credential modes behind one interface:
