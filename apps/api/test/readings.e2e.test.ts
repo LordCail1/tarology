@@ -457,6 +457,48 @@ describe("Reading durability and history API", () => {
     await closeTrackedApp(app);
   });
 
+  it("returns 404 when a canvas command targets a card outside the reading", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "missing-card-create")
+      .send({
+        rootQuestion: "What happens when the card is missing?",
+        deckId: "thoth",
+        deckSpecVersion: "thoth-v1",
+        canvasMode: "freeform",
+      })
+      .expect(201);
+
+    const commandResponse = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "missing-card-command")
+      .send({
+        commandId: "84e6fd09-4ed1-4341-acaf-a5fab4f7432d",
+        expectedVersion: 1,
+        type: "move_card",
+        payload: {
+          cardId: "missing-card-id",
+          freeform: {
+            xPx: 320,
+            yPx: 180,
+          },
+        },
+      })
+      .expect(404);
+
+    expect(commandResponse.body.message).toContain('Card "missing-card-id" is not part of this reading.');
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(detail.body.version).toBe(1);
+
+    await closeTrackedApp(app);
+  });
+
   it("rejects stale versions, soft deletes readings, and replays delete commands idempotently", async () => {
     const app = await createAuthorizedApp(TEST_USER);
 

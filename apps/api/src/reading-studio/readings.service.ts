@@ -374,11 +374,15 @@ export class ReadingsService {
       );
     }
 
-    const nextEvent = this.buildCommandEvent(currentDetail, command);
-    const nextProjection = applyReadingEvent(currentDetail, nextEvent);
-    const commandTimestamp = new Date(nextProjection.updatedAt);
+    let nextEvent: ReadingStoredEvent;
+    let nextProjection: ReadingDetail;
+    let commandTimestamp: Date;
 
     try {
+      nextEvent = this.buildCommandEvent(currentDetail, command);
+      nextProjection = applyReadingEvent(currentDetail, nextEvent);
+      commandTimestamp = new Date(nextProjection.updatedAt);
+
       await this.prisma.$transaction(async (tx) => {
         const updatedCount = await this.applyProjectionUpdate(tx, {
           readingId,

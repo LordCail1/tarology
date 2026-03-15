@@ -165,6 +165,7 @@ Execution sequencing:
   - queued persistence responses now skip stale lower-version commits so older server responses cannot roll back newer optimistic canvas edits
   - reading activation failures now surface as recoverable inline alerts instead of unhandled rejections when a selected reading cannot be fetched
   - workspace persistence chains now self-heal after a failed save-plus-reload path so later user actions still attempt API persistence
+  - invalid canvas commands that target cards outside the reading now return `404` instead of leaking a service error as `500`
 - Reading durability/history backend branch:
   - Prisma/Postgres now replaces the in-memory reading map for the canonical create/read path
   - shared reading contracts now include lifecycle status, summaries/details, history filters, and command envelopes
