@@ -158,4 +158,59 @@ describe("DeckManagementShell", () => {
       screen.getByText(/The Fool is loaded here as starter-content mock knowledge\./)
     ).toBeInTheDocument();
   });
+
+  it("rejects duplicate symbol creation without bumping persisted knowledge version", async () => {
+    render(
+      <DeckManagementShell
+        profile={profile}
+        preferences={preferences}
+        availableDecks={availableDecks}
+      />
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Thoth Tarot").length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByRole("button", { name: "Symbols" }));
+    fireEvent.change(screen.getByPlaceholderText("Symbol name"), {
+      target: { value: "Hourglass" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Short description"), {
+      target: { value: "Time pressure and pacing." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Symbol" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Hourglass" })).toBeInTheDocument()
+    );
+
+    const rawSnapshot = window.localStorage.getItem(buildDeckLibraryStorageKey(profile.userId));
+    expect(rawSnapshot).toBeTruthy();
+    const snapshotAfterFirstCreate = JSON.parse(rawSnapshot!);
+    const deckAfterFirstCreate = snapshotAfterFirstCreate.decks.find(
+      (candidate: { id: string }) => candidate.id === snapshotAfterFirstCreate.activeDeckId
+    );
+    const knowledgeVersionAfterFirstCreate = deckAfterFirstCreate.knowledgeVersion;
+    const symbolCountAfterFirstCreate = deckAfterFirstCreate.symbolCount;
+
+    fireEvent.change(screen.getByPlaceholderText("Symbol name"), {
+      target: { value: "Hourglass" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Symbol" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Symbol already exists in this deck.")).toBeInTheDocument()
+    );
+    expect(screen.queryByText("Symbol created.")).not.toBeInTheDocument();
+
+    const rawSnapshotAfterDuplicate = window.localStorage.getItem(
+      buildDeckLibraryStorageKey(profile.userId)
+    );
+    const snapshotAfterDuplicate = JSON.parse(rawSnapshotAfterDuplicate!);
+    const deckAfterDuplicate = snapshotAfterDuplicate.decks.find(
+      (candidate: { id: string }) => candidate.id === snapshotAfterDuplicate.activeDeckId
+    );
+
+    expect(deckAfterDuplicate.knowledgeVersion).toBe(knowledgeVersionAfterFirstCreate);
+    expect(deckAfterDuplicate.symbolCount).toBe(symbolCountAfterFirstCreate);
+  });
 });

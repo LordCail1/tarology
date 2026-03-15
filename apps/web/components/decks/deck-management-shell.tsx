@@ -597,15 +597,19 @@ export function DeckManagementShell({
     }
 
     const symbolId = slugify(symbolDraft.name) || createPortableId("symbol");
+    const alreadyExists = selectedDeck.symbols.some((symbol) => symbol.symbolId === symbolId);
+
+    if (alreadyExists) {
+      setFlashMessage({
+        tone: "error",
+        text: "Symbol already exists in this deck.",
+      });
+      return;
+    }
 
     updateSelectedDeck(
       (currentDeck) => {
         const nextDeck = withKnowledgeVersion(currentDeck);
-        const alreadyExists = nextDeck.symbols.some((symbol) => symbol.symbolId === symbolId);
-
-        if (alreadyExists) {
-          return nextDeck;
-        }
 
         nextDeck.symbols.push({
           id: createPortableId("symbol"),

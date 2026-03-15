@@ -163,6 +163,7 @@ export interface DeckExportDocument {
     label: string;
     format: DeckEntryFormat | "json";
     summary: string | null;
+    tags?: string[];
     sourceIds: string[];
     sortOrder: number;
     archivedAt?: string | null;
@@ -175,6 +176,7 @@ export interface DeckExportDocument {
     label: string;
     format: DeckEntryFormat | "json";
     summary: string | null;
+    tags?: string[];
     sourceIds: string[];
     sortOrder: number;
     archivedAt?: string | null;

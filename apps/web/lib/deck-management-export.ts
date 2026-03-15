@@ -32,6 +32,7 @@ function toCardEntryPayload(entry: DeckCardEntry): DeckExportDocument["cardInfor
     label: entry.label,
     format: entry.format,
     summary: entry.summary,
+    tags: entry.tags,
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
     archivedAt: entry.archivedAt,
@@ -57,6 +58,7 @@ function toSymbolEntryPayload(
     label: entry.label,
     format: entry.format,
     summary: entry.summary,
+    tags: entry.tags,
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
     archivedAt: entry.archivedAt,
@@ -146,6 +148,10 @@ function toOptionalRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 function toDisplayBodyText(bodyJson: Record<string, unknown>): string {
   return JSON.stringify(bodyJson, null, 2);
 }
@@ -168,7 +174,7 @@ function importCardEntry(
       bodyText: toDisplayBodyText(bodyJson),
       bodyJson,
       summary: entry.summary,
-      tags: [],
+      tags: toStringArray(entry.tags),
       sourceIds: entry.sourceIds,
       sortOrder: entry.sortOrder,
       archivedAt: toOptionalString(entry.archivedAt),
@@ -188,7 +194,7 @@ function importCardEntry(
     bodyText: entry.bodyText,
     bodyJson: null,
     summary: entry.summary,
-    tags: [],
+    tags: toStringArray(entry.tags),
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
     archivedAt: toOptionalString(entry.archivedAt),
@@ -215,7 +221,7 @@ function importSymbolEntry(
       bodyText: toDisplayBodyText(bodyJson),
       bodyJson,
       summary: entry.summary,
-      tags: [],
+      tags: toStringArray(entry.tags),
       sourceIds: entry.sourceIds,
       sortOrder: entry.sortOrder,
       archivedAt: toOptionalString(entry.archivedAt),
@@ -238,7 +244,7 @@ function importSymbolEntry(
     bodyText: entry.bodyText,
     bodyJson: null,
     summary: entry.summary,
-    tags: [],
+    tags: toStringArray(entry.tags),
     sourceIds: entry.sourceIds,
     sortOrder: entry.sortOrder,
     archivedAt: toOptionalString(entry.archivedAt),

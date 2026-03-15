@@ -138,4 +138,30 @@ describe("deck export/import helpers", () => {
 
     expect(importedEntry?.archivedAt).toBe(archivedAt);
   });
+
+  it("round-trips entry tags through export and import", () => {
+    const deck = createThothStarterDeck(thothSummary);
+
+    deck.cardInformationEntries[0] = {
+      ...deck.cardInformationEntries[0],
+      tags: ["starter", "focus"],
+    };
+
+    const document = buildDeckExportDocument(deck);
+    const exportedEntry = document.cardInformationEntries.find(
+      (entry) => entry.entryId === deck.cardInformationEntries[0]?.entryId
+    );
+
+    expect(exportedEntry?.tags).toEqual(["starter", "focus"]);
+
+    const snapshot = importDeckFromDocument(document, {
+      activeDeckId: deck.id,
+      decks: [deck],
+    });
+    const importedEntry = snapshot.decks
+      .at(-1)
+      ?.cardInformationEntries.find((entry) => entry.entryId === deck.cardInformationEntries[0]?.entryId);
+
+    expect(importedEntry?.tags).toEqual(["starter", "focus"]);
+  });
 });
