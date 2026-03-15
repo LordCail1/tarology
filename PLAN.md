@@ -159,6 +159,8 @@ Execution sequencing:
   - regression coverage now includes API command round-trip/restore and API-datasource command mapping in the web layer
   - async workspace persistence is now keyed by the originating reading id so late command responses cannot overwrite a newly activated reading
   - browser fallback command/idempotency IDs now stay RFC 4122 v4-shaped when `crypto.randomUUID` is unavailable, preserving command API compatibility in older runtimes
+  - the canvas-state migration now backfills pre-existing `reading_cards` from `deck_index` so legacy readings do not collapse into `(0,0)` after deploy
+  - create-reading failures now surface as a recoverable in-studio alert instead of leaving unhandled promise rejections with no user feedback
 - Reading durability/history backend branch:
   - Prisma/Postgres now replaces the in-memory reading map for the canonical create/read path
   - shared reading contracts now include lifecycle status, summaries/details, history filters, and command envelopes

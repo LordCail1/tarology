@@ -25,6 +25,7 @@ type PersistedWorkspaceAction = Extract<
 
 const mockStudioState = vi.hoisted(() => ({
   snapshot: null as ReadingStudioSnapshot | null,
+  createReadingOverride: null as ((rootQuestion: string) => Promise<ReadingStudioWorkspace>) | null,
   applyWorkspaceActionOverride: null as ((
     readingId: string,
     currentVersion: number,
@@ -103,6 +104,10 @@ vi.mock("../../lib/reading-studio-api-data-source", () => ({
       return cloneValue(snapshot.workspaces[readingId]);
     },
     async createReading(rootQuestion: string) {
+      if (mockStudioState.createReadingOverride) {
+        return mockStudioState.createReadingOverride(rootQuestion);
+      }
+
       const snapshot = mockStudioState.snapshot ?? cloneValue(readingStudioSeedSnapshot);
       mockStudioState.snapshot = snapshot;
       const template = cloneValue(
@@ -206,6 +211,7 @@ describe("ReadingStudioShell", () => {
     setViewportWidth(1440);
     vi.restoreAllMocks();
     mockStudioState.snapshot = cloneValue(readingStudioSeedSnapshot);
+    mockStudioState.createReadingOverride = null;
     mockStudioState.applyWorkspaceActionOverride = null;
   });
 
@@ -464,6 +470,26 @@ describe("ReadingStudioShell", () => {
     expect(window.localStorage.getItem(READING_STUDIO_ACTIVE_READING_STORAGE_KEY)).toBe(
       "rdg_004"
     );
+  });
+
+  it("shows a recoverable message when creating a reading fails", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("What needs a clearer frame?");
+    mockStudioState.createReadingOverride = async () => {
+      throw new Error("Unable to create a new reading right now. Please try again.");
+    };
+
+    await renderHydratedShell();
+
+    fireEvent.click(screen.getByRole("button", { name: "New Reading" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Unable to create a new reading right now. Please try again."
+      )
+    );
+    expect(
+      screen.getByRole("heading", { name: "Career realignment and confidence" })
+    ).toBeInTheDocument();
   });
 
   it("uses drawer behavior on mobile and closes through backdrop and Escape", async () => {

@@ -153,6 +153,7 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
   const [studioSnapshot, setStudioSnapshot] = useState<ReadingStudioSnapshot | null>(null);
   const [studioStatus, setStudioStatus] = useState<StudioStatus>("loading");
   const [studioErrorMessage, setStudioErrorMessage] = useState<string | null>(null);
+  const [readingCreationErrorMessage, setReadingCreationErrorMessage] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] =
@@ -488,19 +489,28 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
     }
 
     const rootQuestion = promptedQuestion.trim().length > 0 ? promptedQuestion.trim() : "Untitled reading";
+    setReadingCreationErrorMessage(null);
 
-    const nextWorkspace = await dataSource.createReading(rootQuestion);
-    setStudioSnapshot((current) => {
-      return {
-        activeReadingId: nextWorkspace.reading.id,
-        history: upsertHistoryItem(current?.history ?? [], nextWorkspace.reading),
-        workspaces: {
-          ...(current?.workspaces ?? {}),
-          [nextWorkspace.reading.id]: nextWorkspace,
-        },
-      };
-    });
-    setSelectedCardId(null);
+    try {
+      const nextWorkspace = await dataSource.createReading(rootQuestion);
+      setStudioSnapshot((current) => {
+        return {
+          activeReadingId: nextWorkspace.reading.id,
+          history: upsertHistoryItem(current?.history ?? [], nextWorkspace.reading),
+          workspaces: {
+            ...(current?.workspaces ?? {}),
+            [nextWorkspace.reading.id]: nextWorkspace,
+          },
+        };
+      });
+      setSelectedCardId(null);
+    } catch (error) {
+      setReadingCreationErrorMessage(
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "Unable to create a new reading right now. Please try again."
+      );
+    }
   }
 
   function dispatchWorkspaceAction(
@@ -573,6 +583,14 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           <p className="mt-3 text-sm text-[var(--color-muted)]">
             Your workspace is ready. Create a reading to load durable history and canvas state.
           </p>
+          {readingCreationErrorMessage ? (
+            <p
+              role="alert"
+              className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+            >
+              {readingCreationErrorMessage}
+            </p>
+          ) : null}
           <button
             type="button"
             className="mt-6 inline-flex items-center justify-center rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)] px-4 py-3 text-sm font-semibold text-black transition hover:brightness-110"
@@ -689,6 +707,16 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           onOpenMobileAnalysisDrawer={() => setPanelOpen("right", true)}
           onNewReading={() => void handleNewReading()}
         />
+        {readingCreationErrorMessage ? (
+          <div className="mx-auto w-full max-w-[1500px] px-4 pt-4 lg:px-8">
+            <p
+              role="alert"
+              className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+            >
+              {readingCreationErrorMessage}
+            </p>
+          </div>
+        ) : null}
         <CanvasPanel
           workspace={activeWorkspace}
           selectedCardId={selectedCardId}
