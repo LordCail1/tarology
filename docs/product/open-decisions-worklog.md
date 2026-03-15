@@ -1,7 +1,7 @@
 # Open Decisions Worklog
 
 Status: Temporary working document
-Last updated: 2026-03-14
+Last updated: 2026-03-15
 Owner: Product + Engineering
 
 Purpose:
@@ -66,13 +66,19 @@ Important:
 - Option 3 preserves the architecture direction while reducing immediate surface area.
 
 ### Provisional leaning
-- Pending discussion.
+- Keep provider connections in V1, but make them OpenAI-first and replace protocol-specific `oauth` language with a broader provider-account mode.
 
 ### Final decision
-- Pending.
+- V1 provider connectivity is OpenAI-first.
+- Public users use `api_key` mode for OpenAI.
+- Allowlisted internal accounts may use a hosted `provider_account` mode for OpenAI subscription-backed access.
+- Additional providers remain possible later behind the same provider-connection interface.
+- `oauth` is no longer the canonical product term for this feature; exact transport for provider-account mode is provider-specific and may differ by runtime or provider.
 
 ### Follow-up updates
-- Pending.
+- Update charter and PRDs to replace `oauth`-centric wording with `provider_account` wording where it currently acts as the canonical mode name.
+- Keep public provider UX/documentation centered on supported API-key flows.
+- Treat OpenAI subscription-backed access as an internal allowlisted mode in V1, not the public hosted contract.
 
 ## Decision 3: Reading Lifecycle Vocabulary Alignment
 ### Current requirement

@@ -1,6 +1,6 @@
 # Tarology v2 Plan
 
-Last updated: 2026-03-14 (America/Toronto)
+Last updated: 2026-03-15 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
@@ -112,6 +112,11 @@ Execution sequencing:
   - canonical system status is `active` / `archived` / `deleted`
   - `reopen` remains an action/event, not a steady-state status
   - reader-facing states such as `completed` belong to a separate label/tag layer if introduced later
+- Provider-connections decision resolved:
+  - V1 is OpenAI-first
+  - public hosted use centers on `api_key`
+  - hosted `provider_account` mode is internal-only and limited to allowlisted Tarology accounts in V1
+  - future providers stay possible behind the same provider-connection boundary
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
@@ -147,7 +152,7 @@ Execution sequencing:
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
 - App auth is Google-first for V1.
-- Provider connectivity supports both `api_key` and `oauth` modes where capability exists.
+- Provider connectivity is OpenAI-first in V1, with public `api_key` mode plus an allowlisted internal OpenAI `provider_account` mode.
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
 - Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
 - User default deck is captured during onboarding and can be overridden per reading.
@@ -208,7 +213,7 @@ Status note:
 - Acceptance: root/sub-questions and named groups persist with relationships.
 
 9. Start provider-connections domain with capability model.
-- Acceptance: schema/API support provider type, credential mode (`api_key` or `oauth`), status, and default selection.
+- Acceptance: schema/API support provider type, credential mode (`api_key` or `provider_account`), status, default selection, and allowlisted internal OpenAI provider-account handling.
 
 10. Add interpretation request job model with cancellable state machine.
 - Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
@@ -273,7 +278,7 @@ Status note:
 - Data retention windows for generated artifacts and dialogue logs.
 
 ## Known Risks
-- Provider OAuth delegation capability varies by provider.
+- Provider-account capability varies by provider/runtime and must remain optional behind capability flags.
 - Auth can fail in hosted environments if web/API public URLs drift or production envs silently fall back to localhost defaults.
 - High-card and visual generation flows can cause cost drift.
 - Provenance quality can regress if not contract-tested.

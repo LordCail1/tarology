@@ -51,7 +51,7 @@ Data invariants:
 - reader-facing organization markers such as `completed`, `paused`, or custom labels belong to a separate label/tag layer and must not redefine lifecycle status in stored projections or API contracts.
 - interpretation/storyboard/fusion/dialogue requests store frozen context tuple (`readingId`, `questionId`, `groupId`, `stateVersion`).
 - provider credentials are never returned in raw form after initial save.
-- OAuth refresh/access tokens are encrypted and rotated per provider policy.
+- provider-account tokens or session artifacts are encrypted/handled according to provider policy when that mode is enabled.
 - each generation artifact stores `register_mode`, `provenance_map`, `safety_flags`, and `cost_estimate_snapshot`.
 - custom deck publishability requires `rights_attested_at` and `moderation_status=approved`.
 
@@ -75,8 +75,8 @@ Command-oriented mutation API with idempotency.
 - `GET /v1/profile/stats`
 - `GET /v1/provider-connections`
 - `POST /v1/provider-connections/api-key`
-- `POST /v1/provider-connections/oauth/start`
-- `GET /v1/provider-connections/oauth/callback`
+- `POST /v1/provider-connections/provider-account/start`
+- `POST /v1/provider-connections/provider-account/complete`
 - `PATCH /v1/provider-connections/{id}`
 - `DELETE /v1/provider-connections/{id}`
 
@@ -117,7 +117,10 @@ V1 integration/read-model sync extensions:
 - Connections are scoped per user account.
 - One connection may be marked default.
 - Generation requests accept optional `providerConnectionId`; if absent, use user's default.
-- Provider capability matrix (`supportsApiKey`, `supportsOAuth`, `supportsStreaming`, `supportsBackground`) is resolved server-side.
+- Provider capability matrix (`supportsApiKey`, `supportsProviderAccount`, `supportsStreaming`, `supportsBackground`) is resolved server-side.
+- OpenAI is the first provider required in V1.
+- Public hosted OpenAI connections use `api_key`.
+- Hosted OpenAI `provider_account` mode is reserved for allowlisted internal accounts in V1.
 
 ### 10.6 Interface and Versioning Rules
 - External API is versioned (`/v1/...`), additive-first.

@@ -25,7 +25,7 @@ This version merges:
 8. V1 interpretation is web-first for card and symbol research on every request (founder requirement), with caching and provenance.
 9. Safety posture is reflective guidance, not directives or certainty claims.
 10. V1 app auth is Google only, server-side sessions, provider subject (`sub`) as external identity anchor.
-11. Model access supports user-managed provider connections in two modes: `api_key` and `oauth` (where provider delegation is available).
+11. Model access supports user-managed provider connections in two modes: `api_key` and `provider_account`; V1 is OpenAI-first, with public API-key access and an allowlisted internal OpenAI subscription-backed mode.
 12. Git workflow is branch + PR based; direct pushes to `main` are disallowed.
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
@@ -77,8 +77,8 @@ Primary JTBD:
 - Google sign-in.
 - Provider connection management for LLM access:
   - user can add API keys,
-  - user can connect OAuth provider accounts where supported,
-  - user can keep one or both configured.
+  - user can connect provider-backed accounts where supported by a given provider/runtime,
+  - user can keep one or both configured where available.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
   - center: card fan + canvas with mode selection,
@@ -107,23 +107,27 @@ Primary JTBD:
 ### 4.3 Model Provider Connections (V1)
 Supported credential modes:
 - `api_key`: user pastes provider API key (encrypted at rest).
-- `oauth`: user authorizes delegated provider access through OAuth/OIDC, if provider exposes this capability for third-party inference.
+- `provider_account`: user authenticates with a provider-backed account/subscription flow when the provider/runtime supports it for this product shape.
 
 Product requirement:
 - User can configure one or many provider connections.
 - User can set default provider/model per workspace.
 - User can override provider/model per interpretation request.
 - Provider connection auth is separate from app account auth (Google sign-in remains required for the app).
+- V1 provider connectivity is OpenAI-first.
+- Public hosted use centers on OpenAI `api_key` mode.
+- OpenAI `provider_account` mode is internal-only in V1 and visible only to allowlisted Tarology accounts.
 
 Important feasibility note (as of 2026-03-08):
-- Some providers document API-key auth for inference but may not expose delegated OAuth that lets a third-party app spend a user's consumer subscription directly.
-- OpenAI and Anthropic integrations should be implemented behind capability checks so product behavior matches current provider auth support at runtime.
-- The app must expose OAuth mode as capability-driven, not hardcoded to any one provider.
+- Some providers document API-key auth for inference but may not expose a supported provider-account flow that lets a third-party app use a user's subscription/account directly.
+- OpenAI should be implemented first behind capability checks so product behavior matches current provider auth support at runtime.
+- Provider-account mode must remain capability-driven and must not assume one fixed protocol such as OAuth.
 
 V1 support policy:
-- Ship API-key mode for providers where API keys are available.
-- Ship OAuth mode behind provider capability flags.
-- If provider OAuth delegation is unavailable, UI must say “Not available for this provider yet” and offer API key setup.
+- Ship OpenAI `api_key` mode as the public baseline.
+- Ship OpenAI `provider_account` mode only for allowlisted internal accounts in V1.
+- Future providers may add either `api_key` or `provider_account` support behind capability flags.
+- If provider-account mode is unavailable for a provider/runtime, UI must say “Not available for this provider yet” and offer API key setup when applicable.
 
 ## 5) UX Blueprint
 ### 5.1 Layout
@@ -355,7 +359,7 @@ Data invariants:
 - reader-defined organization states (for example `completed` or custom labels) belong to a separate label/tag layer and must not replace canonical lifecycle status in persistence or API contracts.
 - each interpretation request stores frozen target context.
 - provider credentials are never returned in raw form after initial save.
-- OAuth refresh/access tokens are encrypted and rotated per provider policy.
+- provider-account tokens or session artifacts are encrypted/handled according to provider policy when that mode is enabled.
 - each interpretation request stores planner metadata (`cardCount`, `mode`, `sourceStrategy`, `estimateSnapshot`).
 
 ## 10) API Design (V1)
@@ -378,8 +382,8 @@ Command-oriented mutation API with idempotency.
 - `GET /v1/profile/stats`
 - `GET /v1/provider-connections`
 - `POST /v1/provider-connections/api-key`
-- `POST /v1/provider-connections/oauth/start`
-- `GET /v1/provider-connections/oauth/callback`
+- `POST /v1/provider-connections/provider-account/start`
+- `POST /v1/provider-connections/provider-account/complete`
 - `PATCH /v1/provider-connections/{id}`
 - `DELETE /v1/provider-connections/{id}`
 
@@ -402,7 +406,7 @@ V1 integration/read-model sync extensions:
 - Connections are scoped per user account.
 - One connection may be marked default.
 - Interpretation request accepts optional `providerConnectionId`; if absent, use user's default.
-- Provider capability matrix (`supportsApiKey`, `supportsOAuth`, `supportsStreaming`, `supportsBackground`) is resolved server-side.
+- Provider capability matrix (`supportsApiKey`, `supportsProviderAccount`, `supportsStreaming`, `supportsBackground`) is resolved server-side.
 
 ### 10.5 Interface and Versioning Rules
 - External API is versioned (`/v1/...`), additive-first.
@@ -516,7 +520,7 @@ Reliability targets:
 - command write success >= 99.9%.
 - restore success >= 99.9% in crash/refresh harness.
 - duplicate visible interpretation failures < 0.1%.
-- provider token refresh success >= 99.5% (for enabled OAuth providers).
+- provider-account auth/session renewal success >= 99.5% (for enabled provider-account modes).
 - cancel acknowledgement latency p95 < 2s for queued/running interpretation jobs.
 
 Quality targets:
@@ -527,7 +531,7 @@ Quality targets:
 - high-card warning display coverage = 100% when threshold is exceeded.
 
 Security targets:
-- provider API keys and OAuth tokens encrypted at rest using managed KMS keys.
+- provider API keys and provider-account tokens/session artifacts encrypted at rest using managed KMS keys.
 - no plaintext credential logging.
 - credential access paths fully audited.
 
@@ -576,7 +580,7 @@ Maintain 200-300 benchmark cases:
 Weeks 1-2:
 - monorepo bootstrap,
 - Google auth,
-- provider connection framework (API key mode),
+- OpenAI-first provider connection framework (`api_key` public baseline + internal provider-account mode scaffold),
 - onboarding default deck preference capture,
 - deterministic reading creation,
 - base schema.
@@ -606,7 +610,7 @@ Weeks 9-10:
 - safety interruption pipeline,
 - tracing/observability,
 - retry and dedupe hardening,
-- first OAuth-capable provider integration (if provider support is available).
+- first non-OpenAI provider integration and any provider-account follow-up enabled by provider support.
 
 Weeks 11-12:
 - benchmark harness,
@@ -646,9 +650,9 @@ Weeks 11-12:
   - Mitigation: threshold warnings, planner modes, chunked execution, explicit cancellation.
   - Kill test: high-card runs exceed budget guardrails without warning in production telemetry.
 
-- Provider OAuth delegation unavailable or unstable.
+- Provider-account support unavailable or unstable.
   - Mitigation: capability flags + API-key fallback + clear UX messaging.
-  - Kill test: OAuth connection success rate < 95% for enabled providers.
+  - Kill test: provider-account connection success rate < 95% for enabled provider-account modes.
 
 - Post-core generation cost growth (storyboard/fusion/dialogue) outpaces retention.
   - Mitigation: cost estimate confirmation, quotas, entitlement controls.
@@ -682,7 +686,7 @@ Weeks 11-12:
 3. Public randomness verification timing (V1.1 vs V2).
 4. Initial deck/art package licensing strategy.
 5. Data retention windows for sensitive reading text and generated artifacts.
-6. Provider-by-provider launch order for OAuth connections.
+6. Provider-by-provider launch order for future provider-account integrations.
 7. Default high-card warning threshold and initial token/runtime budget limits.
 8. Storyboard model/provider routing strategy per abstraction level.
 9. Subscription packaging details (plan tiers and usage-pack denominations).
