@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { buildDeckLibraryStorageKey } from "../../lib/deck-management-data-source";
 import { DeckManagementShell } from "./deck-management-shell";
 
 const profile = {
@@ -63,5 +64,61 @@ describe("DeckManagementShell", () => {
       expect(screen.getByRole("heading", { name: "Hourglass" })).toBeInTheDocument()
     );
     expect(screen.getByText("Symbol created.")).toBeInTheDocument();
+  });
+
+  it("creates unique source ids when the reader adds duplicate-titled sources", async () => {
+    render(
+      <DeckManagementShell
+        profile={profile}
+        preferences={preferences}
+        availableDecks={availableDecks}
+      />
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Thoth Tarot").length).toBeGreaterThan(0));
+
+    fireEvent.change(screen.getByPlaceholderText("Source title"), {
+      target: { value: "Golden Dawn Notes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Source" }));
+
+    await waitFor(() => expect(screen.getByText("Source added.")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText("Source title"), {
+      target: { value: "Golden Dawn Notes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Source" }));
+
+    await waitFor(() => {
+      const rawSnapshot = window.localStorage.getItem(buildDeckLibraryStorageKey(profile.userId));
+      expect(rawSnapshot).toBeTruthy();
+
+      const snapshot = JSON.parse(rawSnapshot!);
+      const deck = snapshot.decks.find((candidate: { id: string }) => candidate.id === snapshot.activeDeckId);
+      const duplicateSources = deck.knowledgeSources.filter(
+        (source: { title: string }) => source.title === "Golden Dawn Notes"
+      );
+
+      expect(duplicateSources).toHaveLength(2);
+      expect(duplicateSources[0].sourceId).not.toBe(duplicateSources[1].sourceId);
+    });
+  });
+
+  it("shows a recoverable empty-library state instead of an infinite loader", async () => {
+    render(
+      <DeckManagementShell
+        profile={profile}
+        preferences={preferences}
+        availableDecks={[]}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "No deck library available" })).toBeInTheDocument()
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Preparing deck surface" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to Reading" })).toBeInTheDocument();
   });
 });

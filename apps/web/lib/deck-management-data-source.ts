@@ -7,6 +7,17 @@ export function buildDeckLibraryStorageKey(userId: string): string {
   return `${DECK_LIBRARY_STORAGE_KEY}:${userId}`;
 }
 
+function normalizeSnapshot(snapshot: DeckLibrarySnapshot): DeckLibrarySnapshot {
+  const activeDeckId = snapshot.decks.some((deck) => deck.id === snapshot.activeDeckId)
+    ? snapshot.activeDeckId
+    : snapshot.decks[0]?.id ?? "";
+
+  return {
+    activeDeckId,
+    decks: snapshot.decks,
+  };
+}
+
 function cloneSnapshot(snapshot: DeckLibrarySnapshot): DeckLibrarySnapshot {
   return {
     activeDeckId: snapshot.activeDeckId,
@@ -19,20 +30,16 @@ export interface DeckManagementDataSource {
   saveLibrary(snapshot: DeckLibrarySnapshot): Promise<void>;
 }
 
-function buildSeedSnapshot(
+export function createSeedDeckLibrarySnapshot(
   deckSummaries: DeckSummary[],
   defaultDeckId: string | null
 ): DeckLibrarySnapshot {
   const decks = deckSummaries.map((summary) => createDeckFromSummary(summary));
-  const activeDeckId =
-    (defaultDeckId && decks.some((deck) => deck.id === defaultDeckId) ? defaultDeckId : null) ??
-    decks[0]?.id ??
-    "";
 
-  return {
-    activeDeckId,
+  return normalizeSnapshot({
+    activeDeckId: defaultDeckId ?? "",
     decks,
-  };
+  });
 }
 
 export function createLocalDeckManagementDataSource(
@@ -46,7 +53,7 @@ export function createLocalDeckManagementDataSource(
       deckSummaries: DeckSummary[],
       defaultDeckId: string | null
     ): Promise<DeckLibrarySnapshot> {
-      const fallback = buildSeedSnapshot(deckSummaries, defaultDeckId);
+      const fallback = createSeedDeckLibrarySnapshot(deckSummaries, defaultDeckId);
 
       if (!storage) {
         return fallback;
@@ -63,14 +70,12 @@ export function createLocalDeckManagementDataSource(
           return fallback;
         }
 
-        const activeDeckId = parsed.decks.some((deck) => deck.id === parsed.activeDeckId)
-          ? parsed.activeDeckId
-          : fallback.activeDeckId;
-
-        return cloneSnapshot({
-          activeDeckId,
-          decks: parsed.decks,
-        });
+        return cloneSnapshot(
+          normalizeSnapshot({
+            activeDeckId: parsed.activeDeckId,
+            decks: parsed.decks,
+          })
+        );
       } catch {
         return fallback;
       }

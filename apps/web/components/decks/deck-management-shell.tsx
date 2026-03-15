@@ -9,7 +9,10 @@ import {
   type ChangeEvent,
 } from "react";
 import type { DeckSummary, ProfileShellDto, UserPreferencesDto } from "@tarology/shared";
-import { createLocalDeckManagementDataSource } from "../../lib/deck-management-data-source";
+import {
+  createLocalDeckManagementDataSource,
+  createSeedDeckLibrarySnapshot,
+} from "../../lib/deck-management-data-source";
 import { buildDeckExportDocument, importDeckFromDocument } from "../../lib/deck-management-export";
 import { cloneDeckLibraryDeck } from "../../lib/deck-management-thoth";
 import type {
@@ -65,6 +68,19 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function createUniqueSourceId(deck: DeckLibraryDeck, title: string): string {
+  const baseId = slugify(title) || createPortableId("source");
+  let candidate = baseId;
+  let suffix = 2;
+
+  while (deck.knowledgeSources.some((source) => source.sourceId === candidate)) {
+    candidate = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
 }
 
 function buildInitials(displayName: string): string {
@@ -233,7 +249,20 @@ export function DeckManagementShell({
   }
 
   const selectedDeck =
-    snapshot?.decks.find((deck) => deck.id === snapshot.activeDeckId) ?? null;
+    snapshot?.decks.find((deck) => deck.id === snapshot.activeDeckId) ??
+    snapshot?.decks[0] ??
+    null;
+
+  useEffect(() => {
+    if (!snapshot || !selectedDeck || snapshot.activeDeckId === selectedDeck.id) {
+      return;
+    }
+
+    void persistSnapshot({
+      ...snapshot,
+      activeDeckId: selectedDeck.id,
+    });
+  }, [selectedDeck, snapshot]);
 
   const filteredCards = useMemo(() => {
     if (!selectedDeck) {
@@ -643,7 +672,9 @@ export function DeckManagementShell({
   }
 
   function handleCreateSource() {
-    if (!sourceDraft.title.trim()) {
+    const title = sourceDraft.title.trim();
+
+    if (!title) {
       return;
     }
 
@@ -651,13 +682,13 @@ export function DeckManagementShell({
       (currentDeck) => {
         const nextDeck = withKnowledgeVersion(currentDeck);
         const now = createNow();
-        const sourceId = slugify(sourceDraft.title) || createPortableId("source");
+        const sourceId = createUniqueSourceId(nextDeck, title);
 
         nextDeck.knowledgeSources.push({
           id: createPortableId("source"),
           sourceId,
           kind: sourceDraft.kind,
-          title: sourceDraft.title.trim(),
+          title,
           capturedAt: now,
           author: null,
           publisher: null,
@@ -682,6 +713,23 @@ export function DeckManagementShell({
       title: "",
       url: "",
       kind: "manual_reference",
+    });
+  }
+
+  function handleRestoreStarterLibrary() {
+    const nextSnapshot = createSeedDeckLibrarySnapshot(
+      availableDecks,
+      preferences.defaultDeckId
+    );
+
+    void persistSnapshot(nextSnapshot);
+    setSelectedSubject(null);
+    setActiveTab("cards");
+    resetEntryDraft();
+    setFilterQuery("");
+    setFlashMessage({
+      tone: "success",
+      text: "Starter deck library restored.",
     });
   }
 
@@ -755,7 +803,7 @@ export function DeckManagementShell({
     }
   }
 
-  if (!snapshot || !selectedDeck) {
+  if (!snapshot) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 py-10">
         <section className="surface w-full rounded-2xl p-8 text-center">
@@ -766,6 +814,36 @@ export function DeckManagementShell({
           <p className="mt-3 text-sm text-[var(--color-muted)]">
             Loading your personal deck library snapshot.
           </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!selectedDeck) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 py-10">
+        <section className="surface w-full rounded-2xl p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+            Deck Library
+          </p>
+          <h1 className="mt-2 text-2xl text-[var(--color-ink)]">No deck library available</h1>
+          <p className="mt-3 text-sm text-[var(--color-muted)]">
+            Your local deck snapshot is empty or missing a recoverable active deck.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            {availableDecks.length > 0 ? (
+              <button
+                type="button"
+                className={primaryButtonClass}
+                onClick={handleRestoreStarterLibrary}
+              >
+                Restore starter library
+              </button>
+            ) : null}
+            <Link href="/reading" className={buttonClass}>
+              Back to Reading
+            </Link>
+          </div>
         </section>
       </main>
     );

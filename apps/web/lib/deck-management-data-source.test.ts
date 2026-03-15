@@ -62,6 +62,40 @@ describe("createLocalDeckManagementDataSource", () => {
     storage.clear();
   });
 
+  it("repairs a persisted snapshot whose active deck id no longer exists", async () => {
+    const storage = window.localStorage;
+    storage.setItem(
+      buildDeckLibraryStorageKey("usr_123"),
+      JSON.stringify({
+        activeDeckId: "missing-deck",
+        decks: [
+          {
+            ...thothSummary,
+            id: "imported-1",
+            knowledgeVersion: 3,
+            initializationMode: "imported_clone",
+            initializerKey: null,
+            originExportDigest: "digest:abc",
+            symbolCount: 0,
+            cards: [],
+            symbols: [],
+            cardSymbols: [],
+            knowledgeSources: [],
+            cardInformationEntries: [],
+            symbolInformationEntries: [],
+          },
+        ],
+      })
+    );
+
+    const dataSource = createLocalDeckManagementDataSource(storage, "usr_123");
+    const snapshot = await dataSource.loadLibrary([thothSummary], "thoth");
+
+    expect(snapshot.activeDeckId).toBe("imported-1");
+    expect(snapshot.decks[0].id).toBe("imported-1");
+    storage.clear();
+  });
+
   it("keeps one reader's local deck library isolated from another reader on the same browser", async () => {
     const storage = window.localStorage;
     storage.setItem(
