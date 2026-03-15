@@ -39,13 +39,21 @@ describe("Auth baseline API", () => {
       .expect(401);
   });
 
-  it("returns 401 for profile, preferences, and deck catalog without auth", async () => {
+  it("returns 401 for profile, preferences, deck catalog, and provider connections without auth", async () => {
     await request(app.getHttpServer()).get("/v1/profile").expect(401);
     await request(app.getHttpServer()).get("/v1/preferences").expect(401);
     await request(app.getHttpServer()).patch("/v1/preferences").send({
       defaultDeckId: "thoth",
     }).expect(401);
     await request(app.getHttpServer()).get("/v1/decks").expect(401);
+    await request(app.getHttpServer()).get("/v1/provider-connections").expect(401);
+    await request(app.getHttpServer())
+      .post("/v1/provider-connections/api-key")
+      .send({
+        provider: "openai",
+        apiKey: "sk-test-secret",
+      })
+      .expect(401);
   });
 
   it("keeps logout idempotent without an active session", async () => {
