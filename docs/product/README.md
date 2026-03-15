@@ -31,6 +31,7 @@ Migration note:
 - [PRD 13 - Dialogue Mode](./prd-13-dialogue-mode.md)
 - [PRD 14 - Deck Creation and Moderation](./prd-14-deck-creation-and-moderation.md)
 - [PRD 15 - Sharing, Engagement, and Monetization](./prd-15-sharing-engagement-and-monetization.md)
+- [PRD 16 - Deck Knowledge Schema and Export](./prd-16-deck-knowledge-schema-and-export.md)
 
 ## Symbolic Expansion
 Symbolic expansion modules are staged after reliability gates to protect trust and shipping focus.

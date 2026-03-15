@@ -130,6 +130,8 @@ Execution sequencing:
   - decks may be initialized from starter content or empty templates
   - symbols are first-class deck entities and independently viewable
   - full deck state should be exportable/importable for cloning and sharing
+- Canonical deck-knowledge schema/export spec added:
+  - `docs/product/prd-16-deck-knowledge-schema-and-export.md` now defines user-owned deck instances, card/symbol knowledge entry shape, split `deckSpecVersion` vs `knowledgeVersion`, and the V1 JSON export/import package
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
@@ -297,7 +299,6 @@ Deck-knowledge pivot follow-ups:
 - Durable workflow engine selection for V1 infrastructure.
 - API hosting target for post-MVP dogfooding deployment.
 - Onboarding register choice (`plain` only vs optional `esoteric` picker).
-- Concrete schema shape for card/symbol knowledge entries and deck export package format.
 - Pricing/package shape for subscription and usage packs.
 - Data retention windows for generated artifacts and dialogue logs.
 
@@ -329,6 +330,7 @@ npm run ci:checks
 sed -n '1,220p' docs/product/README.md
 sed -n '1,220p' docs/product/prd-04-interpretation-intelligence.md
 sed -n '1,220p' docs/product/prd-06-data-model-and-api.md
+sed -n '1,260p' docs/product/prd-16-deck-knowledge-schema-and-export.md
 sed -n '1,260p' PLAN.md
 ```
 

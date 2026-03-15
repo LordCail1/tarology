@@ -3,6 +3,9 @@
 Source: `CHARTER.md` (v0.3 extraction + strategic expansion updates)
 Coverage: sections 9 and 10 + post-core interface additions
 
+Detailed deck-knowledge and export/import execution rules now live in:
+- `docs/product/prd-16-deck-knowledge-schema-and-export.md`
+
 ## 9) Data Model (Conceptual)
 Core entities:
 - `users`
