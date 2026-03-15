@@ -26,11 +26,14 @@ Current deployment status:
 - Gate 0 reading durability baseline is also in the local repo now:
   - DB-backed reading create/list/detail/command APIs,
   - deterministic deck assignments stored in Postgres,
-  - archive/reopen/delete lifecycle commands with idempotency and version checks.
+  - archive/reopen/delete lifecycle commands with idempotency and version checks,
+  - durable canvas-mode and card workspace commands for switch/move/rotate/flip.
 - Current UI integration note:
   - the Reading Studio shell is real and interactive,
-  - but its visible history/workspace restore path is still seeded client-side and persisted in browser `localStorage`,
-  - and the `New Reading` button in the shell is still disabled.
+  - its visible history/create/restore path is now wired to the durable reading API,
+  - semantic canvas interactions persist through reading commands,
+  - local browser persistence is now limited to sidebar widths and the last active reading selection,
+  - the analysis panel remains placeholder-only until question-tree and interpretation work lands.
 
 Root scripts:
 - `npm run dev:web`
@@ -43,7 +46,7 @@ Root scripts:
 
 Recommended local startup path:
 - use [docs/local-dev-runbook.md](./docs/local-dev-runbook.md)
-- it covers database bring-up, API/web startup, auth prerequisites, current mock-vs-real behavior, and manual smoke tests
+- it covers database bring-up, API/web startup, auth prerequisites, current durable studio behavior, and manual smoke tests
 
 Database local setup:
 - API requires `DATABASE_URL` in production and for local test/CI execution.
@@ -53,7 +56,7 @@ Database local setup:
   - press `t` in the Prisma dev terminal to print the TCP connection strings
   - export `DATABASE_URL` to the printed main database URL
   - optionally export `TEST_DATABASE_URL="$DATABASE_URL"`
-  - run `npm run prisma:migrate:dev --workspace @tarology/api`
+  - run `npm run prisma:migrate:deploy --workspace @tarology/api`
   - run `npm run prisma:seed --workspace @tarology/api`
 - Repo-level `npm run ci:checks` now expects those database env vars to be present locally.
 

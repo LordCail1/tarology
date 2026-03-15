@@ -12,13 +12,17 @@ import type {
   AuthenticatedUser,
   CanvasMode,
   CreateReadingResponse,
+  FlipCardPayload,
   GetReadingResponse,
   ListReadingsResponse,
+  MoveCardPayload,
   ReadingCommandRequest,
   ReadingCommandResponse,
   ReadingDetail,
   ReadingLifecycleStatus,
   ReadingListStatusFilter,
+  RotateCardPayload,
+  SwitchCanvasModePayload,
 } from "@tarology/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { toCreateReadingResponse, toReadingDetail, toReadingSummary } from "./reading-contract.mapper.js";
@@ -26,14 +30,27 @@ import { DeckCatalogService } from "./deck-catalog.service.js";
 import { applyReadingEvent } from "./domain/reading-projector.js";
 import {
   READING_ARCHIVED_EVENT,
+  READING_CANVAS_MODE_SWITCHED_EVENT,
+  READING_CARD_FLIPPED_EVENT,
+  READING_CARD_MOVED_EVENT,
+  READING_CARD_ROTATED_EVENT,
   READING_CREATED_EVENT,
   READING_DELETED_EVENT,
   READING_REOPENED_EVENT,
+  type ReadingCanvasModeSwitchedEventPayload,
+  type ReadingCardFlippedEventPayload,
+  type ReadingCardMovedEventPayload,
+  type ReadingCardRotatedEventPayload,
   type ReadingEventPayload,
   type ReadingEventType,
   type ReadingLifecycleEventPayload,
   type ReadingStoredEvent,
 } from "./domain/reading-events.js";
+import {
+  buildInitialCanvasCards,
+  getHighestStackOrder,
+  normalizeRotation,
+} from "./domain/reading-canvas.js";
 import { buildDeterministicCardAssignment } from "./domain/deterministic-shuffle.js";
 import { CreateReadingDto } from "./dto/create-reading.dto.js";
 import { ReadingCommandDto } from "./dto/reading-command.dto.js";
@@ -48,6 +65,7 @@ interface CreateReadingResult {
 }
 
 class VersionConflictError extends Error {}
+class MissingCardError extends Error {}
 
 function normalizeCanvasMode(value: CanvasMode | undefined): CanvasMode {
   return value ?? "freeform";
@@ -91,6 +109,10 @@ function stableStringify(value: unknown): string {
 
 function hashRequest(value: unknown): string {
   return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+function isEmptyObject(value: unknown): value is Record<string, never> {
+  return !!value && !Array.isArray(value) && typeof value === "object" && Object.keys(value).length === 0;
 }
 
 function buildConflict(
@@ -168,6 +190,7 @@ export class ReadingsService {
     }
 
     const builtAssignment = buildDeterministicCardAssignment(deck.spec.cardIds);
+    const canvasCards = buildInitialCanvasCards(builtAssignment.assignments);
     const readingId = randomUUID();
     const createdAt = new Date();
 
@@ -176,6 +199,7 @@ export class ReadingsService {
       rootQuestion: normalizedRequest.rootQuestion,
       deckId: deck.summary.id,
       deckSpecVersion: deck.summary.specVersion,
+      cardCount: builtAssignment.assignments.length,
       canvasMode: normalizedRequest.canvasMode,
       status: "active",
       version: 1,
@@ -183,6 +207,10 @@ export class ReadingsService {
       seedCommitment: builtAssignment.seedCommitment,
       orderHash: builtAssignment.orderHash,
       assignments: builtAssignment.assignments,
+      canvas: {
+        activeMode: normalizedRequest.canvasMode,
+        cards: canvasCards,
+      },
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
       archivedAt: null,
@@ -206,10 +234,17 @@ export class ReadingsService {
           updatedAt: createdAt,
           archivedAt: null,
           deletedAt: null,
-          cards: response.assignments.map((assignment) => ({
-            deckIndex: assignment.deckIndex,
-            cardId: assignment.cardId,
-            assignedReversal: assignment.assignedReversal,
+          cards: response.canvas.cards.map((card) => ({
+            deckIndex: card.deckIndex,
+            cardId: card.cardId,
+            assignedReversal: card.assignedReversal,
+            isFaceUp: card.isFaceUp,
+            rotationDeg: card.rotationDeg,
+            freeformXPx: card.freeform.xPx,
+            freeformYPx: card.freeform.yPx,
+            freeformStackOrder: card.freeform.stackOrder,
+            gridColumn: card.grid.column,
+            gridRow: card.grid.row,
             createdAt,
           })),
         });
@@ -300,15 +335,15 @@ export class ReadingsService {
     idempotencyKey: string,
     payload: ReadingCommandDto
   ): Promise<ReadingCommandResponse> {
-    this.assertEmptyPayload(payload.payload);
+    const command = this.normalizeCommandPayload(payload);
 
     const requestHash = hashRequest({
       readingId,
       command: {
-        commandId: payload.commandId,
-        expectedVersion: payload.expectedVersion,
-        type: payload.type,
-        payload: {},
+        commandId: command.commandId,
+        expectedVersion: command.expectedVersion,
+        type: command.type,
+        payload: command.payload,
       },
     });
 
@@ -321,7 +356,7 @@ export class ReadingsService {
       throw new NotFoundException("Reading not found.");
     }
 
-    const replay = await this.getCommandReplay(readingId, payload, idempotencyKey, requestHash);
+    const replay = await this.getCommandReplay(readingId, command, idempotencyKey, requestHash);
     if (replay) {
       return replay;
     }
@@ -331,29 +366,32 @@ export class ReadingsService {
     }
 
     const currentDetail = toReadingDetail(currentRecord);
-    if (currentDetail.version !== payload.expectedVersion) {
+    if (currentDetail.version !== command.expectedVersion) {
       throw buildConflict(
         "version_conflict",
-        `Expected reading version ${payload.expectedVersion}, received ${currentDetail.version}.`,
+        `Expected reading version ${command.expectedVersion}, received ${currentDetail.version}.`,
         currentDetail.version
       );
     }
 
-    const nextEvent = this.buildLifecycleEvent(currentDetail, payload.type);
-    const nextProjection = applyReadingEvent(currentDetail, nextEvent);
-    const commandTimestamp = new Date(nextProjection.updatedAt);
+    let nextEvent: ReadingStoredEvent;
+    let nextProjection: ReadingDetail;
+    let commandTimestamp: Date;
 
     try {
+      nextEvent = this.buildCommandEvent(currentDetail, command);
+      nextProjection = applyReadingEvent(currentDetail, nextEvent);
+      commandTimestamp = new Date(nextProjection.updatedAt);
+
       await this.prisma.$transaction(async (tx) => {
-        const updatedCount = await this.readingsRepository.updateLifecycle(tx, {
+        const updatedCount = await this.applyProjectionUpdate(tx, {
           readingId,
           ownerUserId: user.userId,
-          expectedVersion: currentDetail.version,
-          status: nextProjection.status,
-          version: nextProjection.version,
-          updatedAt: commandTimestamp,
-          archivedAt: toOptionalDate(nextProjection.archivedAt),
-          deletedAt: toOptionalDate(nextProjection.deletedAt),
+          currentDetail,
+          nextProjection,
+          commandTimestamp,
+          command,
+          eventType: nextEvent.eventType,
         });
 
         if (updatedCount !== 1) {
@@ -367,7 +405,7 @@ export class ReadingsService {
           version: nextProjection.version,
           eventType: nextEvent.eventType,
           payload: toJson(nextEvent.payload),
-          commandId: payload.commandId,
+          commandId: command.commandId,
           idempotencyKey,
           createdAt: commandTimestamp,
         });
@@ -384,7 +422,7 @@ export class ReadingsService {
           id: randomUUID(),
           readingId,
           ownerUserId: user.userId,
-          commandId: payload.commandId,
+          commandId: command.commandId,
           idempotencyKey,
           requestHash,
           resultingVersion: nextProjection.version,
@@ -396,7 +434,7 @@ export class ReadingsService {
       if (error instanceof VersionConflictError) {
         const duplicateReplay = await this.getCommandReplay(
           readingId,
-          payload,
+          command,
           idempotencyKey,
           requestHash
         );
@@ -409,7 +447,7 @@ export class ReadingsService {
 
         throw buildConflict(
           "version_conflict",
-          `Expected reading version ${payload.expectedVersion}, received ${currentVersion}.`,
+          `Expected reading version ${command.expectedVersion}, received ${currentVersion}.`,
           currentVersion
         );
       }
@@ -417,13 +455,17 @@ export class ReadingsService {
       if (this.isUniqueConstraintError(error)) {
         const duplicateReplay = await this.getCommandReplay(
           readingId,
-          payload,
+          command,
           idempotencyKey,
           requestHash
         );
         if (duplicateReplay) {
           return duplicateReplay;
         }
+      }
+
+      if (error instanceof MissingCardError) {
+        throw new NotFoundException(error.message);
       }
 
       throw error;
@@ -526,13 +568,13 @@ export class ReadingsService {
     return receiptByCommandId.responseJson as unknown as ReadingCommandResponse;
   }
 
-  private buildLifecycleEvent(
+  private buildCommandEvent(
     currentDetail: ReadingDetail,
-    commandType: ReadingCommandRequest["type"]
+    command: ReadingCommandRequest
   ): ReadingStoredEvent {
     const timestamp = new Date().toISOString();
 
-    switch (commandType) {
+    switch (command.type) {
       case "archive_reading": {
         if (currentDetail.status !== "active") {
           throw buildConflict(
@@ -587,8 +629,63 @@ export class ReadingsService {
         );
       }
 
+      case "switch_canvas_mode": {
+        const payload = command.payload as SwitchCanvasModePayload;
+
+        return this.createCanvasModeEvent(
+          payload.canvasMode,
+          currentDetail.version + 1,
+          timestamp
+        );
+      }
+
+      case "move_card": {
+        const payload = command.payload as MoveCardPayload;
+        const targetCard = currentDetail.canvas.cards.find((card) => card.cardId === payload.cardId);
+        if (!targetCard) {
+          throw new MissingCardError(`Card "${payload.cardId}" is not part of this reading.`);
+        }
+
+        return this.createCardMovedEvent(
+          currentDetail,
+          payload,
+          currentDetail.version + 1,
+          timestamp
+        );
+      }
+
+      case "rotate_card": {
+        const payload = command.payload as RotateCardPayload;
+        const targetCard = currentDetail.canvas.cards.find((card) => card.cardId === payload.cardId);
+        if (!targetCard) {
+          throw new MissingCardError(`Card "${payload.cardId}" is not part of this reading.`);
+        }
+
+        return this.createCardRotatedEvent(
+          payload.cardId,
+          payload.deltaDeg,
+          currentDetail.version + 1,
+          timestamp
+        );
+      }
+
+      case "flip_card": {
+        const payload = command.payload as FlipCardPayload;
+        const targetCard = currentDetail.canvas.cards.find((card) => card.cardId === payload.cardId);
+        if (!targetCard) {
+          throw new MissingCardError(`Card "${payload.cardId}" is not part of this reading.`);
+        }
+
+        return this.createCardFlippedEvent(
+          payload.cardId,
+          !targetCard.isFaceUp,
+          currentDetail.version + 1,
+          timestamp
+        );
+      }
+
       default:
-        throw new BadRequestException(`Unsupported reading command "${commandType}".`);
+        throw new BadRequestException(`Unsupported reading command "${command.type}".`);
     }
   }
 
@@ -615,10 +712,328 @@ export class ReadingsService {
     };
   }
 
-  private assertEmptyPayload(payload: Record<string, never>): void {
-    if (Array.isArray(payload) || Object.keys(payload).length > 0) {
-      throw new BadRequestException("Reading command payload must be an empty object.");
+  private createCanvasModeEvent(
+    canvasMode: CanvasMode,
+    version: number,
+    updatedAt: string
+  ): ReadingStoredEvent {
+    const payload: ReadingCanvasModeSwitchedEventPayload = {
+      canvasMode,
+      version,
+      updatedAt,
+    };
+
+    return {
+      eventType: READING_CANVAS_MODE_SWITCHED_EVENT,
+      version,
+      payload,
+    };
+  }
+
+  private createCardMovedEvent(
+    currentDetail: ReadingDetail,
+    payload: MoveCardPayload,
+    version: number,
+    updatedAt: string
+  ): ReadingStoredEvent {
+    const nextFreeform = payload.freeform
+      ? {
+          xPx: payload.freeform.xPx,
+          yPx: payload.freeform.yPx,
+          stackOrder: getHighestStackOrder(currentDetail.canvas.cards) + 1,
+        }
+      : undefined;
+
+    const eventPayload: ReadingCardMovedEventPayload = {
+      cardId: payload.cardId,
+      version,
+      updatedAt,
+      ...(nextFreeform ? { freeform: nextFreeform } : {}),
+      ...(payload.grid ? { grid: payload.grid } : {}),
+    };
+
+    return {
+      eventType: READING_CARD_MOVED_EVENT,
+      version,
+      payload: eventPayload,
+    };
+  }
+
+  private createCardRotatedEvent(
+    cardId: string,
+    deltaDeg: number,
+    version: number,
+    updatedAt: string
+  ): ReadingStoredEvent {
+    const payload: ReadingCardRotatedEventPayload = {
+      cardId,
+      deltaDeg,
+      version,
+      updatedAt,
+    };
+
+    return {
+      eventType: READING_CARD_ROTATED_EVENT,
+      version,
+      payload,
+    };
+  }
+
+  private createCardFlippedEvent(
+    cardId: string,
+    isFaceUp: boolean,
+    version: number,
+    updatedAt: string
+  ): ReadingStoredEvent {
+    const payload: ReadingCardFlippedEventPayload = {
+      cardId,
+      isFaceUp,
+      version,
+      updatedAt,
+    };
+
+    return {
+      eventType: READING_CARD_FLIPPED_EVENT,
+      version,
+      payload,
+    };
+  }
+
+  private async applyProjectionUpdate(
+    tx: Prisma.TransactionClient,
+    input: {
+      readingId: string;
+      ownerUserId: string;
+      currentDetail: ReadingDetail;
+      nextProjection: ReadingDetail;
+      commandTimestamp: Date;
+      command: ReadingCommandRequest;
+      eventType: ReadingEventType;
     }
+  ): Promise<number> {
+    switch (input.eventType) {
+      case READING_ARCHIVED_EVENT:
+      case READING_REOPENED_EVENT:
+      case READING_DELETED_EVENT:
+        return this.readingsRepository.updateLifecycle(tx, {
+          readingId: input.readingId,
+          ownerUserId: input.ownerUserId,
+          expectedVersion: input.currentDetail.version,
+          status: input.nextProjection.status,
+          version: input.nextProjection.version,
+          updatedAt: input.commandTimestamp,
+          archivedAt: toOptionalDate(input.nextProjection.archivedAt),
+          deletedAt: toOptionalDate(input.nextProjection.deletedAt),
+        });
+
+      case READING_CANVAS_MODE_SWITCHED_EVENT:
+        return this.readingsRepository.updateCanvasMode(tx, {
+          readingId: input.readingId,
+          ownerUserId: input.ownerUserId,
+          expectedVersion: input.currentDetail.version,
+          canvasMode: input.nextProjection.canvasMode,
+          version: input.nextProjection.version,
+          updatedAt: input.commandTimestamp,
+        });
+
+      case READING_CARD_MOVED_EVENT:
+      case READING_CARD_ROTATED_EVENT:
+      case READING_CARD_FLIPPED_EVENT: {
+        const readingUpdated = await this.readingsRepository.updateCanvasMode(tx, {
+          readingId: input.readingId,
+          ownerUserId: input.ownerUserId,
+          expectedVersion: input.currentDetail.version,
+          canvasMode: input.nextProjection.canvasMode,
+          version: input.nextProjection.version,
+          updatedAt: input.commandTimestamp,
+        });
+
+        if (readingUpdated !== 1) {
+          return readingUpdated;
+        }
+
+        const targetCard =
+          input.command.type === "move_card" ||
+          input.command.type === "rotate_card" ||
+          input.command.type === "flip_card"
+            ? input.nextProjection.canvas.cards.find(
+                (card) => card.cardId === (input.command.payload as MoveCardPayload | RotateCardPayload | FlipCardPayload).cardId
+              )
+            : null;
+
+        if (!targetCard) {
+          throw new MissingCardError("Reading card projection was not found after applying command.");
+        }
+
+        const cardUpdated = await this.readingsRepository.updateCardCanvasState(tx, {
+          readingId: input.readingId,
+          cardId: targetCard.cardId,
+          data: {
+            isFaceUp: targetCard.isFaceUp,
+            rotationDeg: targetCard.rotationDeg,
+            freeformXPx: targetCard.freeform.xPx,
+            freeformYPx: targetCard.freeform.yPx,
+            freeformStackOrder: targetCard.freeform.stackOrder,
+            gridColumn: targetCard.grid.column,
+            gridRow: targetCard.grid.row,
+          },
+        });
+
+        if (cardUpdated !== 1) {
+          throw new MissingCardError(`Card "${targetCard.cardId}" is not part of this reading.`);
+        }
+
+        return readingUpdated;
+      }
+
+      default:
+        throw new BadRequestException(`Unsupported reading event "${input.eventType}".`);
+    }
+  }
+
+  private normalizeCommandPayload(payload: ReadingCommandDto): ReadingCommandRequest {
+    switch (payload.type) {
+      case "archive_reading":
+      case "reopen_reading":
+      case "delete_reading":
+        if (!isEmptyObject(payload.payload)) {
+          throw new BadRequestException("Reading lifecycle command payload must be an empty object.");
+        }
+
+        return payload;
+
+      case "switch_canvas_mode":
+        return {
+          ...payload,
+          payload: this.parseCanvasModePayload(payload.payload),
+        };
+
+      case "move_card":
+        return {
+          ...payload,
+          payload: this.parseMoveCardPayload(payload.payload),
+        };
+
+      case "rotate_card":
+        return {
+          ...payload,
+          payload: this.parseRotateCardPayload(payload.payload),
+        };
+
+      case "flip_card":
+        return {
+          ...payload,
+          payload: this.parseFlipCardPayload(payload.payload),
+        };
+
+      default:
+        throw new BadRequestException(`Unsupported reading command "${payload.type}".`);
+    }
+  }
+
+  private parseCanvasModePayload(payload: unknown): SwitchCanvasModePayload {
+    if (
+      !payload ||
+      Array.isArray(payload) ||
+      typeof payload !== "object" ||
+      !("canvasMode" in payload)
+    ) {
+      throw new BadRequestException("switch_canvas_mode payload requires a canvasMode.");
+    }
+
+    const { canvasMode } = payload as { canvasMode?: unknown };
+    if (canvasMode !== "freeform" && canvasMode !== "grid") {
+      throw new BadRequestException("switch_canvas_mode canvasMode must be freeform or grid.");
+    }
+
+    return { canvasMode };
+  }
+
+  private parseMoveCardPayload(payload: unknown): MoveCardPayload {
+    if (!payload || Array.isArray(payload) || typeof payload !== "object") {
+      throw new BadRequestException("move_card payload must be an object.");
+    }
+
+    const { cardId, freeform, grid } = payload as {
+      cardId?: unknown;
+      freeform?: { xPx?: unknown; yPx?: unknown };
+      grid?: { column?: unknown; row?: unknown };
+    };
+
+    if (typeof cardId !== "string" || cardId.trim().length === 0) {
+      throw new BadRequestException("move_card payload requires a cardId.");
+    }
+
+    const normalizedFreeform =
+      freeform &&
+      typeof freeform.xPx === "number" &&
+      Number.isFinite(freeform.xPx) &&
+      typeof freeform.yPx === "number" &&
+      Number.isFinite(freeform.yPx)
+        ? {
+            xPx: Math.round(freeform.xPx),
+            yPx: Math.round(freeform.yPx),
+          }
+        : undefined;
+
+    const normalizedGrid =
+      grid &&
+      typeof grid.column === "number" &&
+      Number.isInteger(grid.column) &&
+      typeof grid.row === "number" &&
+      Number.isInteger(grid.row)
+        ? {
+            column: grid.column,
+            row: grid.row,
+          }
+        : undefined;
+
+    if (!normalizedFreeform && !normalizedGrid) {
+      throw new BadRequestException(
+        "move_card payload requires either freeform coordinates or a grid position."
+      );
+    }
+
+    return {
+      cardId,
+      ...(normalizedFreeform ? { freeform: normalizedFreeform } : {}),
+      ...(normalizedGrid ? { grid: normalizedGrid } : {}),
+    };
+  }
+
+  private parseRotateCardPayload(payload: unknown): RotateCardPayload {
+    if (!payload || Array.isArray(payload) || typeof payload !== "object") {
+      throw new BadRequestException("rotate_card payload must be an object.");
+    }
+
+    const { cardId, deltaDeg } = payload as { cardId?: unknown; deltaDeg?: unknown };
+    if (typeof cardId !== "string" || cardId.trim().length === 0) {
+      throw new BadRequestException("rotate_card payload requires a cardId.");
+    }
+
+    if (typeof deltaDeg !== "number" || !Number.isFinite(deltaDeg)) {
+      throw new BadRequestException("rotate_card payload requires a numeric deltaDeg.");
+    }
+
+    return {
+      cardId,
+      deltaDeg: Math.round(deltaDeg),
+    };
+  }
+
+  private parseFlipCardPayload(payload: unknown): FlipCardPayload {
+    if (!payload || Array.isArray(payload) || typeof payload !== "object") {
+      throw new BadRequestException("flip_card payload must be an object.");
+    }
+
+    const { cardId } = payload as { cardId?: unknown };
+    if (typeof cardId !== "string" || cardId.trim().length === 0) {
+      throw new BadRequestException("flip_card payload requires a cardId.");
+    }
+
+    return {
+      cardId,
+    };
   }
 
   private async getUserDefaultDeckId(userId: string): Promise<string | null> {

@@ -1,4 +1,5 @@
 import type {
+  ReadingStudioAction,
   ReadingStudioDataSource,
   ReadingStudioSnapshot,
   ReadingStudioWorkspace,
@@ -86,9 +87,12 @@ export function createLocalReadingStudioDataSource(
     async setActiveReading(readingId: string): Promise<ReadingStudioWorkspace> {
       const snapshot = await this.loadStudio();
       const workspace = snapshot.workspaces[readingId];
+      const fallbackReadingId =
+        snapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0]?.id ?? readingId;
+      const fallbackWorkspace = snapshot.workspaces[fallbackReadingId];
 
       if (!workspace) {
-        return snapshot.workspaces[snapshot.activeReadingId];
+        return fallbackWorkspace;
       }
 
       try {
@@ -98,6 +102,74 @@ export function createLocalReadingStudioDataSource(
       }
 
       return workspace;
+    },
+    async createReading(rootQuestion: string): Promise<ReadingStudioWorkspace> {
+      const seedSnapshot = cloneSnapshot(readingStudioSeedSnapshot);
+      const fallbackReadingId =
+        seedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0]?.id;
+
+      if (!fallbackReadingId) {
+        throw new Error("Reading Studio seed snapshot is empty.");
+      }
+
+      const workspace = seedSnapshot.workspaces[fallbackReadingId];
+
+      return {
+        ...workspace,
+        reading: {
+          ...workspace.reading,
+          id: `local_${Date.now()}`,
+          title: rootQuestion,
+        },
+      };
+    },
+    async applyWorkspaceAction(
+      readingId: string,
+      _currentVersion: number,
+      action: Extract<
+        ReadingStudioAction,
+        {
+          type:
+            | "workspace.modeSwitched"
+            | "workspace.cardMoved"
+            | "workspace.cardRotated"
+            | "workspace.cardFlipped";
+        }
+      >
+    ): Promise<ReadingStudioWorkspace> {
+      const snapshot = await this.loadStudio();
+      const workspace = snapshot.workspaces[readingId];
+      const fallbackReadingId =
+        snapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0]?.id ?? readingId;
+      const fallbackWorkspace = snapshot.workspaces[fallbackReadingId];
+
+      if (!workspace) {
+        return fallbackWorkspace;
+      }
+
+      const nextWorkspace =
+        action.type === "workspace.modeSwitched" ||
+        action.type === "workspace.cardMoved" ||
+        action.type === "workspace.cardRotated" ||
+        action.type === "workspace.cardFlipped"
+          ? {
+              ...workspace,
+            }
+          : workspace;
+
+      if (!storage) {
+        return nextWorkspace;
+      }
+
+      try {
+        storage.setItem(
+          `${READING_STUDIO_WORKSPACE_STORAGE_PREFIX}${readingId}`,
+          JSON.stringify(nextWorkspace)
+        );
+      } catch {
+        // Ignore storage write failures.
+      }
+      return nextWorkspace;
     },
     async saveWorkspace(readingId: string, workspace: ReadingStudioWorkspace): Promise<void> {
       if (!storage) {

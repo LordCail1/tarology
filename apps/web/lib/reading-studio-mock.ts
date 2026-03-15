@@ -30,40 +30,65 @@ const readingHistorySeed: ReadingHistoryItem[] = [
     title: "Career realignment and confidence",
     createdAtIso: "2026-03-08T09:42:00.000-05:00",
     createdAtLabel: "Today, 09:42",
+    updatedAtIso: "2026-03-08T09:42:00.000-05:00",
     cardCount: 5,
     status: "active",
+    version: 1,
+    deckId: "thoth",
+    deckSpecVersion: "thoth-v1",
+    canvasMode: "freeform",
   },
   {
     id: "rdg_002",
     title: "Relationship clarity check-in",
     createdAtIso: "2026-03-07T20:14:00.000-05:00",
     createdAtLabel: "Yesterday, 20:14",
+    updatedAtIso: "2026-03-07T20:14:00.000-05:00",
     cardCount: 5,
-    status: "paused",
+    status: "archived",
+    version: 2,
+    deckId: "thoth",
+    deckSpecVersion: "thoth-v1",
+    canvasMode: "freeform",
   },
   {
     id: "rdg_003",
     title: "Spring direction spread",
     createdAtIso: "2026-03-05T13:30:00.000-05:00",
     createdAtLabel: "Mar 05, 2026",
+    updatedAtIso: "2026-03-05T13:30:00.000-05:00",
     cardCount: 5,
-    status: "complete",
+    status: "archived",
+    version: 3,
+    deckId: "thoth",
+    deckSpecVersion: "thoth-v1",
+    canvasMode: "freeform",
   },
   {
     id: "rdg_004",
     title: "Creative project momentum sprint",
     createdAtIso: "2026-03-03T18:10:00.000-05:00",
     createdAtLabel: "Mar 03, 2026",
+    updatedAtIso: "2026-03-03T18:10:00.000-05:00",
     cardCount: 5,
-    status: "complete",
+    status: "active",
+    version: 4,
+    deckId: "thoth",
+    deckSpecVersion: "thoth-v1",
+    canvasMode: "freeform",
   },
   {
     id: "rdg_005",
     title: "Crossroads spread review",
     createdAtIso: "2026-02-24T08:25:00.000-05:00",
     createdAtLabel: "Feb 24, 2026",
+    updatedAtIso: "2026-02-24T08:25:00.000-05:00",
     cardCount: 5,
-    status: "paused",
+    status: "archived",
+    version: 5,
+    deckId: "thoth",
+    deckSpecVersion: "thoth-v1",
+    canvasMode: "freeform",
   },
 ];
 
@@ -194,8 +219,14 @@ export const readingStudioSeedSnapshot: ReadingStudioSnapshot = {
 };
 
 export const readingHistoryMock = readingStudioSeedSnapshot.history;
+const seedActiveReadingId =
+  readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0]?.id;
+
+if (!seedActiveReadingId) {
+  throw new Error("Reading Studio seed snapshot requires at least one reading.");
+}
+
 export const questionThreadsMock =
-  readingStudioSeedSnapshot.workspaces[readingStudioSeedSnapshot.activeReadingId].threads;
+  readingStudioSeedSnapshot.workspaces[seedActiveReadingId].threads;
 export const interpretationHistoryMock =
-  readingStudioSeedSnapshot.workspaces[readingStudioSeedSnapshot.activeReadingId]
-    .interpretations;
+  readingStudioSeedSnapshot.workspaces[seedActiveReadingId].interpretations;

@@ -1,8 +1,10 @@
-export type CanvasMode = "freeform" | "grid";
+import type { CanvasMode, ReadingLifecycleStatus } from "@tarology/shared";
+export type { CanvasMode } from "@tarology/shared";
+
 export type PanelSide = "left" | "right";
 export type AnalysisTab = "threads" | "interpretations";
 
-export type ReadingStatus = "active" | "paused" | "complete";
+export type ReadingStatus = ReadingLifecycleStatus;
 export type ReadingHistoryFilter = "all" | ReadingStatus;
 export type InterpretationStatus = "ready" | "running" | "queued";
 
@@ -11,8 +13,13 @@ export interface ReadingHistoryItem {
   title: string;
   createdAtIso: string;
   createdAtLabel: string;
+  updatedAtIso: string;
   cardCount: number;
   status: ReadingStatus;
+  version: number;
+  deckId: string | null;
+  deckSpecVersion: string;
+  canvasMode: CanvasMode;
 }
 
 export interface QuestionThreadItem {
@@ -67,7 +74,7 @@ export interface ReadingStudioWorkspace {
 }
 
 export interface ReadingStudioSnapshot {
-  activeReadingId: string;
+  activeReadingId: string | null;
   history: ReadingHistoryItem[];
   workspaces: Record<string, ReadingStudioWorkspace>;
 }
@@ -87,7 +94,25 @@ export interface ReadingStudioPreferenceAdapter {
 export interface ReadingStudioDataSource {
   loadStudio(): Promise<ReadingStudioSnapshot>;
   setActiveReading(readingId: string): Promise<ReadingStudioWorkspace>;
-  saveWorkspace(readingId: string, workspace: ReadingStudioWorkspace): Promise<void>;
+  createReading(rootQuestion: string): Promise<ReadingStudioWorkspace>;
+  applyWorkspaceAction(
+    readingId: string,
+    currentVersion: number,
+    action: Extract<
+      ReadingStudioAction,
+      {
+        type:
+          | "workspace.modeSwitched"
+          | "workspace.cardMoved"
+          | "workspace.cardRotated"
+          | "workspace.cardFlipped";
+        }
+      >
+  ): Promise<ReadingStudioWorkspace>;
+  saveWorkspace?(
+    readingId: string,
+    workspace: ReadingStudioWorkspace
+  ): Promise<void>;
 }
 
 export type ReadingStudioAction =

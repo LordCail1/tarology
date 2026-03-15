@@ -24,6 +24,13 @@ export interface CreateReadingRecordInput {
     deckIndex: number;
     cardId: string;
     assignedReversal: boolean;
+    isFaceUp: boolean;
+    rotationDeg: number;
+    freeformXPx: number;
+    freeformYPx: number;
+    freeformStackOrder: number;
+    gridColumn: number;
+    gridRow: number;
     createdAt: Date;
   }>;
 }
@@ -65,6 +72,13 @@ export class ReadingsRepository {
         deckIndex: card.deckIndex,
         cardId: card.cardId,
         assignedReversal: card.assignedReversal,
+        isFaceUp: card.isFaceUp,
+        rotationDeg: card.rotationDeg,
+        freeformXPx: card.freeformXPx,
+        freeformYPx: card.freeformYPx,
+        freeformStackOrder: card.freeformStackOrder,
+        gridColumn: card.gridColumn,
+        gridRow: card.gridRow,
         createdAt: card.createdAt,
       })),
     });
@@ -107,6 +121,13 @@ export class ReadingsRepository {
         deletedAt: null,
         ...(status === "all" ? {} : { status }),
       },
+      include: {
+        _count: {
+          select: {
+            cards: true,
+          },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     });
   }
@@ -137,6 +158,61 @@ export class ReadingsRepository {
         archivedAt: input.archivedAt,
         deletedAt: input.deletedAt,
       },
+    });
+
+    return result.count;
+  }
+
+  async updateCanvasMode(
+    tx: ReadingTransaction,
+    input: {
+      readingId: string;
+      ownerUserId: string;
+      expectedVersion: number;
+      canvasMode: string;
+      version: number;
+      updatedAt: Date;
+    }
+  ): Promise<number> {
+    const result = await tx.reading.updateMany({
+      where: {
+        id: input.readingId,
+        ownerUserId: input.ownerUserId,
+        version: input.expectedVersion,
+        deletedAt: null,
+      },
+      data: {
+        canvasMode: input.canvasMode,
+        version: input.version,
+        updatedAt: input.updatedAt,
+      },
+    });
+
+    return result.count;
+  }
+
+  async updateCardCanvasState(
+    tx: ReadingTransaction,
+    input: {
+      readingId: string;
+      cardId: string;
+      data: {
+        isFaceUp?: boolean;
+        rotationDeg?: number;
+        freeformXPx?: number;
+        freeformYPx?: number;
+        freeformStackOrder?: number;
+        gridColumn?: number;
+        gridRow?: number;
+      };
+    }
+  ): Promise<number> {
+    const result = await tx.readingCard.updateMany({
+      where: {
+        readingId: input.readingId,
+        cardId: input.cardId,
+      },
+      data: input.data,
     });
 
     return result.count;

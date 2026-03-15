@@ -54,10 +54,12 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - UI now has a production-shaped Reading Studio shell with:
   - collapsible and desktop-resizable sidebars,
   - `freeform` / `grid` canvas modes,
-  - local layout/workspace persistence,
+  - durable API-backed reading history/create/restore flows,
+  - durable semantic canvas mutation persistence for mode switch, move, rotate, and flip,
+  - local layout width + active-reading preference persistence,
   - auth gating and onboarding gating.
 - Important current limitation: the deck-management surface described in the product docs is not implemented yet; current deck handling is limited to the default-deck onboarding/catalog baseline.
-- Important current limitation: the visible Reading Studio history/workspace state is still seeded client-side and persisted in `localStorage`; the web shell has not yet been wired to the durable reading API for create/history/restore flows.
+- Important current limitation: the analysis sidebar is still placeholder-only; question threads, saved card groups, and interpretation workflows are not implemented yet.
 - Product docs now include strategic post-core PRDs (`prd-11` through `prd-15`) and updated API/safety/roadmap guidance.
 - GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.
 - Required checks on `main`: `ci-checks`, `request-codex-review`.

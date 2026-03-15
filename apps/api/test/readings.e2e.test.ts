@@ -272,6 +272,233 @@ describe("Reading durability and history API", () => {
     await closeTrackedApp(app);
   });
 
+  it("persists canvas commands and restores the updated workspace state", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "canvas-commands-create")
+      .send({
+        rootQuestion: "How does the workspace evolve?",
+        deckId: "thoth",
+        deckSpecVersion: "thoth-v1",
+        canvasMode: "freeform",
+      })
+      .expect(201);
+
+    const targetCardId = created.body.canvas.cards[0].cardId as string;
+
+    const modeSwitched = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "canvas-mode-switch")
+      .send({
+        commandId: "77964457-d6f5-40d8-b612-71468dbc145a",
+        expectedVersion: 1,
+        type: "switch_canvas_mode",
+        payload: {
+          canvasMode: "grid",
+        },
+      })
+      .expect(200);
+
+    expect(modeSwitched.body.reading).toMatchObject({
+      canvasMode: "grid",
+      version: 2,
+      canvas: {
+        activeMode: "grid",
+      },
+    });
+
+    const moved = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "canvas-card-move")
+      .send({
+        commandId: "edb75f6e-a3f9-42db-8659-351a1110f413",
+        expectedVersion: 2,
+        type: "move_card",
+        payload: {
+          cardId: targetCardId,
+          grid: {
+            column: 7,
+            row: 5,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(
+      moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      grid: {
+        column: 7,
+        row: 5,
+      },
+    });
+
+    const rotated = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "canvas-card-rotate")
+      .send({
+        commandId: "2680a949-f4ff-48eb-a592-dad687518b76",
+        expectedVersion: 3,
+        type: "rotate_card",
+        payload: {
+          cardId: targetCardId,
+          deltaDeg: 47,
+        },
+      })
+      .expect(200);
+
+    expect(
+      rotated.body.reading.canvas.cards.find(
+        (card: { cardId: string; rotationDeg: number }) => card.cardId === targetCardId
+      )
+    ).toMatchObject({
+      cardId: targetCardId,
+      rotationDeg: 47,
+    });
+
+    const flipped = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "canvas-card-flip")
+      .send({
+        commandId: "4654cbf5-c00c-42bf-be0a-d0f33458dfe4",
+        expectedVersion: 4,
+        type: "flip_card",
+        payload: {
+          cardId: targetCardId,
+        },
+      })
+      .expect(200);
+
+    expect(
+      flipped.body.reading.canvas.cards.find(
+        (card: { cardId: string; isFaceUp: boolean }) => card.cardId === targetCardId
+      )
+    ).toMatchObject({
+      cardId: targetCardId,
+      isFaceUp: true,
+    });
+
+    const returnedToFreeform = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "canvas-mode-return")
+      .send({
+        commandId: "c78829cb-39b6-4043-8072-b2db1fb13584",
+        expectedVersion: 5,
+        type: "switch_canvas_mode",
+        payload: {
+          canvasMode: "freeform",
+        },
+      })
+      .expect(200);
+
+    const movedFreeform = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "canvas-card-freeform-move")
+      .send({
+        commandId: "39300c56-3461-4079-8254-eb689742516f",
+        expectedVersion: 6,
+        type: "move_card",
+        payload: {
+          cardId: targetCardId,
+          freeform: {
+            xPx: 420,
+            yPx: 210,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(movedFreeform.body.reading).toMatchObject({
+      canvasMode: "freeform",
+      version: 7,
+      canvas: {
+        activeMode: "freeform",
+      },
+    });
+    expect(
+      movedFreeform.body.reading.canvas.cards.find(
+        (card: {
+          cardId: string;
+          freeform: { xPx: number; yPx: number; stackOrder: number };
+          grid: { column: number; row: number };
+          isFaceUp: boolean;
+          rotationDeg: number;
+        }) => card.cardId === targetCardId
+      )
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 420,
+        yPx: 210,
+      },
+      grid: {
+        column: 7,
+        row: 5,
+      },
+      isFaceUp: true,
+      rotationDeg: 47,
+    });
+
+    const restored = await app
+      .get(ReadingsService)
+      .restoreReadingFromHistory(TEST_USER.userId, created.body.readingId);
+
+    expect(restored).toEqual(movedFreeform.body.reading);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(detail.body).toEqual(movedFreeform.body.reading);
+
+    await closeTrackedApp(app);
+  });
+
+  it("returns 404 when a canvas command targets a card outside the reading", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "missing-card-create")
+      .send({
+        rootQuestion: "What happens when the card is missing?",
+        deckId: "thoth",
+        deckSpecVersion: "thoth-v1",
+        canvasMode: "freeform",
+      })
+      .expect(201);
+
+    const commandResponse = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "missing-card-command")
+      .send({
+        commandId: "84e6fd09-4ed1-4341-acaf-a5fab4f7432d",
+        expectedVersion: 1,
+        type: "move_card",
+        payload: {
+          cardId: "missing-card-id",
+          freeform: {
+            xPx: 320,
+            yPx: 180,
+          },
+        },
+      })
+      .expect(404);
+
+    expect(commandResponse.body.message).toContain('Card "missing-card-id" is not part of this reading.');
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(detail.body.version).toBe(1);
+
+    await closeTrackedApp(app);
+  });
+
   it("rejects stale versions, soft deletes readings, and replays delete commands idempotently", async () => {
     const app = await createAuthorizedApp(TEST_USER);
 

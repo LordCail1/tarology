@@ -25,7 +25,9 @@ Execution sequencing:
   - explicit active reading selection and grouped history,
   - desktop drag-resize sidebars with persisted widths,
   - mobile drawers plus desktop-specific panel rails/toggles,
-  - local adapter seams for layout preferences and reading workspace restore,
+  - durable API-backed reading history/create/restore flows,
+  - semantic canvas command persistence for mode switch, move, rotate, and flip,
+  - local adapter seams limited to layout preferences and active-reading selection,
   - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`).
 - Profile/preferences onboarding baseline is now implemented:
   - Prisma/Postgres persists `users`, `auth_identities`, `profiles`, `user_preferences`, and `decks`
@@ -67,7 +69,7 @@ Execution sequencing:
   - `reading-studio`
 - Local runbook baseline:
   - `docs/local-dev-runbook.md` now documents the canonical local startup path for database, API, and web
-  - manual smoke-test steps now distinguish between real API-backed flows and the Reading Studio's current local mock workspace behavior
+  - manual smoke-test steps now cover the API-backed Reading Studio flow plus direct canvas-command API checks
 - Deterministic deck assignment on reading creation.
 - Shared `CreateReading` contract package.
 - CI/CD baseline and Vercel preview/production pipeline.
@@ -153,6 +155,22 @@ Execution sequencing:
   - center canvas supports `freeform` and `grid` with local drag, snap, rotate, flip, and per-mode layout memory
   - local workspace/layout restore survives refresh via adapter-backed localStorage persistence
   - web regression coverage now includes drag-resize persistence and canvas workspace restore flows
+- Reading Studio durable wiring branch:
+  - `/reading` now loads durable reading history/detail state from the API instead of seeded client-side workspaces
+  - `New Reading` now creates durable readings from the Studio using the saved default deck
+  - semantic canvas actions (`switch_canvas_mode`, `move_card`, `rotate_card`, `flip_card`) now persist through the reading command API and round-trip through detail/restore
+  - API-backed Reading Studio state now persists exact active workspace state across refresh and API restart
+  - local browser persistence is limited to layout widths and last active reading selection
+  - regression coverage now includes API command round-trip/restore and API-datasource command mapping in the web layer
+  - async workspace persistence is now keyed by the originating reading id so late command responses cannot overwrite a newly activated reading
+  - browser fallback command/idempotency IDs now stay RFC 4122 v4-shaped when `crypto.randomUUID` is unavailable, preserving command API compatibility in older runtimes
+  - the canvas-state migration now backfills pre-existing `reading_cards` from `deck_index` so legacy readings do not collapse into `(0,0)` after deploy
+  - create-reading failures now surface as a recoverable in-studio alert instead of leaving unhandled promise rejections with no user feedback
+  - reading activation now ignores out-of-order fetch completions so slower history loads cannot flip the UI back to a stale selection
+  - queued persistence responses now skip stale lower-version commits so older server responses cannot roll back newer optimistic canvas edits
+  - reading activation failures now surface as recoverable inline alerts instead of unhandled rejections when a selected reading cannot be fetched
+  - workspace persistence chains now self-heal after a failed save-plus-reload path so later user actions still attempt API persistence
+  - invalid canvas commands that target cards outside the reading now return `404` instead of leaking a service error as `500`
 - Reading durability/history backend branch:
   - Prisma/Postgres now replaces the in-memory reading map for the canonical create/read path
   - shared reading contracts now include lifecycle status, summaries/details, history filters, and command envelopes
@@ -212,12 +230,11 @@ Gate 0 is only complete when the app can create multiple readings, preserve card
 
 Status note:
 - Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
-- Queue items 3, 4, 6, and 7 are complete for DB-backed reading durability, lifecycle commands, restore projection, and multi-reading history.
+- Queue items 3, 4, 5, 6, and 7 are complete for DB-backed reading durability, semantic workspace command persistence, restore projection, and multi-reading history.
 - Queue item 9 is complete for the OpenAI-first provider-connections baseline.
 - Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
 - Product pivot note: before the interpretation workflow is treated as complete, the app now needs a deck knowledge domain and deck-management surface that match the updated charter.
-- Short-term alignment follow-up: replace the web mock `paused` / `complete` reading status vocabulary with canonical lifecycle status before durable history wiring lands.
-- Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
+- Remaining work is centered on question trees/card groups, interpretation jobs, deck-management, provider-backed workflow integration, and per-reading deck override UI.
 
 Deck-knowledge pivot follow-ups:
 - Implement deck knowledge domain baseline.
@@ -247,10 +264,11 @@ Deck-knowledge pivot follow-ups:
 
 5. Persist semantic card/layout mutations.
 - Acceptance: draw/flip/drag/rotate/group actions persist as semantic events and survive refresh/reopen without corrupting deterministic assignment.
+  Status: complete for current canvas mode switch, move, rotate, and flip commands.
 
 6. Build read-model restore path.
 - Acceptance: `GET /v1/readings/:id` returns current projection including layout state; snapshots/events replay strategy is in place.
-  Status: complete for current reading lifecycle and immutable assignment state.
+  Status: complete for current reading lifecycle and canvas state projection.
 
 7. Implement readings history query + reopen/delete baseline.
 - Acceptance: users can create multiple readings, reopen any prior reading, and safely delete/archive a reading without affecting other readings.
@@ -332,8 +350,8 @@ Deck-knowledge pivot follow-ups:
 - Provenance quality can regress if not contract-tested.
 - Persona features can create anthropomorphic misunderstanding without clear framing.
 - Deck creation introduces moderation/IP policy burden.
-- The Reading Studio currently restores from web-local persistence; swapping to durable backend restore must preserve mode memory, selection behavior, and sidebar preference semantics.
-- The durable backend currently covers reading lifecycle and immutable card assignment state; canvas/question mutation durability still needs to be added without breaking restore compatibility.
+- The Reading Studio now restores durable reading state from the backend; future question-tree/group persistence must preserve the same restore semantics without regressing current canvas behavior.
+- The analysis panel is still placeholder-only, so question-thread and interpretation features will need contract tests when they replace the current stub content.
 - The current deck catalog is intentionally narrow: only the built-in Thoth deck is selectable, and card-image filename normalization is still deferred.
 - Deck assets are temporarily sourced from `tarology_old` with project-owner approval; broader licensing policy still needs a durable product decision.
 
@@ -345,9 +363,10 @@ sed -n '1,260p' docs/local-dev-runbook.md
 cd apps/api && npx prisma dev --name tarology-local
 # press "t" in the Prisma dev terminal, then export the printed DATABASE_URL in a second shell
 cd /home/ram2c/gitclones/tarology
-set -a && source apps/api/.env && set +a
+if [ -f apps/api/.env ]; then set -a && source apps/api/.env && set +a; fi
 export DATABASE_URL='postgres://...'
 export TEST_DATABASE_URL="$DATABASE_URL"
+npm run prisma:migrate:deploy --workspace @tarology/api
 npm run prisma:seed --workspace @tarology/api
 npm run ci:checks
 sed -n '1,220p' docs/product/README.md
