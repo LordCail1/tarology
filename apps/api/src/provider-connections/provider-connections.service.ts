@@ -34,7 +34,7 @@ export interface ProviderAccountChallengeSession {
   token: string;
   provider: "openai";
   displayName: string;
-  makeDefault: boolean;
+  makeDefault?: boolean;
   expiresAt: string;
 }
 
@@ -69,46 +69,70 @@ export class ProviderConnectionsService {
     user: AuthenticatedUser,
     payload: CreateApiKeyProviderConnectionDto
   ): Promise<ProviderConnectionMutationResponse> {
+    const normalizedApiKey = payload.apiKey.trim();
+    if (normalizedApiKey.length === 0) {
+      throw new BadRequestException("API key must not be empty.");
+    }
+
     const displayName = this.resolveDisplayName(
       payload.displayName,
       "OpenAI API key"
     );
-    const encryptedSecret = this.providerSecretsService.encryptSecret(payload.apiKey.trim());
-    const secretHint = this.providerSecretsService.maskApiKey(payload.apiKey.trim());
+    const encryptedSecret = this.providerSecretsService.encryptSecret(normalizedApiKey);
+    const secretHint = this.providerSecretsService.maskApiKey(normalizedApiKey);
     const isDefault = await this.resolveDefaultFlag(user.userId, payload.makeDefault);
 
     let connection: ConnectionRecord;
     if (isDefault) {
-      await this.prisma.providerConnection.updateMany({
-        where: {
-          userId: user.userId,
-          isDefault: true,
-        },
-        data: {
-          isDefault: false,
-        },
-      });
+      [, connection] = await this.prisma.$transaction([
+        this.prisma.providerConnection.updateMany({
+          where: {
+            userId: user.userId,
+            isDefault: true,
+          },
+          data: {
+            isDefault: false,
+          },
+        }),
+        this.prisma.providerConnection.create({
+          data: {
+            userId: user.userId,
+            provider: "openai",
+            credentialMode: "api_key",
+            status: "active",
+            displayName,
+            isDefault,
+            lastValidatedAt: new Date(),
+            credential: {
+              create: {
+                encryptedSecret,
+                secretHint,
+              },
+            },
+          },
+          include: { credential: true },
+        }),
+      ]);
     } else {
-    }
-
-    connection = await this.prisma.providerConnection.create({
-      data: {
-        userId: user.userId,
-        provider: "openai",
-        credentialMode: "api_key",
-        status: "active",
-        displayName,
-        isDefault,
-        lastValidatedAt: new Date(),
-        credential: {
-          create: {
-            encryptedSecret,
-            secretHint,
+      connection = await this.prisma.providerConnection.create({
+        data: {
+          userId: user.userId,
+          provider: "openai",
+          credentialMode: "api_key",
+          status: "active",
+          displayName,
+          isDefault,
+          lastValidatedAt: new Date(),
+          credential: {
+            create: {
+              encryptedSecret,
+              secretHint,
+            },
           },
         },
-      },
-      include: { credential: true },
-    });
+        include: { credential: true },
+      });
+    }
 
     return {
       connection: this.toSummary(connection),
@@ -135,7 +159,7 @@ export class ProviderConnectionsService {
         token,
         provider: "openai",
         displayName,
-        makeDefault: payload.makeDefault ?? false,
+        makeDefault: payload.makeDefault,
         expiresAt: expiresAt.toISOString(),
       },
       response: {
@@ -175,30 +199,43 @@ export class ProviderConnectionsService {
 
     let connection: ConnectionRecord;
     if (isDefault) {
-      await this.prisma.providerConnection.updateMany({
-        where: {
-          userId: user.userId,
-          isDefault: true,
-        },
-        data: {
-          isDefault: false,
-        },
-      });
+      [, connection] = await this.prisma.$transaction([
+        this.prisma.providerConnection.updateMany({
+          where: {
+            userId: user.userId,
+            isDefault: true,
+          },
+          data: {
+            isDefault: false,
+          },
+        }),
+        this.prisma.providerConnection.create({
+          data: {
+            userId: user.userId,
+            provider: "openai",
+            credentialMode: "provider_account",
+            status: "active",
+            displayName: challenge.displayName,
+            isDefault,
+            lastValidatedAt: new Date(),
+          },
+          include: { credential: true },
+        }),
+      ]);
     } else {
+      connection = await this.prisma.providerConnection.create({
+        data: {
+          userId: user.userId,
+          provider: "openai",
+          credentialMode: "provider_account",
+          status: "active",
+          displayName: challenge.displayName,
+          isDefault,
+          lastValidatedAt: new Date(),
+        },
+        include: { credential: true },
+      });
     }
-
-    connection = await this.prisma.providerConnection.create({
-      data: {
-        userId: user.userId,
-        provider: "openai",
-        credentialMode: "provider_account",
-        status: "active",
-        displayName: challenge.displayName,
-        isDefault,
-        lastValidatedAt: new Date(),
-      },
-      include: { credential: true },
-    });
 
     return {
       connection: this.toSummary(connection),
@@ -230,23 +267,29 @@ export class ProviderConnectionsService {
 
     let connection: ConnectionRecord;
     if (payload.makeDefault === true) {
-      await this.prisma.providerConnection.updateMany({
-        where: {
-          userId: user.userId,
-          isDefault: true,
-        },
-        data: {
-          isDefault: false,
-        },
-      });
+      [, connection] = await this.prisma.$transaction([
+        this.prisma.providerConnection.updateMany({
+          where: {
+            userId: user.userId,
+            isDefault: true,
+          },
+          data: {
+            isDefault: false,
+          },
+        }),
+        this.prisma.providerConnection.update({
+          where: { id: existing.id },
+          data,
+          include: { credential: true },
+        }),
+      ]);
     } else {
+      connection = await this.prisma.providerConnection.update({
+        where: { id: existing.id },
+        data,
+        include: { credential: true },
+      });
     }
-
-    connection = await this.prisma.providerConnection.update({
-      where: { id: existing.id },
-      data,
-      include: { credential: true },
-    });
 
     return {
       connection: this.toSummary(connection),

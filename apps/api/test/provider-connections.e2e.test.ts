@@ -168,6 +168,28 @@ describe("Provider connections API", () => {
     await closeTrackedApp(app);
   }, 15_000);
 
+  it("rejects API keys that trim down to empty content", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const response = await request(app.getHttpServer())
+      .post("/v1/provider-connections/api-key")
+      .send({
+        provider: "openai",
+        apiKey: "   ",
+      })
+      .expect(400);
+
+    expect(response.body.message).toContain("API key must not be empty");
+
+    const listResponse = await request(app.getHttpServer())
+      .get("/v1/provider-connections")
+      .expect(200);
+
+    expect(listResponse.body.connections).toEqual([]);
+
+    await closeTrackedApp(app);
+  }, 15_000);
+
   it("supports the internal allowlisted provider-account flow for OpenAI", async () => {
     process.env.OPENAI_PROVIDER_ACCOUNT_ALLOWLIST = TEST_USER.email;
     const app = await createAuthorizedApp(TEST_USER);
@@ -214,6 +236,35 @@ describe("Provider connections API", () => {
       .expect(400);
 
     expect(replayComplete.body.message).toContain("missing");
+
+    await closeTrackedApp(app);
+  }, 15_000);
+
+  it("auto-defaults the first provider-account connection when makeDefault is omitted", async () => {
+    process.env.OPENAI_PROVIDER_ACCOUNT_ALLOWLIST = TEST_USER.email;
+    const app = await createAuthorizedApp(TEST_USER);
+    const agent = request.agent(app.getHttpServer());
+
+    const started = await agent
+      .post("/v1/provider-connections/provider-account/start")
+      .send({
+        provider: "openai",
+        displayName: "Implicit Default OpenAI",
+      })
+      .expect(201);
+
+    const completed = await agent
+      .post("/v1/provider-connections/provider-account/complete")
+      .send({
+        provider: "openai",
+        challengeToken: started.body.challengeToken,
+      })
+      .expect(201);
+
+    expect(completed.body.connection).toMatchObject({
+      displayName: "Implicit Default OpenAI",
+      isDefault: true,
+    });
 
     await closeTrackedApp(app);
   }, 15_000);

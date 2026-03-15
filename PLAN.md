@@ -172,6 +172,8 @@ Execution sequencing:
   - API keys are encrypted at rest and never returned raw after creation
   - internal OpenAI provider-account mode uses a session-bound challenge/complete flow and only appears for allowlisted accounts
   - API Vitest now runs files sequentially to avoid shared test-database races across multiple e2e suites
+  - default-selection mutations are now wrapped atomically and backed by a partial unique index so concurrent updates cannot leave multiple defaults for one user
+  - API key creation now rejects whitespace-only secrets, and provider-account start/complete now preserves omitted `makeDefault` so first-connection auto-default still works
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
