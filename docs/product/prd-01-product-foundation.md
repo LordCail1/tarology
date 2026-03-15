@@ -30,7 +30,7 @@ This version merges:
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
 15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
-16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
+16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, the built-in starter path creates a user-owned editable deck instance, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
 17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
 19. Symbolic outputs support dual register (`plain` default, `esoteric` optional) with semantic parity.

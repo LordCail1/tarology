@@ -12,11 +12,15 @@ Coverage: sections 4 and 5
   - user can keep one or both configured where available.
 - Deck library and knowledge management:
   - user can initialize a deck from starter content or an empty template,
+  - choosing the built-in starter deck creates a personal editable deck copy rather than leaving the user on a shared template row,
   - user can browse decks, cards, and symbols,
   - user can add/edit card information,
   - user can add/edit symbol information and link symbols to cards,
-  - user can browse symbols independently from cards,
-  - user can export/import private deck state for cloning or sharing.
+  - user can browse symbols independently from cards, with bidirectional card/symbol linking in the UI,
+  - user can export/import private deck state for cloning or sharing,
+  - first-party V1 knowledge editing focuses on layered `plain_text` and `markdown` entries,
+  - sources remain minimal but visible inside deck-management flows,
+  - deck/card images are viewable in V1 but not yet user-editable.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
   - center: card fan + canvas with mode selection,
@@ -93,7 +97,7 @@ V1 support policy:
 
 ### 5.2 Core Journey
 1. User logs in with Google.
-2. On first login, user selects or initializes a default tarot deck (starter-content or empty); preference is persisted.
+2. On first login, user selects or initializes a default tarot deck (starter-content or empty); choosing the built-in starter deck creates a personal owned copy and the preference is persisted.
 3. User may review/edit cards and symbols in that deck before beginning a reading.
 4. User starts a new reading, can override deck selection, and writes root question.
 5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
