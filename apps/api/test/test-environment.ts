@@ -42,6 +42,8 @@ export function configureApiTestEnvironment(): string {
   process.env.GOOGLE_OAUTH_CLIENT_SECRET = "test-client-secret";
   process.env.GOOGLE_OAUTH_CALLBACK_URL =
     "http://localhost:3001/v1/auth/google/callback";
+  process.env.PROVIDER_CREDENTIAL_SECRET = "test-provider-credential-secret";
+  process.env.OPENAI_PROVIDER_ACCOUNT_ALLOWLIST = "";
 
   return databaseUrl;
 }
@@ -61,6 +63,8 @@ export async function resetDatabase(prisma: PrismaService): Promise<void> {
   await prisma.knowledgeSource.deleteMany();
   await prisma.card.deleteMany();
   await prisma.symbol.deleteMany();
+  await prisma.providerCredential.deleteMany();
+  await prisma.providerConnection.deleteMany();
   await prisma.readingCommandReceipt.deleteMany();
   await prisma.readingCreateReceipt.deleteMany();
   await prisma.readingSnapshot.deleteMany();

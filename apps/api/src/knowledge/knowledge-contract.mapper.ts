@@ -166,6 +166,8 @@ export function toKnowledgeSourceDto(source: KnowledgeSourceRecord): KnowledgeSo
     publishedAt: toIsoStringOrNull(source.publishedAt),
     rightsNote: source.rightsNote,
     metadataJson: source.metadataJson,
+    createdAt: source.createdAt.toISOString(),
+    updatedAt: source.updatedAt.toISOString(),
   };
 }
 

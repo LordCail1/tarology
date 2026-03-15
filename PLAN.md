@@ -25,7 +25,9 @@ Execution sequencing:
   - explicit active reading selection and grouped history,
   - desktop drag-resize sidebars with persisted widths,
   - mobile drawers plus desktop-specific panel rails/toggles,
-  - local adapter seams for layout preferences and reading workspace restore,
+  - durable API-backed reading history/create/restore flows,
+  - semantic canvas command persistence for mode switch, move, rotate, and flip,
+  - local adapter seams limited to layout preferences and active-reading selection,
   - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`).
 - Profile/preferences onboarding baseline is now implemented:
   - Prisma/Postgres persists `users`, `auth_identities`, `profiles`, `user_preferences`, and `decks`
@@ -51,11 +53,22 @@ Execution sequencing:
   - `GET /v1/readings` and `GET /v1/readings/:id` return durable history/detail state
   - `POST /v1/readings/:id/commands` supports idempotent, version-checked `archive`, `reopen`, and `delete`
   - lifecycle events and milestone snapshots support restore-from-history for reading state
+- API now has an OpenAI-first provider-connections baseline:
+  - Prisma/Postgres persists `provider_connections` and encrypted `provider_credentials`
+  - `GET /v1/provider-connections`, `POST /v1/provider-connections/api-key`, `POST /v1/provider-connections/provider-account/start`, `POST /v1/provider-connections/provider-account/complete`, `PATCH /v1/provider-connections/:id`, and `DELETE /v1/provider-connections/:id` are live behind session auth
+  - provider capability metadata is resolved server-side
+  - public OpenAI `api_key` mode is live, and internal OpenAI `provider_account` mode is gated by an allowlist
 - Product docs now align on a tarot-reader-first, deck-knowledge-first direction:
   - cards and symbols own extensible knowledge,
   - decks may start from starter content or empty templates,
   - symbols are first-class and independently viewable,
   - live web research is no longer a baseline V1 interpretation requirement
+- Web now also has a deck-management surface at `/decks`:
+  - auth-gated deck library route linked from the Reading Studio topbar,
+  - local adapter-backed deck snapshot seeded from the real deck summary API,
+  - deck-library-first cards/symbols browsing with bidirectional linking,
+  - layered `plain_text` / `markdown` entry editing plus minimal visible sources,
+  - basic local import/export controls and view-only starter images.
 - Vercel currently deploys only the Next.js web app; the NestJS API is not yet publicly hosted.
 - Current documentation now aligns on delaying full-stack hosting until the durable reading MVP is complete.
 
@@ -67,7 +80,7 @@ Execution sequencing:
   - `reading-studio`
 - Local runbook baseline:
   - `docs/local-dev-runbook.md` now documents the canonical local startup path for database, API, and web
-  - manual smoke-test steps now distinguish between real API-backed flows and the Reading Studio's current local mock workspace behavior
+  - manual smoke-test steps now cover the API-backed Reading Studio flow plus direct canvas-command API checks
 - Deterministic deck assignment on reading creation.
 - Shared `CreateReading` contract package.
 - CI/CD baseline and Vercel preview/production pipeline.
@@ -137,6 +150,7 @@ Execution sequencing:
   - full deck state should be exportable/importable for cloning and sharing
 - Canonical deck-knowledge schema/export spec added:
   - `docs/product/prd-16-deck-knowledge-schema-and-export.md` now defines user-owned deck instances, card/symbol knowledge entry shape, split `deckSpecVersion` vs `knowledgeVersion`, and the V1 JSON export/import package
+  - V1 UX defaults are now locked in that spec: onboarding creates a personal starter-deck copy, starter decks should feel substantial even with mock content, symbols are managed deck-library-first with bidirectional linking, entry authoring is layered, sources stay minimal-but-visible, import/export UI stays basic, and images are view-only in V1
 - Planning/docs alignment pass:
   - durable multi-reading restore is now the explicit MVP threshold
   - full-stack deployment is now the next gate after MVP, ahead of post-core symbolic expansion
@@ -152,6 +166,22 @@ Execution sequencing:
   - center canvas supports `freeform` and `grid` with local drag, snap, rotate, flip, and per-mode layout memory
   - local workspace/layout restore survives refresh via adapter-backed localStorage persistence
   - web regression coverage now includes drag-resize persistence and canvas workspace restore flows
+- Reading Studio durable wiring branch:
+  - `/reading` now loads durable reading history/detail state from the API instead of seeded client-side workspaces
+  - `New Reading` now creates durable readings from the Studio using the saved default deck
+  - semantic canvas actions (`switch_canvas_mode`, `move_card`, `rotate_card`, `flip_card`) now persist through the reading command API and round-trip through detail/restore
+  - API-backed Reading Studio state now persists exact active workspace state across refresh and API restart
+  - local browser persistence is limited to layout widths and last active reading selection
+  - regression coverage now includes API command round-trip/restore and API-datasource command mapping in the web layer
+  - async workspace persistence is now keyed by the originating reading id so late command responses cannot overwrite a newly activated reading
+  - browser fallback command/idempotency IDs now stay RFC 4122 v4-shaped when `crypto.randomUUID` is unavailable, preserving command API compatibility in older runtimes
+  - the canvas-state migration now backfills pre-existing `reading_cards` from `deck_index` so legacy readings do not collapse into `(0,0)` after deploy
+  - create-reading failures now surface as a recoverable in-studio alert instead of leaving unhandled promise rejections with no user feedback
+  - reading activation now ignores out-of-order fetch completions so slower history loads cannot flip the UI back to a stale selection
+  - queued persistence responses now skip stale lower-version commits so older server responses cannot roll back newer optimistic canvas edits
+  - reading activation failures now surface as recoverable inline alerts instead of unhandled rejections when a selected reading cannot be fetched
+  - workspace persistence chains now self-heal after a failed save-plus-reload path so later user actions still attempt API persistence
+  - invalid canvas commands that target cards outside the reading now return `404` instead of leaking a service error as `500`
 - Reading durability/history backend branch:
   - Prisma/Postgres now replaces the in-memory reading map for the canonical create/read path
   - shared reading contracts now include lifecycle status, summaries/details, history filters, and command envelopes
@@ -172,6 +202,29 @@ Execution sequencing:
   - profile bootstrap now provisions a personal starter Thoth deck and preferences can only target owned deck instances
   - reading creation now validates owned deck instances and shuffles deck-owned card IDs instead of relying on the legacy shared deck catalog service
   - shared contracts now include deck detail, card detail, symbol detail, source/entry write payloads, and deck export/import envelopes
+- Deck-management surface branch:
+  - `/decks` now exists as an authenticated deck-library route with its own gate and shell
+  - the web app seeds a substantial Thoth starter deck locally from the real deck summary, including 78 cards, starter symbols, links, entries, sources, and image references
+  - cards and symbols can be browsed independently, symbols can be created and linked to cards, and layered entries can be added/edited/archive-soft-deleted in the UI
+  - deck exports and imports now work as basic local JSON actions using the PRD 16 package shape
+  - local deck-library persistence is now scoped by authenticated `userId` so reader-authored deck knowledge cannot leak across accounts in the same browser
+  - import/export hardening now derives imported `cardCount` from the cards payload and preserves `json` knowledge entries as view-only imported records
+  - stale local snapshots now recover to a valid active deck when possible, empty libraries render an explicit recoverable state, and new source IDs are uniqued per deck
+  - entry editing now refuses cross-subject saves, and deck export/import now preserves archived knowledge-entry state
+  - deck export/import now preserves entry tags, and duplicate symbol submissions no longer churn `knowledgeVersion` or report false success
+  - import now normalizes malformed entry `sourceIds`, and duplicate card-symbol link attempts no longer churn `knowledgeVersion` or report false success
+  - import now rejects duplicate `cardId` / `symbolId` values so malformed shared deck files cannot create unreachable deck records
+  - import now rejects malformed knowledge-source kinds so invalid shared deck files cannot crash the deck library surface on source rendering
+  - local snapshot restore now falls back on structurally incomplete persisted decks, and import now rejects orphaned card/symbol references in links and knowledge entries
+  - web regression coverage now includes the deck-management gate, local deck snapshot helpers, import/export helpers, and basic symbol-creation interaction
+- Provider-connections baseline branch:
+  - Prisma/Postgres now persists `provider_connections` and `provider_credentials`
+  - provider connection contracts now expose capability metadata, connection summaries, default selection, and the OpenAI-first `api_key` / allowlisted `provider_account` split
+  - API keys are encrypted at rest and never returned raw after creation
+  - internal OpenAI provider-account mode uses a session-bound challenge/complete flow and only appears for allowlisted accounts
+  - API Vitest now runs files sequentially to avoid shared test-database races across multiple e2e suites
+  - default-selection mutations are now wrapped atomically and backed by a partial unique index so concurrent updates cannot leave multiple defaults for one user
+  - API key creation now rejects whitespace-only secrets, and provider-account start/complete now preserves omitted `makeDefault` so first-connection auto-default still works
 
 ## Locked Product Decisions (Execution)
 - Card identity and reversal are fixed at reading creation; never sampled on click.
@@ -181,6 +234,11 @@ Execution sequencing:
 - Interpretation is deck-knowledge-first; live web research is optional future enrichment rather than a baseline requirement.
 - Cards and symbols own extensible knowledge, and symbols are first-class deck entities that are independently viewable.
 - Decks may start from starter content or empty templates, and deck state must be exportable/importable for cloning or sharing.
+- Choosing the built-in starter deck during onboarding should create a user-owned editable deck instance rather than leaving users on a shared template row.
+- Starter-content decks should feel immediately usable, even if V1 temporarily relies on mock knowledge and image references.
+- Deck-management UX is deck-library-first with bidirectional card/symbol linking.
+- V1 first-party knowledge editing supports `plain_text` and `markdown`; `json` remains internal/import-facing.
+- Sources are minimal but visible in V1; import/export UI is basic; deck/card images are view-only.
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
 - Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
 - User default deck is captured during onboarding and can be overridden per reading.
@@ -205,20 +263,24 @@ Gate 0 is only complete when the app can create multiple readings, preserve card
 
 Status note:
 - Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
-- Queue items 3, 4, 6, and 7 are complete for DB-backed reading durability, lifecycle commands, restore projection, and multi-reading history.
+- Queue items 3, 4, 5, 6, and 7 are complete for DB-backed reading durability, semantic workspace command persistence, restore projection, and multi-reading history.
+- Queue item 9 is complete for the OpenAI-first provider-connections baseline.
 - Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
 - Product pivot note: before the interpretation workflow is treated as complete, the app now needs a deck knowledge domain and deck-management surface that match the updated charter.
-- Short-term alignment follow-up: replace the web mock `paused` / `complete` reading status vocabulary with canonical lifecycle status before durable history wiring lands.
-- Remaining work is to persist semantic workspace mutations and connect the existing UI seams to the durable backend without regressing current interaction behavior.
+- Remaining work is centered on question trees/card groups, interpretation jobs, deck-management, provider-backed workflow integration, and per-reading deck override UI.
 
 Deck-knowledge pivot follow-ups:
 - Implement deck knowledge domain baseline.
   Acceptance: decks persist card information, symbols, symbol links, starter/empty initialization metadata, and attached knowledge references.
   Status: complete for backend/domain/contracts baseline in this branch; import validation now rejects malformed deck metadata, card fields, symbol fields, malformed entry `sourceIds`, missing/blank/malformed `sourceId` values, duplicate `sourceId` values, duplicate card-symbol links, and duplicate per-parent entry IDs before DB writes, imported `sourceId` values are persisted in trimmed form, card/symbol entry writes normalize `entryId`, labels, and `sourceIds` before any destructive delete, linked card/symbol ID arrays are now validated both at DTO and service boundaries, and deck-source replacement rejects blank `sourceId` values and fails fast if existing entries still reference sourceIds that would be removed. Durable verification still needs a stable Postgres run in CI or against a real local Postgres service.
+  Guardrail: implement the owned-deck onboarding path, substantial starter-content path, layered entry model, and minimal-visible source support described in `prd-16`.
 - Implement deck-management surface baseline.
   Acceptance: users can browse decks/cards/symbols, edit card/symbol information, and inspect symbols independently from any specific card view.
+  Guardrail: keep the UI deck-library-first, expose basic import/export controls, and do not add V1 image editing/upload.
+  Status: complete as a web-local, adapter-backed surface; durable API wiring still depends on the knowledge-domain branch.
 - Add deck export/import baseline.
   Acceptance: full deck state can be exported and re-imported without losing card/symbol knowledge or links.
+  Status: complete as local UI/actions; backend ownership and persistence still depend on the knowledge-domain branch.
 
 1. Implement profile shell baseline.
 - Acceptance: authenticated users have a persisted profile shell record and can load profile basics.
@@ -238,10 +300,11 @@ Deck-knowledge pivot follow-ups:
 
 5. Persist semantic card/layout mutations.
 - Acceptance: draw/flip/drag/rotate/group actions persist as semantic events and survive refresh/reopen without corrupting deterministic assignment.
+  Status: complete for current canvas mode switch, move, rotate, and flip commands.
 
 6. Build read-model restore path.
 - Acceptance: `GET /v1/readings/:id` returns current projection including layout state; snapshots/events replay strategy is in place.
-  Status: complete for current reading lifecycle and immutable assignment state.
+  Status: complete for current reading lifecycle and canvas state projection.
 
 7. Implement readings history query + reopen/delete baseline.
 - Acceptance: users can create multiple readings, reopen any prior reading, and safely delete/archive a reading without affecting other readings.
@@ -252,6 +315,7 @@ Deck-knowledge pivot follow-ups:
 
 9. Start provider-connections domain with capability model.
 - Acceptance: schema/API support provider type, credential mode (`api_key` or `provider_account`), status, default selection, and allowlisted internal OpenAI provider-account handling.
+  Status: complete for the OpenAI-first API baseline.
 
 10. Add interpretation request job model with cancellable state machine.
 - Acceptance: queued/running/completed/failed/`cancelled_by_user` states with idempotent cancellation.
@@ -322,8 +386,9 @@ Deck-knowledge pivot follow-ups:
 - Provenance quality can regress if not contract-tested.
 - Persona features can create anthropomorphic misunderstanding without clear framing.
 - Deck creation introduces moderation/IP policy burden.
-- The Reading Studio currently restores from web-local persistence; swapping to durable backend restore must preserve mode memory, selection behavior, and sidebar preference semantics.
-- The durable backend currently covers reading lifecycle and immutable card assignment state; canvas/question mutation durability still needs to be added without breaking restore compatibility.
+- The Reading Studio now restores durable reading state from the backend; future question-tree/group persistence must preserve the same restore semantics without regressing current canvas behavior.
+- The analysis panel is still placeholder-only, so question-thread and interpretation features will need contract tests when they replace the current stub content.
+- The deck-management surface currently persists its knowledge graph in browser-local storage; it must be re-pointed at the knowledge-domain API without losing the deck-library-first UX or PRD 16 export shape.
 - The current deck catalog is intentionally narrow: only the built-in Thoth deck is selectable, and card-image filename normalization is still deferred.
 - Deck assets are temporarily sourced from `tarology_old` with project-owner approval; broader licensing policy still needs a durable product decision.
 - Local WSL2 validation with `@prisma/adapter-pg` against `prisma dev` TCP URLs was unstable in this session; DB-backed API verification should be re-run against CI or a stable local Postgres service before merge.
@@ -336,9 +401,10 @@ sed -n '1,260p' docs/local-dev-runbook.md
 cd apps/api && npx prisma dev --name tarology-local
 # press "t" in the Prisma dev terminal, then export the printed DATABASE_URL in a second shell
 cd /home/ram2c/gitclones/tarology
-set -a && source apps/api/.env && set +a
+if [ -f apps/api/.env ]; then set -a && source apps/api/.env && set +a; fi
 export DATABASE_URL='postgres://...'
 export TEST_DATABASE_URL="$DATABASE_URL"
+npm run prisma:migrate:deploy --workspace @tarology/api
 npm run prisma:seed --workspace @tarology/api
 npm run ci:checks
 sed -n '1,220p' docs/product/README.md
@@ -346,6 +412,11 @@ sed -n '1,220p' docs/product/prd-04-interpretation-intelligence.md
 sed -n '1,220p' docs/product/prd-06-data-model-and-api.md
 sed -n '1,260p' docs/product/prd-16-deck-knowledge-schema-and-export.md
 sed -n '1,260p' PLAN.md
+cd /home/ram2c/gitclones/.worktrees/tarology/feature/deck-management-surface
+git status --short --branch
+npm run test --workspace @tarology/web
+npm run build --workspace @tarology/web
+# for full branch verification, start Prisma dev in apps/api and rerun root ci:checks with DATABASE_URL and TEST_DATABASE_URL set
 ```
 
 ## Codex Continuity Note

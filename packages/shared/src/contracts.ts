@@ -16,10 +16,17 @@ export type KnowledgeSourceKind =
   | "external_enrichment";
 export type ReadingLifecycleStatus = "active" | "archived" | "deleted";
 export type ReadingListStatusFilter = "all" | "active" | "archived";
+export type ModelProvider = "openai";
+export type ProviderCredentialMode = "api_key" | "provider_account";
+export type ProviderConnectionStatus = "active" | "pending" | "needs_attention";
 export type ReadingCommandType =
   | "archive_reading"
   | "reopen_reading"
-  | "delete_reading";
+  | "delete_reading"
+  | "switch_canvas_mode"
+  | "move_card"
+  | "rotate_card"
+  | "flip_card";
 export type ApiConflictCode =
   | "version_conflict"
   | "idempotency_conflict"
@@ -75,6 +82,8 @@ export interface KnowledgeSourceDto {
   publishedAt: string | null;
   rightsNote: string | null;
   metadataJson: unknown | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface KnowledgeSourceWriteDto {
@@ -103,6 +112,28 @@ export interface KnowledgeEntryDto {
   sourceIds: string[];
   sortOrder: number;
   archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderCapability {
+  provider: ModelProvider;
+  supportsApiKey: boolean;
+  supportsProviderAccount: boolean;
+  supportsStreaming: boolean;
+  supportsBackground: boolean;
+  providerAccountNotice: string | null;
+}
+
+export interface ProviderConnectionSummary {
+  id: string;
+  provider: ModelProvider;
+  credentialMode: ProviderCredentialMode;
+  status: ProviderConnectionStatus;
+  displayName: string;
+  isDefault: boolean;
+  maskedCredentialHint: string | null;
+  lastValidatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -320,6 +351,50 @@ export interface ImportDeckResponse {
   deck: DeckSummary;
 }
 
+export interface GetProviderConnectionsResponse {
+  capabilities: ProviderCapability[];
+  connections: ProviderConnectionSummary[];
+}
+
+export interface CreateApiKeyProviderConnectionRequest {
+  provider: ModelProvider;
+  displayName?: string;
+  apiKey: string;
+  makeDefault?: boolean;
+}
+
+export interface StartProviderAccountConnectionRequest {
+  provider: ModelProvider;
+  displayName?: string;
+  makeDefault?: boolean;
+}
+
+export interface StartProviderAccountConnectionResponse {
+  provider: ModelProvider;
+  challengeToken: string;
+  expiresAt: string;
+  flow: "internal_allowlisted";
+  message: string;
+}
+
+export interface CompleteProviderAccountConnectionRequest {
+  provider: ModelProvider;
+  challengeToken: string;
+}
+
+export interface UpdateProviderConnectionRequest {
+  displayName?: string;
+  makeDefault?: boolean;
+}
+
+export interface ProviderConnectionMutationResponse {
+  connection: ProviderConnectionSummary;
+}
+
+export interface DeleteProviderConnectionResponse {
+  success: true;
+}
+
 export interface ProfileShellDto {
   userId: string;
   email: string;
@@ -361,11 +436,35 @@ export interface ReadingCardAssignment {
 
 export type CardAssignment = ReadingCardAssignment;
 
+export interface FreeformPositionDto {
+  xPx: number;
+  yPx: number;
+  stackOrder: number;
+}
+
+export interface GridPositionDto {
+  column: number;
+  row: number;
+}
+
+export interface ReadingCanvasCardState extends ReadingCardAssignment {
+  isFaceUp: boolean;
+  rotationDeg: number;
+  freeform: FreeformPositionDto;
+  grid: GridPositionDto;
+}
+
+export interface ReadingCanvasStateDto {
+  activeMode: CanvasMode;
+  cards: ReadingCanvasCardState[];
+}
+
 export interface ReadingSummary {
   readingId: string;
   rootQuestion: string;
   deckId: string | null;
   deckSpecVersion: string;
+  cardCount: number;
   canvasMode: CanvasMode;
   status: ReadingLifecycleStatus;
   version: number;
@@ -380,6 +479,7 @@ export interface ReadingDetail extends ReadingSummary {
   seedCommitment: string;
   orderHash: string;
   assignments: ReadingCardAssignment[];
+  canvas: ReadingCanvasStateDto;
 }
 
 export interface CreateReadingResponse {
@@ -387,6 +487,7 @@ export interface CreateReadingResponse {
   rootQuestion: string;
   deckId: string | null;
   deckSpecVersion: string;
+  cardCount: number;
   canvasMode: CanvasMode;
   status: ReadingLifecycleStatus;
   version: number;
@@ -394,6 +495,7 @@ export interface CreateReadingResponse {
   seedCommitment: string;
   orderHash: string;
   assignments: ReadingCardAssignment[];
+  canvas: ReadingCanvasStateDto;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -406,11 +508,37 @@ export interface ListReadingsResponse {
 
 export type GetReadingResponse = ReadingDetail;
 
+export interface SwitchCanvasModePayload {
+  canvasMode: CanvasMode;
+}
+
+export interface MoveCardPayload {
+  cardId: string;
+  freeform?: Pick<FreeformPositionDto, "xPx" | "yPx">;
+  grid?: GridPositionDto;
+}
+
+export interface RotateCardPayload {
+  cardId: string;
+  deltaDeg: number;
+}
+
+export interface FlipCardPayload {
+  cardId: string;
+}
+
+export type ReadingCommandPayload =
+  | Record<string, never>
+  | SwitchCanvasModePayload
+  | MoveCardPayload
+  | RotateCardPayload
+  | FlipCardPayload;
+
 export interface ReadingCommandRequest {
   commandId: string;
   expectedVersion: number;
   type: ReadingCommandType;
-  payload: Record<string, never>;
+  payload: ReadingCommandPayload;
 }
 
 export interface ReadingCommandResponse {

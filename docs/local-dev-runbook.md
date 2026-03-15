@@ -17,14 +17,16 @@ The current local stack is:
 
 Important current behavior:
 - auth, profile, preferences, deck catalog, and reading durability APIs are real and backed by Postgres
-- the Reading Studio shell is real UI, but the visible history/workspace interactions are still seeded from local mock data and persisted in browser `localStorage`
-- the `New Reading` button in the Reading Studio is still disabled
+- the Reading Studio shell now loads reading history/workspace state from the API
+- `New Reading` is enabled and creates durable readings through the API
+- canvas mode switches and card move/rotate/flip interactions persist durably
+- browser `localStorage` now only keeps layout widths and the last active reading selection
 
 That means a good smoke pass needs to cover both:
 - real API flows
 - real auth/onboarding flows
-- current web-shell behavior and persistence
-- direct manual API checks for durable readings
+- real web-shell history/create/restore behavior
+- direct manual API checks for durable readings and canvas commands
 
 ## Prerequisites
 
@@ -56,9 +58,11 @@ Once Prisma dev is running:
 From the repo root:
 
 ```bash
-set -a
-source apps/api/.env
-set +a
+if [ -f apps/api/.env ]; then
+  set -a
+  source apps/api/.env
+  set +a
+fi
 
 export DATABASE_URL='PASTE_THE_PRISMA_TCP_DATABASE_URL_HERE'
 export TEST_DATABASE_URL="$DATABASE_URL"
@@ -70,7 +74,7 @@ npm run dev:api
 
 Notes:
 - `TEST_DATABASE_URL` is needed for local `npm run ci:checks`
-- the API currently reads `process.env` directly, so sourcing `apps/api/.env` in your shell is the safe local setup for Google auth
+- if you keep local untracked API env vars in `apps/api/.env`, sourcing that file is the safest local setup for Google auth
 - `npm run dev:api` is not a watch server today; if you edit backend code, rerun the command
 
 ### Terminal 3: web
@@ -134,31 +138,40 @@ For returning users with an existing default deck, expected behavior is:
 On `/reading`, verify:
 - the profile shell renders
 - the default deck label is shown
+- the `New Reading` action is enabled
 - left and right sidebars can be collapsed and expanded
 - on desktop, both resize handles work
 - refreshing the page preserves sidebar widths
 
-### 5. Canvas behavior
+### 5. Reading history and creation
+
+Verify:
+- clicking `New Reading` creates a new reading and places it at the top of history
+- selecting different readings in the history rail swaps workspaces from the API
+- refreshing restores the active reading from the API and reselects the last active reading id
+
+### 6. Canvas behavior
 
 Verify:
 - `freeform` and `grid` modes can be toggled
 - card drag/flip/rotate interactions work
-- switching modes preserves each mode's layout memory
-- refreshing the page restores the current workspace state
+ - refreshing the page restores the current workspace state from the backend
+ - switching to another reading and back restores the prior reading's exact canvas state
 
-### 6. History behavior
+### 7. Optional restart check
 
-Verify:
-- selecting different readings in the history rail swaps workspaces
-- refreshing restores the active reading and last saved local workspace state
+After creating and editing a reading:
+- stop the API server
+- start it again
+- refresh `/reading`
 
-Important:
-- this history/workspace data is still local seeded data today, not yet loaded from the durable reading API
-- `New Reading` is intentionally disabled in the current shell
+Expected:
+- the same readings still load
+- the edited workspace state survives the restart
 
-## Durable Reading API Smoke Test
+## Extra API Smoke Test
 
-The Reading Studio UI is not yet wired to the durable reading create/history APIs, so test those directly after logging in.
+The Reading Studio UI now exercises the durable reading create/history/restore flow directly, but it is still useful to test the APIs in isolation after logging in.
 
 The easiest path is the browser devtools console while you are already on `http://localhost:3000`, because the browser session cookie is already present.
 
@@ -186,6 +199,76 @@ const list = await fetch(`${api}/v1/readings`, {
 
 const detail = await fetch(`${api}/v1/readings/${created.readingId}`, {
   credentials: "include",
+}).then((response) => response.json());
+
+const switched = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
+  method: "POST",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    commandId: crypto.randomUUID(),
+    expectedVersion: 1,
+    type: "switch_canvas_mode",
+    payload: {
+      canvasMode: "grid",
+    },
+  }),
+}).then((response) => response.json());
+
+const moved = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
+  method: "POST",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    commandId: crypto.randomUUID(),
+    expectedVersion: 2,
+    type: "move_card",
+    payload: {
+      cardId: created.canvas.cards[0].cardId,
+      grid: { column: 7, row: 5 },
+    },
+  }),
+}).then((response) => response.json());
+
+const rotated = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
+  method: "POST",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    commandId: crypto.randomUUID(),
+    expectedVersion: 3,
+    type: "rotate_card",
+    payload: {
+      cardId: created.canvas.cards[0].cardId,
+      deltaDeg: 47,
+    },
+  }),
+}).then((response) => response.json());
+
+const flipped = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
+  method: "POST",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    commandId: crypto.randomUUID(),
+    expectedVersion: 4,
+    type: "flip_card",
+    payload: {
+      cardId: created.canvas.cards[0].cardId,
+    },
+  }),
 }).then((response) => response.json());
 
 const archived = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
@@ -238,6 +321,7 @@ Expected API results:
 - create returns a UUID reading with 78 fixed card assignments
 - list includes the new reading
 - detail matches the created reading
+- switch/move/rotate/flip update the `canvas` projection and increment `version`
 - archive changes the reading to `archived`
 - reopen changes it back to `active`
 - delete changes it to `deleted`
