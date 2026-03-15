@@ -1011,7 +1011,7 @@ export function DeckManagementShell({
           <section className="surface rounded-[1.5rem] p-5">
             <div className="flex flex-col gap-4 md:flex-row">
               <img
-                src={selectedDeck.previewImageUrl}
+                src={selectedDeck.previewImageUrl ?? undefined}
                 alt={`${selectedDeck.name} preview`}
                 className="h-44 w-32 rounded-[1.15rem] border border-[var(--color-border-strong)] object-cover shadow-[0_16px_34px_rgba(0,0,0,0.28)]"
               />
@@ -1096,7 +1096,7 @@ export function DeckManagementShell({
                     >
                       <div className="flex gap-3">
                         <img
-                          src={card.faceImageUrl ?? selectedDeck.previewImageUrl}
+                          src={card.faceImageUrl ?? selectedDeck.previewImageUrl ?? undefined}
                           alt={`${card.name} art`}
                           className="h-24 w-16 rounded-[0.9rem] border border-[var(--color-border-strong)] object-cover"
                         />
@@ -1187,7 +1187,7 @@ export function DeckManagementShell({
             <>
               <div className="flex gap-3">
                 <img
-                  src={selectedCard.faceImageUrl ?? selectedDeck.previewImageUrl}
+                  src={selectedCard.faceImageUrl ?? selectedDeck.previewImageUrl ?? undefined}
                   alt={`${selectedCard.name} art`}
                   className="h-36 w-24 rounded-[1rem] border border-[var(--color-border-strong)] object-cover"
                 />

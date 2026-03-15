@@ -165,15 +165,19 @@ const profileFixture = {
 };
 
 const preferencesFixture = {
-  defaultDeckId: "thoth",
+  defaultDeckId: "deck_thoth_owned",
   defaultDeck: {
-    id: "thoth",
+    id: "deck_thoth_owned",
     name: "Thoth Tarot",
     description: "Starter deck",
     specVersion: "thoth-v1",
+    knowledgeVersion: 1,
+    initializationMode: "starter_content" as const,
+    initializerKey: "thoth",
     previewImageUrl: "/images/cards/thoth/TheSun.jpg",
     backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
     cardCount: 78,
+    symbolCount: 8,
   },
   onboardingComplete: true,
   updatedAt: "2026-03-11T10:05:00.000Z",

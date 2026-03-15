@@ -116,8 +116,8 @@ export interface DeckExportDocument {
     knowledgeVersion: number;
     initializationMode: DeckInitializationMode;
     initializerKey: string | null;
-    previewImageUrl: string;
-    backImageUrl: string;
+    previewImageUrl: string | null;
+    backImageUrl: string | null;
     cardCount: number;
     originExportDigest?: string | null;
     exportNotes?: string | null;

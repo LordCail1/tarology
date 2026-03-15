@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { DatabaseModule } from "./database/database.module.js";
 import { IdentityModule } from "./identity/identity.module.js";
+import { KnowledgeModule } from "./knowledge/knowledge.module.js";
 import { ProfileModule } from "./profile/profile.module.js";
 import { ProviderConnectionsModule } from "./provider-connections/provider-connections.module.js";
 import { ReadingStudioModule } from "./reading-studio/reading-studio.module.js";
@@ -9,6 +10,7 @@ import { ReadingStudioModule } from "./reading-studio/reading-studio.module.js";
   imports: [
     DatabaseModule,
     IdentityModule,
+    KnowledgeModule,
     ProfileModule,
     ProviderConnectionsModule,
     ReadingStudioModule,

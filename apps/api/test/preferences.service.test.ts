@@ -35,10 +35,14 @@ describe("PreferencesService", () => {
     const prisma = {
       deck: {
         findUnique: vi.fn().mockResolvedValue({
-          id: "thoth",
+          id: "deck_thoth_owned",
+          ownerUserId: "user-1",
           name: "Thoth Tarot",
           description: "Deck",
-          specVersion: "thoth-v1",
+          deckSpecVersion: "thoth-v1",
+          knowledgeVersion: 1,
+          initializationMode: "starter_content",
+          initializerKey: "thoth",
           previewImageUrl: "/images/cards/thoth/TheSun.jpg",
           backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
           cardCount: 78,
@@ -49,47 +53,67 @@ describe("PreferencesService", () => {
           .fn()
           .mockResolvedValueOnce({ onboardingCompletedAt: firstCompletedAt })
           .mockResolvedValueOnce({
-            defaultDeckId: "thoth",
+            defaultDeckId: "deck_thoth_owned",
             onboardingCompletedAt: firstCompletedAt,
             updatedAt,
             defaultDeck: {
-              id: "thoth",
+              id: "deck_thoth_owned",
               name: "Thoth Tarot",
               description: "Deck",
-              specVersion: "thoth-v1",
+              deckSpecVersion: "thoth-v1",
+              knowledgeVersion: 1,
+              initializationMode: "starter_content",
+              initializerKey: "thoth",
               previewImageUrl: "/images/cards/thoth/TheSun.jpg",
               backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
               cardCount: 78,
+              _count: {
+                symbols: 8,
+              },
             },
           }),
         update: vi.fn().mockResolvedValue({
-          defaultDeckId: "thoth",
+          defaultDeckId: "deck_thoth_owned",
           onboardingCompletedAt: firstCompletedAt,
           updatedAt,
           defaultDeck: {
-            id: "thoth",
+            id: "deck_thoth_owned",
             name: "Thoth Tarot",
             description: "Deck",
-            specVersion: "thoth-v1",
+            deckSpecVersion: "thoth-v1",
+            knowledgeVersion: 1,
+            initializationMode: "starter_content",
+            initializerKey: "thoth",
             previewImageUrl: "/images/cards/thoth/TheSun.jpg",
             backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
             cardCount: 78,
+            _count: {
+              symbols: 8,
+            },
           },
         }),
       },
     };
 
     const service = new PreferencesService(prisma as never);
-    const response = await service.updateDefaultDeck("user-1", "thoth");
+    const response = await service.updateDefaultDeck("user-1", "deck_thoth_owned");
 
     expect(prisma.userPreference.update).toHaveBeenCalledWith({
       where: { userId: "user-1" },
       data: {
-        defaultDeckId: "thoth",
+        defaultDeckId: "deck_thoth_owned",
         onboardingCompletedAt: firstCompletedAt,
       },
       include: {
-        defaultDeck: true,
+        defaultDeck: {
+          include: {
+            _count: {
+              select: {
+                symbols: true,
+              },
+            },
+          },
+        },
       },
     });
     expect(response.preferences.onboardingComplete).toBe(true);

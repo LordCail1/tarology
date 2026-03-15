@@ -176,7 +176,11 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
             aria-pressed="true"
           >
             <img
-              src={selectedDeck.previewImageUrl}
+              src={
+                selectedDeck.previewImageUrl ??
+                selectedDeck.backImageUrl ??
+                "/images/cards/thoth/backofcard/BackOfCard.jpg"
+              }
               alt={`${selectedDeck.name} preview`}
               className="h-32 w-[5.5rem] rounded-xl border border-[var(--color-border-strong)] object-cover shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
             />

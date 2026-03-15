@@ -7,9 +7,13 @@ const thothSummary = {
   name: "Thoth Tarot",
   description: "Starter deck",
   specVersion: "thoth-v1",
+  knowledgeVersion: 1,
+  initializationMode: "starter_content" as const,
+  initializerKey: "thoth",
   previewImageUrl: "/images/cards/thoth/TheSun.jpg",
   backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
   cardCount: 78,
+  symbolCount: 8,
 };
 
 describe("deck export/import helpers", () => {
