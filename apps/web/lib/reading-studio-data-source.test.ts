@@ -23,7 +23,7 @@ describe("reading-studio-data-source", () => {
     const readingId = "rdg_004";
     const workspace = readingStudioSeedSnapshot.workspaces[readingId];
 
-    await dataSource.saveWorkspace(readingId, {
+    await dataSource.saveWorkspace?.(readingId, {
       ...workspace,
       canvas: {
         ...workspace.canvas,

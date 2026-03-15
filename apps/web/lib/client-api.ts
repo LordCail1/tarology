@@ -1,8 +1,14 @@
 import type {
+  CreateReadingRequest,
+  CreateReadingResponse,
   GetDecksResponse,
   GetPreferencesResponse,
   GetProfileResponse,
+  GetReadingResponse,
   GetSessionResponse,
+  ListReadingsResponse,
+  ReadingCommandRequest,
+  ReadingCommandResponse,
   UpdatePreferencesRequest,
 } from "@tarology/shared";
 import { getClientApiBaseUrl } from "./api-origin";
@@ -90,6 +96,41 @@ export function fetchPreferences(): Promise<GetPreferencesResponse> {
 
 export function fetchDecks(): Promise<GetDecksResponse> {
   return requestJson<GetDecksResponse>("/v1/decks", { method: "GET" });
+}
+
+export function fetchReadings(): Promise<ListReadingsResponse> {
+  return requestJson<ListReadingsResponse>("/v1/readings", { method: "GET" });
+}
+
+export function fetchReading(readingId: string): Promise<GetReadingResponse> {
+  return requestJson<GetReadingResponse>(`/v1/readings/${readingId}`, { method: "GET" });
+}
+
+export function postCreateReading(
+  payload: CreateReadingRequest,
+  idempotencyKey: string
+): Promise<CreateReadingResponse> {
+  return requestJson<CreateReadingResponse>("/v1/readings", {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function postReadingCommand(
+  readingId: string,
+  payload: ReadingCommandRequest,
+  idempotencyKey: string
+): Promise<ReadingCommandResponse> {
+  return requestJson<ReadingCommandResponse>(`/v1/readings/${readingId}/commands`, {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function patchPreferences(

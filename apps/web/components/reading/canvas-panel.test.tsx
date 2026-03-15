@@ -10,8 +10,10 @@ import type { ReadingStudioWorkspace } from "../../lib/reading-studio-types";
 import { CanvasPanel } from "./canvas-panel";
 
 function CanvasPanelHarness() {
+  const activeReadingId =
+    readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
   const [workspace, setWorkspace] = useState<ReadingStudioWorkspace>(
-    readingStudioSeedSnapshot.workspaces[readingStudioSeedSnapshot.activeReadingId]
+    readingStudioSeedSnapshot.workspaces[activeReadingId]
   );
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 

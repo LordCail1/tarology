@@ -11,6 +11,10 @@ const READING_COMMAND_TYPES = [
   "archive_reading",
   "reopen_reading",
   "delete_reading",
+  "switch_canvas_mode",
+  "move_card",
+  "rotate_card",
+  "flip_card",
 ] as const;
 
 export class ReadingCommandDto implements ReadingCommandRequest {
@@ -25,5 +29,5 @@ export class ReadingCommandDto implements ReadingCommandRequest {
   type!: ReadingCommandRequest["type"];
 
   @IsObject()
-  payload!: Record<string, never>;
+  payload!: ReadingCommandRequest["payload"];
 }

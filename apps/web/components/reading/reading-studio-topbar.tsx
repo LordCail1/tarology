@@ -67,9 +67,7 @@ export function ReadingStudioTopbar({
             <button
               type="button"
               onClick={onNewReading}
-              disabled
-              aria-disabled="true"
-              className="rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)]/35 px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition disabled:cursor-not-allowed disabled:opacity-70"
+              className="rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)]/35 px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:brightness-110"
             >
               New Reading
             </button>
@@ -97,6 +95,14 @@ export function ReadingStudioTopbar({
               className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
             >
               Analysis
+            </button>
+            <button
+              type="button"
+              aria-label="Create new reading"
+              onClick={onNewReading}
+              className="rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent)]/35 px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)]"
+            >
+              New
             </button>
           </div>
         )}
