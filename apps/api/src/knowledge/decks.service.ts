@@ -269,6 +269,71 @@ function normalizeKnowledgeEntryId(entryId: unknown): string | undefined {
   return entryId.trim();
 }
 
+function normalizeLinkedRecordIds(
+  linkedRecordIds: unknown,
+  fieldName: "linkedSymbolIds" | "linkedCardIds"
+): string[] {
+  if (
+    !Array.isArray(linkedRecordIds) ||
+    linkedRecordIds.some((linkedRecordId) => typeof linkedRecordId !== "string")
+  ) {
+    throw new BadRequestException(
+      `Deck link field "${fieldName}" must be an array of non-empty strings.`
+    );
+  }
+
+  const normalizedLinkedRecordIds = linkedRecordIds.map((linkedRecordId) => linkedRecordId.trim());
+  if (normalizedLinkedRecordIds.some((linkedRecordId) => linkedRecordId.length === 0)) {
+    throw new BadRequestException(
+      `Deck link field "${fieldName}" must be an array of non-empty strings.`
+    );
+  }
+
+  return normalizedLinkedRecordIds;
+}
+
+function validateImportedDeckRecord(deck: ImportDeckRequest["deck"]): void {
+  if (typeof deck.name !== "string" || deck.name.trim().length === 0) {
+    throw new BadRequestException('Imported deck metadata must provide a non-empty string "name".');
+  }
+  if (typeof deck.deckSpecVersion !== "string" || deck.deckSpecVersion.trim().length === 0) {
+    throw new BadRequestException(
+      'Imported deck metadata must provide a non-empty string "deckSpecVersion".'
+    );
+  }
+  if (!Number.isInteger(deck.knowledgeVersion) || deck.knowledgeVersion < 1) {
+    throw new BadRequestException(
+      'Imported deck metadata must provide a positive integer "knowledgeVersion".'
+    );
+  }
+  if (typeof deck.initializationMode !== "string" || deck.initializationMode.trim().length === 0) {
+    throw new BadRequestException(
+      'Imported deck metadata must provide a non-empty string "initializationMode".'
+    );
+  }
+  if (deck.description !== null && typeof deck.description !== "string") {
+    throw new BadRequestException('Imported deck metadata field "description" must be a string or null.');
+  }
+  if (deck.initializerKey !== null && typeof deck.initializerKey !== "string") {
+    throw new BadRequestException(
+      'Imported deck metadata field "initializerKey" must be a string or null.'
+    );
+  }
+  if (deck.previewImageUrl !== null && typeof deck.previewImageUrl !== "string") {
+    throw new BadRequestException(
+      'Imported deck metadata field "previewImageUrl" must be a string or null.'
+    );
+  }
+  if (deck.backImageUrl !== null && typeof deck.backImageUrl !== "string") {
+    throw new BadRequestException(
+      'Imported deck metadata field "backImageUrl" must be a string or null.'
+    );
+  }
+  if (!Number.isInteger(deck.cardCount)) {
+    throw new BadRequestException('Imported deck metadata must provide an integer "cardCount".');
+  }
+}
+
 function validateImportedCardRecord(card: ImportDeckRequest["cards"][number]): void {
   if (typeof card.cardId !== "string" || card.cardId.trim().length === 0) {
     throw new BadRequestException('Imported cards must provide a non-empty string "cardId".');
@@ -1181,17 +1246,19 @@ export class DecksService {
     cardRecordId: string,
     linkedSymbolIds: string[]
   ): Promise<void> {
-    const symbols = linkedSymbolIds.length
+    const normalizedLinkedSymbolIds = normalizeLinkedRecordIds(linkedSymbolIds, "linkedSymbolIds");
+
+    const symbols = normalizedLinkedSymbolIds.length
       ? await tx.symbol.findMany({
           where: {
-            id: { in: linkedSymbolIds },
+            id: { in: normalizedLinkedSymbolIds },
             deckId,
           },
           select: { id: true },
         })
       : [];
 
-    if (symbols.length !== linkedSymbolIds.length) {
+    if (symbols.length !== normalizedLinkedSymbolIds.length) {
       throw new BadRequestException("One or more linked symbols are missing from this deck.");
     }
 
@@ -1199,9 +1266,9 @@ export class DecksService {
       where: { cardRecordId },
     });
 
-    if (linkedSymbolIds.length > 0) {
+    if (normalizedLinkedSymbolIds.length > 0) {
       await tx.cardSymbol.createMany({
-        data: linkedSymbolIds.map((symbolRecordId, index) => ({
+        data: normalizedLinkedSymbolIds.map((symbolRecordId, index) => ({
           id: randomUUID(),
           deckId,
           cardRecordId,
@@ -1222,17 +1289,19 @@ export class DecksService {
     symbolRecordId: string,
     linkedCardIds: string[]
   ): Promise<void> {
-    const cards = linkedCardIds.length
+    const normalizedLinkedCardIds = normalizeLinkedRecordIds(linkedCardIds, "linkedCardIds");
+
+    const cards = normalizedLinkedCardIds.length
       ? await tx.card.findMany({
           where: {
-            id: { in: linkedCardIds },
+            id: { in: normalizedLinkedCardIds },
             deckId,
           },
           select: { id: true },
         })
       : [];
 
-    if (cards.length !== linkedCardIds.length) {
+    if (cards.length !== normalizedLinkedCardIds.length) {
       throw new BadRequestException("One or more linked cards are missing from this deck.");
     }
 
@@ -1240,9 +1309,9 @@ export class DecksService {
       where: { symbolRecordId },
     });
 
-    if (linkedCardIds.length > 0) {
+    if (normalizedLinkedCardIds.length > 0) {
       await tx.cardSymbol.createMany({
-        data: linkedCardIds.map((cardRecordId, index) => ({
+        data: normalizedLinkedCardIds.map((cardRecordId, index) => ({
           id: randomUUID(),
           deckId,
           cardRecordId,
@@ -1511,6 +1580,7 @@ export class DecksService {
     if (!isPlainObject(payload.deck)) {
       throw new BadRequestException('Deck import payload field "deck" must be an object.');
     }
+    validateImportedDeckRecord(payload.deck);
     if (!Array.isArray(payload.cards)) {
       throw new BadRequestException('Deck import payload field "cards" must be an array.');
     }

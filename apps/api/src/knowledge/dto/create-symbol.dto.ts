@@ -30,6 +30,7 @@ export class CreateSymbolDto implements CreateSymbolRequest {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   linkedCardIds?: string[];
 
   @IsOptional()

@@ -22,6 +22,7 @@ export class UpdateSymbolDto implements UpdateSymbolRequest {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   linkedCardIds?: string[];
 
   @IsOptional()

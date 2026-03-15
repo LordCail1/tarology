@@ -229,6 +229,21 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects imported deck metadata with malformed required fields", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.deck = {
+      ...payload.deck,
+      name: null as unknown as string,
+    };
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects duplicate knowledge source identifiers in import payloads", async () => {
     const { prisma, service } = createDecksService();
     const payload = buildValidImportPayload();
@@ -705,6 +720,45 @@ describe("DecksService", () => {
     expect(tx.knowledgeSource.findMany).not.toHaveBeenCalled();
     expect(tx.cardInformationEntry.deleteMany).not.toHaveBeenCalled();
     expect(tx.cardInformationEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string linkedSymbolIds in card update flows", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      symbol: {
+        findMany: vi.fn(),
+      },
+      cardSymbol: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+      card: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedCardDetail").mockResolvedValue({
+      id: "card-record-1",
+      deckId: "deck-owned-1",
+    });
+
+    await expect(
+      service.updateCard("11111111-1111-1111-1111-111111111111", "card-record-1", {
+        linkedSymbolIds: [123 as unknown as string],
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.symbol.findMany).not.toHaveBeenCalled();
+    expect(tx.cardSymbol.deleteMany).not.toHaveBeenCalled();
+    expect(tx.cardSymbol.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects symbol information entries with malformed sourceIds in import payloads", async () => {
