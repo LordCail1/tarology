@@ -5,6 +5,9 @@ export type AppAuthProvider = "google";
 export type CanvasMode = "freeform" | "grid";
 export type ReadingLifecycleStatus = "active" | "archived" | "deleted";
 export type ReadingListStatusFilter = "all" | "active" | "archived";
+export type ModelProvider = "openai";
+export type ProviderCredentialMode = "api_key" | "provider_account";
+export type ProviderConnectionStatus = "active" | "pending" | "needs_attention";
 export type ReadingCommandType =
   | "archive_reading"
   | "reopen_reading"
@@ -48,6 +51,72 @@ export interface DeckSummary {
 
 export interface GetDecksResponse {
   decks: DeckSummary[];
+}
+
+export interface ProviderCapability {
+  provider: ModelProvider;
+  supportsApiKey: boolean;
+  supportsProviderAccount: boolean;
+  supportsStreaming: boolean;
+  supportsBackground: boolean;
+  providerAccountNotice: string | null;
+}
+
+export interface ProviderConnectionSummary {
+  id: string;
+  provider: ModelProvider;
+  credentialMode: ProviderCredentialMode;
+  status: ProviderConnectionStatus;
+  displayName: string;
+  isDefault: boolean;
+  maskedCredentialHint: string | null;
+  lastValidatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetProviderConnectionsResponse {
+  capabilities: ProviderCapability[];
+  connections: ProviderConnectionSummary[];
+}
+
+export interface CreateApiKeyProviderConnectionRequest {
+  provider: ModelProvider;
+  displayName?: string;
+  apiKey: string;
+  makeDefault?: boolean;
+}
+
+export interface StartProviderAccountConnectionRequest {
+  provider: ModelProvider;
+  displayName?: string;
+  makeDefault?: boolean;
+}
+
+export interface StartProviderAccountConnectionResponse {
+  provider: ModelProvider;
+  challengeToken: string;
+  expiresAt: string;
+  flow: "internal_allowlisted";
+  message: string;
+}
+
+export interface CompleteProviderAccountConnectionRequest {
+  provider: ModelProvider;
+  challengeToken: string;
+}
+
+export interface UpdateProviderConnectionRequest {
+  displayName?: string;
+  makeDefault?: boolean;
+}
+
+export interface ProviderConnectionMutationResponse {
+  connection: ProviderConnectionSummary;
+}
+
+export interface DeleteProviderConnectionResponse {
+  success: true;
 }
 
 export interface ProfileShellDto {
