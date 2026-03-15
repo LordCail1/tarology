@@ -29,7 +29,25 @@ if [ -z "$branch_name" ]; then
   exit 1
 fi
 
-repo_root="$(git rev-parse --show-toplevel)"
+repo_root=""
+
+while IFS= read -r line; do
+  case "$line" in
+    worktree\ *)
+      candidate_root="${line#worktree }"
+      # The primary checkout keeps a real .git directory. Linked worktrees use a .git file.
+      if [ -d "$candidate_root/.git" ]; then
+        repo_root="$candidate_root"
+        break
+      fi
+      ;;
+  esac
+done < <(git worktree list --porcelain)
+
+if [ -z "$repo_root" ]; then
+  repo_root="$(git rev-parse --show-toplevel)"
+fi
+
 repo_name="$(basename "$repo_root")"
 repo_parent="$(dirname "$repo_root")"
 worktree_root="$repo_parent/.worktrees/$repo_name"

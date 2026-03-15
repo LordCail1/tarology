@@ -62,6 +62,7 @@ npm run git:worktree:add -- feature/<scope>-<short-description> origin/main
 ```
 
 The helper script creates the worktree under the standard Tarology root, creates or reuses the branch, and prints the next commands for the feature agent.
+It resolves that root from the primary checkout's Git metadata even if you invoke it from an existing linked worktree, so it will not create nested `.worktrees` trees inside another feature lane.
 
 Use raw `git worktree` commands only if the helper script is unavailable.
 

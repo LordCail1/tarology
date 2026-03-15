@@ -113,6 +113,7 @@ Execution sequencing:
   - coordination work stays in the primary repo checkout
   - each implementation branch gets its own dedicated worktree under `/home/ram2c/gitclones/.worktrees/tarology/<branch-name>`
   - helper commands now exist for worktree creation/list/prune
+  - the worktree helper now derives the shared Tarology root correctly even when it is invoked from an existing linked worktree, preventing nested `.worktrees` trees inside feature lanes
 - Reading lifecycle vocabulary decision resolved:
   - canonical system status is `active` / `archived` / `deleted`
   - `reopen` remains an action/event, not a steady-state status
