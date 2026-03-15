@@ -209,6 +209,26 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects imported symbols with malformed required fields", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.symbols = [
+      {
+        symbolId: 123 as unknown as string,
+        name: "Lantern",
+        shortLabel: null,
+        description: null,
+        metadataJson: null,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects duplicate knowledge source identifiers in import payloads", async () => {
     const { prisma, service } = createDecksService();
     const payload = buildValidImportPayload();
@@ -634,6 +654,57 @@ describe("DecksService", () => {
     expect(tx.knowledgeSource.findMany).not.toHaveBeenCalled();
     expect(tx.symbolInformationEntry.deleteMany).not.toHaveBeenCalled();
     expect(tx.symbolInformationEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string entryIds in card update flows", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      knowledgeSource: {
+        findMany: vi.fn(),
+      },
+      cardInformationEntry: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+      card: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedCardDetail").mockResolvedValue({
+      id: "card-record-1",
+      deckId: "deck-owned-1",
+    });
+
+    await expect(
+      service.updateCard("11111111-1111-1111-1111-111111111111", "card-record-1", {
+        entries: [
+          {
+            entryId: 42 as unknown as string,
+            label: "core-theme",
+            format: "plain_text",
+            bodyText: "A note",
+            bodyJson: null,
+            summary: null,
+            tags: [],
+            sourceIds: [],
+            sortOrder: 0,
+          },
+        ],
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.knowledgeSource.findMany).not.toHaveBeenCalled();
+    expect(tx.cardInformationEntry.deleteMany).not.toHaveBeenCalled();
+    expect(tx.cardInformationEntry.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects symbol information entries with malformed sourceIds in import payloads", async () => {

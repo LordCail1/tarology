@@ -258,6 +258,17 @@ function normalizeKnowledgeEntryLabel(label: unknown): string {
   return label.trim();
 }
 
+function normalizeKnowledgeEntryId(entryId: unknown): string | undefined {
+  if (entryId == null) {
+    return undefined;
+  }
+  if (typeof entryId !== "string" || entryId.trim().length === 0) {
+    throw new BadRequestException('Knowledge entry field "entryId" must be a non-empty string when provided.');
+  }
+
+  return entryId.trim();
+}
+
 function validateImportedCardRecord(card: ImportDeckRequest["cards"][number]): void {
   if (typeof card.cardId !== "string" || card.cardId.trim().length === 0) {
     throw new BadRequestException('Imported cards must provide a non-empty string "cardId".');
@@ -270,11 +281,21 @@ function validateImportedCardRecord(card: ImportDeckRequest["cards"][number]): v
   }
 }
 
+function validateImportedSymbolRecord(symbol: ImportDeckRequest["symbols"][number]): void {
+  if (typeof symbol.symbolId !== "string" || symbol.symbolId.trim().length === 0) {
+    throw new BadRequestException('Imported symbols must provide a non-empty string "symbolId".');
+  }
+  if (typeof symbol.name !== "string" || symbol.name.trim().length === 0) {
+    throw new BadRequestException('Imported symbols must provide a non-empty string "name".');
+  }
+}
+
 function normalizeKnowledgeEntryWrite(entry: KnowledgeEntryWriteDto): KnowledgeEntryWriteDto {
   ensureExclusiveEntryBody(entry);
 
   return {
     ...entry,
+    entryId: normalizeKnowledgeEntryId(entry.entryId),
     label: normalizeKnowledgeEntryLabel(entry.label),
     sourceIds:
       entry.sourceIds == null
@@ -1092,7 +1113,7 @@ export class DecksService {
           return {
             id: randomUUID(),
             cardRecordId,
-            entryId: entry.entryId?.trim() || randomUUID(),
+            entryId: entry.entryId ?? randomUUID(),
             label: entry.label,
             format: entry.format,
             bodyText: entry.bodyText ?? null,
@@ -1133,7 +1154,7 @@ export class DecksService {
           return {
             id: randomUUID(),
             symbolRecordId,
-            entryId: entry.entryId?.trim() || randomUUID(),
+            entryId: entry.entryId ?? randomUUID(),
             label: entry.label,
             format: entry.format,
             bodyText: entry.bodyText ?? null,
@@ -1532,6 +1553,7 @@ export class DecksService {
 
     const symbolIds = new Set<string>();
     for (const symbol of payload.symbols) {
+      validateImportedSymbolRecord(symbol);
       if (symbolIds.has(symbol.symbolId)) {
         throw new ConflictException(`Duplicate symbolId "${symbol.symbolId}" in import payload.`);
       }
