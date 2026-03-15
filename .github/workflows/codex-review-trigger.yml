@@ -48,7 +48,7 @@ jobs:
               return;
             }
 
-            const body = `${marker}\n${mention} for regressions in correctness, reliability, security, and cost.\n\nContext:\n- Follow CHARTER.md and AGENTS.md\n- Prioritize P0/P1 findings\n- Flag behavior regressions and missing tests`;
+            const body = `${marker}\n${mention}`;
 
             await github.rest.issues.createComment({
               owner,

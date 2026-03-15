@@ -17,7 +17,8 @@ Codex code review can be requested by posting this exact mention in a pull reque
 - Every PR must include a Codex review trigger mention.
 - We enforce this by automation:
   - `.github/workflows/codex-review-trigger.yml` listens to PR open/reopen/ready-for-review events.
-  - On each PR head update (`synchronize`), the workflow posts a fresh `@codex review` trigger tied to the current head SHA.
+  - On each PR head update (`synchronize`), the workflow posts a fresh trigger comment tied to the current head SHA.
+  - The automated trigger comment itself is just the hidden SHA marker plus a standalone `@codex review`, so it matches the official Codex trigger format exactly.
   - This ensures fixes pushed after review feedback can retrigger a new Codex review pass automatically.
 - Contributors can still trigger manually by adding a PR comment with `@codex review`.
 
