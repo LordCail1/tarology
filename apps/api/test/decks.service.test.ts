@@ -245,6 +245,89 @@ describe("DecksService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects duplicate card entry identifiers in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.cardInformationEntries = [
+      {
+        entryId: "entry-card-1",
+        cardId: payload.cards[0].cardId,
+        label: "core-theme",
+        format: "plain_text",
+        bodyText: "First note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: [],
+        sortOrder: 0,
+      },
+      {
+        entryId: "entry-card-1",
+        cardId: payload.cards[0].cardId,
+        label: "second-note",
+        format: "plain_text",
+        bodyText: "Second note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: [],
+        sortOrder: 1,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate symbol entry identifiers in import payloads", async () => {
+    const { prisma, service } = createDecksService();
+    const payload = buildValidImportPayload();
+    payload.symbols = [
+      {
+        symbolId: "symbol-1",
+        name: "Lantern",
+        shortLabel: null,
+        description: null,
+        metadataJson: null,
+      },
+    ];
+    payload.symbolInformationEntries = [
+      {
+        entryId: "entry-symbol-1",
+        symbolId: "symbol-1",
+        label: "motif",
+        format: "plain_text",
+        bodyText: "First note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: [],
+        sortOrder: 0,
+      },
+      {
+        entryId: "entry-symbol-1",
+        symbolId: "symbol-1",
+        label: "motif-2",
+        format: "plain_text",
+        bodyText: "Second note",
+        bodyJson: null,
+        summary: null,
+        tags: [],
+        sourceIds: [],
+        sortOrder: 1,
+      },
+    ];
+
+    await expect(
+      service.importDeck("11111111-1111-1111-1111-111111111111", payload)
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("rejects card information entries with malformed sourceIds in import payloads", async () => {
     const { prisma, service } = createDecksService();
     const payload = buildValidImportPayload();
@@ -268,6 +351,57 @@ describe("DecksService", () => {
     ).rejects.toThrow(BadRequestException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string sourceIds in card entry update flows", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      knowledgeSource: {
+        findMany: vi.fn(),
+      },
+      cardInformationEntry: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+      card: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedCardDetail").mockResolvedValue({
+      id: "card-record-1",
+      deckId: "deck-owned-1",
+    });
+
+    await expect(
+      service.updateCard("11111111-1111-1111-1111-111111111111", "card-record-1", {
+        entries: [
+          {
+            entryId: "entry-card-update",
+            label: "core-theme",
+            format: "plain_text",
+            bodyText: "A note",
+            bodyJson: null,
+            summary: null,
+            tags: [],
+            sourceIds: [123 as unknown as string],
+            sortOrder: 0,
+          },
+        ],
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.knowledgeSource.findMany).not.toHaveBeenCalled();
+    expect(tx.cardInformationEntry.deleteMany).not.toHaveBeenCalled();
+    expect(tx.cardInformationEntry.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects symbol information entries with malformed sourceIds in import payloads", async () => {
@@ -302,6 +436,57 @@ describe("DecksService", () => {
     ).rejects.toThrow(BadRequestException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-string sourceIds in symbol entry update flows", async () => {
+    const { prisma, service } = createDecksService();
+
+    const tx = {
+      knowledgeSource: {
+        findMany: vi.fn(),
+      },
+      symbolInformationEntry: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      deck: {
+        update: vi.fn(),
+      },
+      symbol: {
+        update: vi.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback: (txArg: typeof tx) => unknown) =>
+      callback(tx)
+    );
+
+    vi.spyOn(service as any, "requireOwnedSymbolDetail").mockResolvedValue({
+      id: "symbol-record-1",
+      deckId: "deck-owned-1",
+    });
+
+    await expect(
+      service.updateSymbol("11111111-1111-1111-1111-111111111111", "symbol-record-1", {
+        entries: [
+          {
+            entryId: "entry-symbol-update",
+            label: "motif",
+            format: "plain_text",
+            bodyText: "A note",
+            bodyJson: null,
+            summary: null,
+            tags: [],
+            sourceIds: [123 as unknown as string],
+            sortOrder: 0,
+          },
+        ],
+      })
+    ).rejects.toThrow(BadRequestException);
+
+    expect(tx.knowledgeSource.findMany).not.toHaveBeenCalled();
+    expect(tx.symbolInformationEntry.deleteMany).not.toHaveBeenCalled();
+    expect(tx.symbolInformationEntry.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects duplicate knowledge source identifiers when replacing deck sources", async () => {

@@ -177,6 +177,26 @@ function requireImportEntrySourceIds(
   return sourceIds;
 }
 
+function ensureUniqueScopedEntryIds<
+  TEntry extends { entryId: string },
+  TScope extends string,
+>(
+  entries: TEntry[],
+  getScopeId: (entry: TEntry) => TScope,
+  message: string
+): void {
+  const seen = new Set<string>();
+
+  for (const entry of entries) {
+    const compositeKey = `${getScopeId(entry)}::${entry.entryId}`;
+    if (seen.has(compositeKey)) {
+      throw new ConflictException(message);
+    }
+
+    seen.add(compositeKey);
+  }
+}
+
 @Injectable()
 export class DecksService {
   constructor(
@@ -1058,7 +1078,23 @@ export class DecksService {
   ): Promise<void> {
     const referencedSourceIds = Array.from(
       new Set(
-        entries.flatMap((entry) => entry.sourceIds ?? []).filter((sourceId) => sourceId.trim().length > 0)
+        entries
+          .flatMap((entry) => {
+            if (entry.sourceIds == null) {
+              return [];
+            }
+            if (
+              !Array.isArray(entry.sourceIds) ||
+              entry.sourceIds.some((sourceId) => typeof sourceId !== "string")
+            ) {
+              throw new BadRequestException(
+                'Knowledge entry field "sourceIds" must be an array of strings when provided.'
+              );
+            }
+
+            return entry.sourceIds;
+          })
+          .filter((sourceId) => sourceId.trim().length > 0)
       )
     );
 
@@ -1394,6 +1430,12 @@ export class DecksService {
       }
     }
 
+    ensureUniqueScopedEntryIds(
+      payload.cardInformationEntries,
+      (entry) => entry.cardId,
+      "Duplicate card information entryIds are not allowed per card in import payload."
+    );
+
     for (const entry of payload.symbolInformationEntries) {
       if (!symbolIds.has(entry.symbolId)) {
         throw new BadRequestException(
@@ -1411,5 +1453,11 @@ export class DecksService {
         }
       }
     }
+
+    ensureUniqueScopedEntryIds(
+      payload.symbolInformationEntries,
+      (entry) => entry.symbolId,
+      "Duplicate symbol information entryIds are not allowed per symbol in import payload."
+    );
   }
 }
