@@ -16,12 +16,15 @@ import { getClientApiBaseUrl } from "./api-origin";
 export class ClientApiError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    readonly kind: "http" | "network" | "timeout" = "http"
   ) {
     super(message);
     this.name = "ClientApiError";
   }
 }
+
+const CLIENT_API_TIMEOUT_MS = 4_000;
 
 async function readErrorMessage(response: Response): Promise<string> {
   try {
@@ -47,19 +50,49 @@ async function readErrorMessage(response: Response): Promise<string> {
   return `Request failed with status ${response.status}.`;
 }
 
+async function fetchClientApi(
+  path: string,
+  init?: Omit<RequestInit, "credentials" | "cache">
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), CLIENT_API_TIMEOUT_MS);
+
+  try {
+    return await fetch(`${getClientApiBaseUrl()}${path}`, {
+      ...init,
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ClientApiError(
+        0,
+        `Request to ${path} timed out. Please try again.`,
+        "timeout"
+      );
+    }
+
+    const message =
+      error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : `Request to ${path} failed before the server responded.`;
+
+    throw new ClientApiError(0, message, "network");
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 async function requestJson<T>(
   path: string,
   init?: Omit<RequestInit, "credentials" | "cache">
 ): Promise<T> {
-  const response = await fetch(`${getClientApiBaseUrl()}${path}`, {
-    ...init,
-    credentials: "include",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const response = await fetchClientApi(path, init);
 
   if (!response.ok) {
     throw new ClientApiError(response.status, await readErrorMessage(response));
@@ -69,10 +102,8 @@ async function requestJson<T>(
 }
 
 export async function fetchSession(): Promise<GetSessionResponse | null> {
-  const response = await fetch(`${getClientApiBaseUrl()}/v1/auth/session`, {
+  const response = await fetchClientApi("/v1/auth/session", {
     method: "GET",
-    credentials: "include",
-    cache: "no-store",
   });
 
   if (response.status === 401) {
@@ -144,4 +175,11 @@ export function patchPreferences(
 
 export function isUnauthorizedClientApiError(error: unknown): boolean {
   return error instanceof ClientApiError && error.status === 401;
+}
+
+export function isTransientClientApiError(error: unknown): boolean {
+  return (
+    error instanceof ClientApiError &&
+    (error.kind === "network" || error.kind === "timeout")
+  );
 }

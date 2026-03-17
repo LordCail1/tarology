@@ -7,9 +7,11 @@ import {
   fetchDecks,
   fetchPreferences,
   fetchSession,
+  isTransientClientApiError,
   isUnauthorizedClientApiError,
   patchPreferences,
 } from "../../lib/client-api";
+import { retryTransientClientLoad } from "../../lib/retry-transient-client-load";
 
 interface OnboardingGateProps {
   returnTo: string;
@@ -42,38 +44,40 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
       setErrorMessage(null);
 
       try {
-        const session = await fetchSession();
-        if (cancelled) {
-          return;
-        }
+        await retryTransientClientLoad(async () => {
+          const session = await fetchSession();
+          if (cancelled) {
+            return;
+          }
 
-        if (!session) {
-          router.replace("/login?returnTo=%2Fonboarding");
-          return;
-        }
+          if (!session) {
+            router.replace("/login?returnTo=%2Fonboarding");
+            return;
+          }
 
-        const [{ preferences: loadedPreferences }, { decks: loadedDecks }] = await Promise.all([
-          fetchPreferences(),
-          fetchDecks(),
-        ]);
+          const [{ preferences: loadedPreferences }, { decks: loadedDecks }] = await Promise.all([
+            fetchPreferences(),
+            fetchDecks(),
+          ]);
 
-        if (cancelled) {
-          return;
-        }
+          if (cancelled) {
+            return;
+          }
 
-        if (loadedPreferences.defaultDeckId) {
-          router.replace(returnTo);
-          return;
-        }
+          if (loadedPreferences.defaultDeckId) {
+            router.replace(returnTo);
+            return;
+          }
 
-        if (loadedDecks.length === 0) {
-          throw new Error("No tarot decks are currently available for onboarding.");
-        }
+          if (loadedDecks.length === 0) {
+            throw new Error("No tarot decks are currently available for onboarding.");
+          }
 
-        setPreferences(loadedPreferences);
-        setDecks(loadedDecks);
-        setSelectedDeckId(loadedPreferences.defaultDeckId ?? loadedDecks[0].id);
-        setState("ready");
+          setPreferences(loadedPreferences);
+          setDecks(loadedDecks);
+          setSelectedDeckId(loadedPreferences.defaultDeckId ?? loadedDecks[0].id);
+          setState("ready");
+        });
       } catch (error) {
         if (cancelled) {
           return;
@@ -84,7 +88,11 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
           return;
         }
 
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(
+          isTransientClientApiError(error)
+            ? "Checking your session took too long. Please try again."
+            : getErrorMessage(error)
+        );
         setState("error");
       }
     }

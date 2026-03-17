@@ -7,8 +7,10 @@ import {
   fetchPreferences,
   fetchProfile,
   fetchSession,
+  isTransientClientApiError,
   isUnauthorizedClientApiError,
 } from "../../lib/client-api";
+import { retryTransientClientLoad } from "../../lib/retry-transient-client-load";
 import { ReadingStudioShell } from "./reading-studio-shell";
 
 type AuthGateStatus = "checking" | "ready" | "error";
@@ -37,33 +39,35 @@ export function ReadingAuthGate() {
       setErrorMessage(null);
 
       try {
-        const session = await fetchSession();
-        if (cancelled) {
-          return;
-        }
+        await retryTransientClientLoad(async () => {
+          const session = await fetchSession();
+          if (cancelled) {
+            return;
+          }
 
-        if (!session) {
-          router.replace("/login?returnTo=%2Freading");
-          return;
-        }
+          if (!session) {
+            router.replace("/login?returnTo=%2Freading");
+            return;
+          }
 
-        const [{ profile: loadedProfile }, { preferences: loadedPreferences }] = await Promise.all([
-          fetchProfile(),
-          fetchPreferences(),
-        ]);
+          const [{ profile: loadedProfile }, { preferences: loadedPreferences }] = await Promise.all([
+            fetchProfile(),
+            fetchPreferences(),
+          ]);
 
-        if (cancelled) {
-          return;
-        }
+          if (cancelled) {
+            return;
+          }
 
-        if (!loadedPreferences.defaultDeckId) {
-          router.replace("/onboarding?returnTo=%2Freading");
-          return;
-        }
+          if (!loadedPreferences.defaultDeckId) {
+            router.replace("/onboarding?returnTo=%2Freading");
+            return;
+          }
 
-        setProfile(loadedProfile);
-        setPreferences(loadedPreferences);
-        setAuthStatus("ready");
+          setProfile(loadedProfile);
+          setPreferences(loadedPreferences);
+          setAuthStatus("ready");
+        });
       } catch (error) {
         if (cancelled) {
           return;
@@ -74,7 +78,11 @@ export function ReadingAuthGate() {
           return;
         }
 
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(
+          isTransientClientApiError(error)
+            ? "Checking your session took too long. Please try again."
+            : getErrorMessage(error)
+        );
         setAuthStatus("error");
       }
     }

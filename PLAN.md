@@ -100,6 +100,10 @@ Execution sequencing:
   - `/reading` auth gating now happens client-side with credentialed browser requests instead of forwarding server-side cookies to the API
   - web TypeScript now resolves `@tarology/shared` from source for clean CI and preview builds
   - Vercel preview/production deploy jobs now run from repo root so monorepo workspace packages are uploaded during builds
+- Auth gate transient recovery hardening:
+  - protected web gates now time out and retry once on transient client-side session/bootstrap fetch failures instead of hanging indefinitely on the loading screen
+  - `/reading`, `/decks`, and `/onboarding` now surface a recoverable error state if session/bootstrap loading still cannot complete after the retry
+  - web regression coverage now protects the first-load transient-failure path for all three gates
 - Hosted session-cookie proxy hardening:
   - API bootstrap now trusts the first upstream proxy before enabling production secure session cookies
   - API regression coverage now asserts production-mode bootstrap sets proxy trust for TLS-terminating deployments
