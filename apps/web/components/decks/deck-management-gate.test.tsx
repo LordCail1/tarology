@@ -192,4 +192,83 @@ describe("DeckManagementGate", () => {
       expect(routerMock.replace).toHaveBeenCalledWith("/onboarding?returnTo=%2Fdecks")
     );
   });
+
+  it("retries once after a transient deck gate bootstrap failure", async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          authenticated: true,
+          user: {
+            userId: "usr_123",
+            provider: "google",
+            providerSubject: "123",
+            email: "reader@example.com",
+            displayName: "Reader",
+            avatarUrl: null,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          profile: {
+            userId: "usr_123",
+            email: "reader@example.com",
+            displayName: "Reader Example",
+            avatarUrl: null,
+            provider: "google",
+            createdAt: "2026-03-11T10:00:00.000Z",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          preferences: {
+            defaultDeckId: "thoth",
+            defaultDeck: {
+              id: "thoth",
+              name: "Thoth Tarot",
+              description: "Starter deck",
+              specVersion: "thoth-v1",
+              previewImageUrl: "/images/cards/thoth/TheSun.jpg",
+              backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
+              cardCount: 78,
+            },
+            onboardingComplete: true,
+            updatedAt: "2026-03-11T10:05:00.000Z",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decks: [
+            {
+              id: "thoth",
+              name: "Thoth Tarot",
+              description: "Starter deck",
+              specVersion: "thoth-v1",
+              previewImageUrl: "/images/cards/thoth/TheSun.jpg",
+              backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
+              cardCount: 78,
+            },
+          ],
+        }),
+      });
+
+    render(<DeckManagementGate />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Deck Management Shell")).toBeInTheDocument()
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
 });

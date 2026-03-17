@@ -16,11 +16,16 @@ import { getClientApiBaseUrl } from "./api-origin";
 export class ClientApiError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    readonly kind: "http" | "network" | "timeout" = "http"
   ) {
     super(message);
     this.name = "ClientApiError";
   }
+}
+
+interface ClientApiRequestOptions {
+  timeoutMs?: number;
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -47,19 +52,56 @@ async function readErrorMessage(response: Response): Promise<string> {
   return `Request failed with status ${response.status}.`;
 }
 
+async function fetchClientApi(
+  path: string,
+  init?: Omit<RequestInit, "credentials" | "cache">,
+  options?: ClientApiRequestOptions
+): Promise<Response> {
+  const controller = options?.timeoutMs ? new AbortController() : null;
+  const timeoutId =
+    controller && options?.timeoutMs
+      ? window.setTimeout(() => controller.abort(), options.timeoutMs)
+      : null;
+
+  try {
+    return await fetch(`${getClientApiBaseUrl()}${path}`, {
+      ...init,
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      signal: controller?.signal,
+    });
+  } catch (error) {
+    if (controller && error instanceof Error && error.name === "AbortError") {
+      throw new ClientApiError(
+        0,
+        `Request to ${path} timed out. Please try again.`,
+        "timeout"
+      );
+    }
+
+    const message =
+      error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : `Request to ${path} failed before the server responded.`;
+
+    throw new ClientApiError(0, message, "network");
+  } finally {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
 async function requestJson<T>(
   path: string,
-  init?: Omit<RequestInit, "credentials" | "cache">
+  init?: Omit<RequestInit, "credentials" | "cache">,
+  options?: ClientApiRequestOptions
 ): Promise<T> {
-  const response = await fetch(`${getClientApiBaseUrl()}${path}`, {
-    ...init,
-    credentials: "include",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const response = await fetchClientApi(path, init, options);
 
   if (!response.ok) {
     throw new ClientApiError(response.status, await readErrorMessage(response));
@@ -68,12 +110,10 @@ async function requestJson<T>(
   return (await response.json()) as T;
 }
 
-export async function fetchSession(): Promise<GetSessionResponse | null> {
-  const response = await fetch(`${getClientApiBaseUrl()}/v1/auth/session`, {
+export async function fetchSession(options?: ClientApiRequestOptions): Promise<GetSessionResponse | null> {
+  const response = await fetchClientApi("/v1/auth/session", {
     method: "GET",
-    credentials: "include",
-    cache: "no-store",
-  });
+  }, options);
 
   if (response.status === 401) {
     return null;
@@ -86,16 +126,16 @@ export async function fetchSession(): Promise<GetSessionResponse | null> {
   return (await response.json()) as GetSessionResponse;
 }
 
-export function fetchProfile(): Promise<GetProfileResponse> {
-  return requestJson<GetProfileResponse>("/v1/profile", { method: "GET" });
+export function fetchProfile(options?: ClientApiRequestOptions): Promise<GetProfileResponse> {
+  return requestJson<GetProfileResponse>("/v1/profile", { method: "GET" }, options);
 }
 
-export function fetchPreferences(): Promise<GetPreferencesResponse> {
-  return requestJson<GetPreferencesResponse>("/v1/preferences", { method: "GET" });
+export function fetchPreferences(options?: ClientApiRequestOptions): Promise<GetPreferencesResponse> {
+  return requestJson<GetPreferencesResponse>("/v1/preferences", { method: "GET" }, options);
 }
 
-export function fetchDecks(): Promise<GetDecksResponse> {
-  return requestJson<GetDecksResponse>("/v1/decks", { method: "GET" });
+export function fetchDecks(options?: ClientApiRequestOptions): Promise<GetDecksResponse> {
+  return requestJson<GetDecksResponse>("/v1/decks", { method: "GET" }, options);
 }
 
 export function fetchReadings(): Promise<ListReadingsResponse> {
@@ -144,4 +184,11 @@ export function patchPreferences(
 
 export function isUnauthorizedClientApiError(error: unknown): boolean {
   return error instanceof ClientApiError && error.status === 401;
+}
+
+export function isTransientClientApiError(error: unknown): boolean {
+  return (
+    error instanceof ClientApiError &&
+    (error.kind === "network" || error.kind === "timeout")
+  );
 }

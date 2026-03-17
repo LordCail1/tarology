@@ -94,11 +94,11 @@ describe("ReadingAuthGate", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "https://api.tarology.test/v1/auth/session",
-      {
+      expect.objectContaining({
         method: "GET",
         credentials: "include",
         cache: "no-store",
-      }
+      })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
@@ -236,5 +236,98 @@ describe("ReadingAuthGate", () => {
     );
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it("retries once after a transient session bootstrap failure", async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          authenticated: true,
+          user: {
+            userId: "usr_123",
+            provider: "google",
+            providerSubject: "123",
+            email: "reader@example.com",
+            displayName: "Reader",
+            avatarUrl: null,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          profile: {
+            userId: "usr_123",
+            email: "reader@example.com",
+            displayName: "Reader Example",
+            avatarUrl: null,
+            provider: "google",
+            createdAt: "2026-03-11T10:00:00.000Z",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          preferences: {
+            defaultDeckId: "thoth",
+            defaultDeck: {
+              id: "thoth",
+              name: "Thoth Tarot",
+              description: "Starter deck",
+              specVersion: "thoth-v1",
+              previewImageUrl: "/images/cards/thoth/TheSun.jpg",
+              backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
+              cardCount: 78,
+            },
+            onboardingComplete: true,
+            updatedAt: "2026-03-11T10:05:00.000Z",
+          },
+        }),
+      });
+
+    render(<ReadingAuthGate />);
+
+    await waitFor(() => expect(screen.getByText("Reading Studio Shell")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it("does not attach timeout abort signals to later non-gate reading mutations", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        preferences: {
+          defaultDeckId: "thoth",
+          defaultDeck: {
+            id: "thoth",
+            name: "Thoth Tarot",
+            description: "Starter deck",
+            specVersion: "thoth-v1",
+            previewImageUrl: "/images/cards/thoth/TheSun.jpg",
+            backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
+            cardCount: 78,
+          },
+          onboardingComplete: true,
+          updatedAt: "2026-03-11T10:10:00.000Z",
+        },
+      }),
+    });
+
+    const { patchPreferences } = await import("../../lib/client-api");
+    await patchPreferences({ defaultDeckId: "thoth" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.tarology.test/v1/preferences",
+      expect.not.objectContaining({
+        signal: expect.anything(),
+      })
+    );
   });
 });

@@ -305,4 +305,61 @@ describe("OnboardingGate", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
+
+  it("retries once after a transient onboarding bootstrap failure", async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          authenticated: true,
+          user: {
+            userId: "usr_123",
+            provider: "google",
+            providerSubject: "123",
+            email: "reader@example.com",
+            displayName: "Reader",
+            avatarUrl: null,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          preferences: {
+            defaultDeckId: null,
+            defaultDeck: null,
+            onboardingComplete: false,
+            updatedAt: "2026-03-11T10:05:00.000Z",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decks: [
+            {
+              id: "thoth",
+              name: "Thoth Tarot",
+              description: "Starter deck",
+              specVersion: "thoth-v1",
+              previewImageUrl: "/images/cards/thoth/TheSun.jpg",
+              backImageUrl: "/images/cards/thoth/backofcard/BackOfCard.jpg",
+              cardCount: 78,
+            },
+          ],
+        }),
+      });
+
+    render(<OnboardingGate returnTo="/reading" />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Choose your default tarot deck" })).toBeInTheDocument()
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
 });
