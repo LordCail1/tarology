@@ -24,7 +24,9 @@ export class ClientApiError extends Error {
   }
 }
 
-const CLIENT_API_TIMEOUT_MS = 4_000;
+interface ClientApiRequestOptions {
+  timeoutMs?: number;
+}
 
 async function readErrorMessage(response: Response): Promise<string> {
   try {
@@ -52,10 +54,14 @@ async function readErrorMessage(response: Response): Promise<string> {
 
 async function fetchClientApi(
   path: string,
-  init?: Omit<RequestInit, "credentials" | "cache">
+  init?: Omit<RequestInit, "credentials" | "cache">,
+  options?: ClientApiRequestOptions
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), CLIENT_API_TIMEOUT_MS);
+  const controller = options?.timeoutMs ? new AbortController() : null;
+  const timeoutId =
+    controller && options?.timeoutMs
+      ? window.setTimeout(() => controller.abort(), options.timeoutMs)
+      : null;
 
   try {
     return await fetch(`${getClientApiBaseUrl()}${path}`, {
@@ -66,10 +72,10 @@ async function fetchClientApi(
         "Content-Type": "application/json",
         ...(init?.headers ?? {}),
       },
-      signal: controller.signal,
+      signal: controller?.signal,
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (controller && error instanceof Error && error.name === "AbortError") {
       throw new ClientApiError(
         0,
         `Request to ${path} timed out. Please try again.`,
@@ -84,15 +90,18 @@ async function fetchClientApi(
 
     throw new ClientApiError(0, message, "network");
   } finally {
-    window.clearTimeout(timeoutId);
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
   }
 }
 
 async function requestJson<T>(
   path: string,
-  init?: Omit<RequestInit, "credentials" | "cache">
+  init?: Omit<RequestInit, "credentials" | "cache">,
+  options?: ClientApiRequestOptions
 ): Promise<T> {
-  const response = await fetchClientApi(path, init);
+  const response = await fetchClientApi(path, init, options);
 
   if (!response.ok) {
     throw new ClientApiError(response.status, await readErrorMessage(response));
@@ -101,10 +110,10 @@ async function requestJson<T>(
   return (await response.json()) as T;
 }
 
-export async function fetchSession(): Promise<GetSessionResponse | null> {
+export async function fetchSession(options?: ClientApiRequestOptions): Promise<GetSessionResponse | null> {
   const response = await fetchClientApi("/v1/auth/session", {
     method: "GET",
-  });
+  }, options);
 
   if (response.status === 401) {
     return null;
@@ -117,16 +126,16 @@ export async function fetchSession(): Promise<GetSessionResponse | null> {
   return (await response.json()) as GetSessionResponse;
 }
 
-export function fetchProfile(): Promise<GetProfileResponse> {
-  return requestJson<GetProfileResponse>("/v1/profile", { method: "GET" });
+export function fetchProfile(options?: ClientApiRequestOptions): Promise<GetProfileResponse> {
+  return requestJson<GetProfileResponse>("/v1/profile", { method: "GET" }, options);
 }
 
-export function fetchPreferences(): Promise<GetPreferencesResponse> {
-  return requestJson<GetPreferencesResponse>("/v1/preferences", { method: "GET" });
+export function fetchPreferences(options?: ClientApiRequestOptions): Promise<GetPreferencesResponse> {
+  return requestJson<GetPreferencesResponse>("/v1/preferences", { method: "GET" }, options);
 }
 
-export function fetchDecks(): Promise<GetDecksResponse> {
-  return requestJson<GetDecksResponse>("/v1/decks", { method: "GET" });
+export function fetchDecks(options?: ClientApiRequestOptions): Promise<GetDecksResponse> {
+  return requestJson<GetDecksResponse>("/v1/decks", { method: "GET" }, options);
 }
 
 export function fetchReadings(): Promise<ListReadingsResponse> {

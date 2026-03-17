@@ -11,7 +11,10 @@ import {
   isTransientClientApiError,
   isUnauthorizedClientApiError,
 } from "../../lib/client-api";
-import { retryTransientClientLoad } from "../../lib/retry-transient-client-load";
+import {
+  GATE_BOOTSTRAP_TIMEOUT_MS,
+  retryTransientClientLoad,
+} from "../../lib/retry-transient-client-load";
 import { DeckManagementShell } from "./deck-management-shell";
 
 type DeckGateStatus = "checking" | "ready" | "error";
@@ -42,7 +45,7 @@ export function DeckManagementGate() {
 
       try {
         await retryTransientClientLoad(async () => {
-          const session = await fetchSession();
+          const session = await fetchSession({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS });
           if (cancelled) {
             return;
           }
@@ -53,7 +56,11 @@ export function DeckManagementGate() {
           }
 
           const [{ profile: loadedProfile }, { preferences: loadedPreferences }, { decks: loadedDecks }] =
-            await Promise.all([fetchProfile(), fetchPreferences(), fetchDecks()]);
+            await Promise.all([
+              fetchProfile({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
+              fetchPreferences({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
+              fetchDecks({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
+            ]);
 
           if (cancelled) {
             return;

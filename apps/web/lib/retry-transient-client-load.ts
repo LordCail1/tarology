@@ -1,5 +1,7 @@
 import { isTransientClientApiError } from "./client-api";
 
+export const GATE_BOOTSTRAP_TIMEOUT_MS = 4_000;
+
 const MAX_TRANSIENT_LOAD_ATTEMPTS = 2;
 
 export async function retryTransientClientLoad(task: () => Promise<void>): Promise<void> {

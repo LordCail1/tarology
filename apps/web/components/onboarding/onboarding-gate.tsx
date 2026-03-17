@@ -11,7 +11,10 @@ import {
   isUnauthorizedClientApiError,
   patchPreferences,
 } from "../../lib/client-api";
-import { retryTransientClientLoad } from "../../lib/retry-transient-client-load";
+import {
+  GATE_BOOTSTRAP_TIMEOUT_MS,
+  retryTransientClientLoad,
+} from "../../lib/retry-transient-client-load";
 
 interface OnboardingGateProps {
   returnTo: string;
@@ -45,7 +48,7 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
 
       try {
         await retryTransientClientLoad(async () => {
-          const session = await fetchSession();
+          const session = await fetchSession({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS });
           if (cancelled) {
             return;
           }
@@ -56,8 +59,8 @@ export function OnboardingGate({ returnTo }: OnboardingGateProps) {
           }
 
           const [{ preferences: loadedPreferences }, { decks: loadedDecks }] = await Promise.all([
-            fetchPreferences(),
-            fetchDecks(),
+            fetchPreferences({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
+            fetchDecks({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
           ]);
 
           if (cancelled) {

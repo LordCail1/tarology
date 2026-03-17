@@ -10,7 +10,10 @@ import {
   isTransientClientApiError,
   isUnauthorizedClientApiError,
 } from "../../lib/client-api";
-import { retryTransientClientLoad } from "../../lib/retry-transient-client-load";
+import {
+  GATE_BOOTSTRAP_TIMEOUT_MS,
+  retryTransientClientLoad,
+} from "../../lib/retry-transient-client-load";
 import { ReadingStudioShell } from "./reading-studio-shell";
 
 type AuthGateStatus = "checking" | "ready" | "error";
@@ -40,7 +43,7 @@ export function ReadingAuthGate() {
 
       try {
         await retryTransientClientLoad(async () => {
-          const session = await fetchSession();
+          const session = await fetchSession({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS });
           if (cancelled) {
             return;
           }
@@ -51,8 +54,8 @@ export function ReadingAuthGate() {
           }
 
           const [{ profile: loadedProfile }, { preferences: loadedPreferences }] = await Promise.all([
-            fetchProfile(),
-            fetchPreferences(),
+            fetchProfile({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
+            fetchPreferences({ timeoutMs: GATE_BOOTSTRAP_TIMEOUT_MS }),
           ]);
 
           if (cancelled) {
