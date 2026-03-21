@@ -360,6 +360,21 @@ describe("CanvasPanel", () => {
     );
   });
 
+  it("keeps Space keyboard activation on focused canvas controls", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    const fitSpreadButton = screen.getByRole("button", { name: "Fit Spread" });
+    fitSpreadButton.focus();
+
+    fireEvent.keyDown(window, { key: " ", code: "Space", charCode: 32 });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-pan-ready", "false");
+    });
+    expect(document.activeElement).toBe(fitSpreadButton);
+  });
+
   it("pans freeform immediately on wheel input", async () => {
     render(<CanvasPanelHarness />);
 

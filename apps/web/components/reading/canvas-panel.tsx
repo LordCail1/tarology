@@ -175,6 +175,18 @@ function isTextEntryElement(element: Element | null): boolean {
   );
 }
 
+function isKeyboardActivationElement(element: Element | null): boolean {
+  if (!element) {
+    return false;
+  }
+
+  return Boolean(
+    element.closest(
+      'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"]'
+    )
+  );
+}
+
 function isCardElement(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(".reading-canvas-card"));
 }
@@ -294,7 +306,10 @@ export function CanvasPanel({
       }
 
       const activeElement = document.activeElement;
-      if (activeElement && isTextEntryElement(activeElement)) {
+      if (
+        activeElement &&
+        (isTextEntryElement(activeElement) || isKeyboardActivationElement(activeElement))
+      ) {
         return;
       }
 
@@ -710,7 +725,9 @@ export function CanvasPanel({
       top: `${position.yPx}px`,
       zIndex:
         activeMode === "freeform"
-          ? card.freeform.stackOrder
+          ? dragState?.cardId === card.id
+            ? 999
+            : card.freeform.stackOrder
           : card.grid.row * 10 + card.grid.column + 1,
       transform: `rotate(${card.rotationDeg}deg)`,
     };
