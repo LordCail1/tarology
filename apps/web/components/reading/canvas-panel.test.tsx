@@ -471,6 +471,50 @@ describe("CanvasPanel", () => {
     });
   });
 
+  it("uses the live freeform camera while dragging cards", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    const magicianCard = screen.getByRole("button", { name: "The Magician card" });
+
+    fireEvent.mouseDown(magicianCard, {
+      button: 0,
+      buttons: 1,
+      clientX: 80,
+      clientY: 120,
+    });
+
+    fireEvent.wheel(viewport, {
+      deltaX: 50,
+      deltaY: 20,
+      deltaMode: 0,
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-50");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-20");
+    });
+
+    fireEvent.mouseMove(window, {
+      button: 0,
+      buttons: 1,
+      clientX: 180,
+      clientY: 220,
+    });
+
+    await waitFor(() => {
+      expect(magicianCard.style.left).toBe("190px");
+      expect(magicianCard.style.top).toBe("192px");
+    });
+
+    fireEvent.mouseUp(window, {
+      button: 0,
+      buttons: 0,
+      clientX: 180,
+      clientY: 220,
+    });
+  });
+
   it("pans freeform through the pointer-event background path", async () => {
     await withMockPointerEvent(async () => {
       render(<CanvasPanelHarness />);

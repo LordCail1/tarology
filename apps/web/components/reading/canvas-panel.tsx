@@ -73,7 +73,6 @@ interface DragState {
   pointerId: number | null;
   pointerOffsetXPx: number;
   pointerOffsetYPx: number;
-  freeformViewState: FreeformViewState | null;
   gridMetrics: CanvasMetrics | null;
   freeform: {
     xPx: number;
@@ -273,8 +272,11 @@ export function CanvasPanel({
   const [freeformViewState, setFreeformViewState] = useState<FreeformViewState>(() =>
     getDefaultFreeformViewState()
   );
+  const freeformViewStateRef = useRef(freeformViewState);
   const supportsPointerEvents =
     typeof window !== "undefined" && typeof window.PointerEvent === "function";
+
+  freeformViewStateRef.current = freeformViewState;
 
   const activeMode = workspace.canvas.activeMode;
   const isFreeformMode = activeMode === "freeform";
@@ -880,12 +882,6 @@ export function CanvasPanel({
           : null,
       pointerOffsetXPx: pointer.xPx - currentPosition.xPx,
       pointerOffsetYPx: pointer.yPx - currentPosition.yPx,
-      freeformViewState:
-        activeMode === "freeform"
-          ? {
-              ...freeformViewState,
-            }
-          : null,
       gridMetrics:
         activeMode === "grid"
           ? {
@@ -924,7 +920,9 @@ export function CanvasPanel({
         viewportElement: viewportRef.current,
         mode: initialDragState.mode,
         freeformViewState:
-          initialDragState.freeformViewState ?? getDefaultFreeformViewState(),
+          initialDragState.mode === "freeform"
+            ? freeformViewStateRef.current
+            : getDefaultFreeformViewState(),
       });
 
       if (!nextPoint) {
