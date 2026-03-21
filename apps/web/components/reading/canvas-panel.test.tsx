@@ -481,6 +481,21 @@ describe("CanvasPanel", () => {
         expect(viewport).toHaveAttribute("data-view-pan-y", "70");
       });
 
+      fireEvent.pointerDown(viewport, {
+        button: 0,
+        buttons: 1,
+        clientX: 520,
+        clientY: 460,
+        pointerId: 2,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-panning", "true");
+        expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+      });
+
       fireEvent.pointerMove(window, {
         button: 0,
         buttons: 1,
@@ -878,5 +893,30 @@ describe("CanvasPanel", () => {
       expect(viewport).toHaveAttribute("data-view-pan-y", "-160");
       expect(viewport).toHaveAttribute("data-view-zoom", "0.800");
     });
+  });
+
+  it("hydrates a persisted freeform camera on direct mount", () => {
+    const activeReadingId =
+      readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
+    writePersistedFreeformViewState(
+      window.localStorage,
+      activeReadingId,
+      {
+        panXPx: -180,
+        panYPx: -120,
+        zoomLevel: 0.75,
+      },
+      {
+        widthPx: 960,
+        heightPx: 640,
+      }
+    );
+
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    expect(viewport).toHaveAttribute("data-view-pan-x", "-180");
+    expect(viewport).toHaveAttribute("data-view-pan-y", "-120");
+    expect(viewport).toHaveAttribute("data-view-zoom", "0.750");
   });
 });

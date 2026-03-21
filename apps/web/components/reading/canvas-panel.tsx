@@ -265,6 +265,7 @@ export function CanvasPanel({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [spacePanArmed, setSpacePanArmed] = useState(false);
+  const activePanPointerIdRef = useRef<number | "mouse" | null>(null);
   const [viewportMetrics, setViewportMetrics] = useState(() =>
     resolveCanvasMetrics(undefined)
   );
@@ -366,7 +367,7 @@ export function CanvasPanel({
   }, [workspace.reading.id]);
 
   useLayoutEffect(() => {
-    if (!isFreeformMode || !hasMeasuredViewportRef.current) {
+    if (!isFreeformMode) {
       return;
     }
 
@@ -374,13 +375,34 @@ export function CanvasPanel({
       return;
     }
 
+    let resolvedViewportMetrics: CanvasMetrics | null = null;
+    const viewportElement = viewportRef.current;
+    if (viewportElement) {
+      const measuredViewportMetrics = readViewportMetrics(viewportElement);
+      resolvedViewportMetrics = measuredViewportMetrics;
+      hasMeasuredViewportRef.current = true;
+
+      if (
+        measuredViewportMetrics.widthPx !== viewportMetrics.widthPx ||
+        measuredViewportMetrics.heightPx !== viewportMetrics.heightPx
+      ) {
+        setViewportMetrics(measuredViewportMetrics);
+      }
+    } else if (hasMeasuredViewportRef.current) {
+      resolvedViewportMetrics = resolveCanvasMetrics(viewportMetrics);
+    }
+
+    if (!resolvedViewportMetrics) {
+      return;
+    }
+
     const persistedViewState = readPersistedFreeformViewState(
       storageRef.current,
       workspace.reading.id,
-      viewportMetrics
+      resolvedViewportMetrics
     );
     setFreeformViewState(persistedViewState);
-    previousMeasuredViewportRef.current = viewportMetrics;
+    previousMeasuredViewportRef.current = resolvedViewportMetrics;
     hydratedReadingIdRef.current = workspace.reading.id;
   }, [
     isFreeformMode,
@@ -511,7 +533,7 @@ export function CanvasPanel({
     };
   }, [isFreeformMode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const viewportElement = viewportRef.current;
     if (!viewportElement) {
       return;
@@ -713,9 +735,9 @@ export function CanvasPanel({
     options?: {
       allowPrimaryButton?: boolean;
     }
-  ) {
+  ): boolean {
     if (!isFreeformMode) {
-      return;
+      return false;
     }
 
     const shouldStartPan =
@@ -723,7 +745,11 @@ export function CanvasPanel({
       (event.button === 0 && (spacePanArmed || options?.allowPrimaryButton));
 
     if (!shouldStartPan) {
-      return;
+      return false;
+    }
+
+    if (activePanPointerIdRef.current !== null) {
+      return false;
     }
 
     ensureCurrentFreeformPersistenceContext();
@@ -744,8 +770,12 @@ export function CanvasPanel({
       upEventName: event.type === "pointerdown" ? "pointerup" : "mouseup",
     };
     const cancelEventName = event.type === "pointerdown" ? "pointercancel" : null;
+    activePanPointerIdRef.current = initialPanState.pointerId ?? "mouse";
 
     function endViewportPan() {
+      if (activePanPointerIdRef.current === (initialPanState.pointerId ?? "mouse")) {
+        activePanPointerIdRef.current = null;
+      }
       setIsPanning(false);
       window.removeEventListener(initialPanState.moveEventName, handlePointerMove);
       window.removeEventListener(initialPanState.upEventName, handlePointerUp);
@@ -799,6 +829,7 @@ export function CanvasPanel({
       window.addEventListener(cancelEventName, handlePointerUp);
     }
     window.addEventListener("blur", endViewportPan);
+    return true;
   }
 
   function beginCardDrag(card: ReadingCanvasCard, event: DragStartEvent) {
@@ -1127,8 +1158,9 @@ export function CanvasPanel({
         onMouseDownCapture={(event) => beginViewportPan(event)}
         onPointerDown={(event) => {
           if (isFreeformMode && !isCardElement(event.target)) {
-            onSelectCard(null);
-            beginViewportPan(event, { allowPrimaryButton: true });
+            if (beginViewportPan(event, { allowPrimaryButton: true })) {
+              onSelectCard(null);
+            }
           }
         }}
         onMouseDown={(event) => {
@@ -1137,8 +1169,9 @@ export function CanvasPanel({
             !supportsPointerEvents &&
             !isCardElement(event.target)
           ) {
-            onSelectCard(null);
-            beginViewportPan(event, { allowPrimaryButton: true });
+            if (beginViewportPan(event, { allowPrimaryButton: true })) {
+              onSelectCard(null);
+            }
           }
         }}
         onAuxClick={(event) => {
