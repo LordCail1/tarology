@@ -18,7 +18,6 @@ export const MIN_CANVAS_ZOOM = 0.05;
 export const MAX_CANVAS_ZOOM = 1.8;
 export const DEFAULT_CANVAS_ZOOM = 1;
 export const CANVAS_ZOOM_STEP = 0.1;
-export const VIEWPORT_REVEAL_PADDING_PX = 24;
 
 export interface CanvasMetrics {
   widthPx: number;
@@ -189,45 +188,22 @@ export function resolveZoomedFreeformViewState(options: {
   };
 }
 
-export function resolveViewportRevealViewState(options: {
-  viewportMetrics: Partial<CanvasMetrics> | undefined;
+export function resolveViewportCenteredFreeformViewState(options: {
+  previousViewportMetrics: Partial<CanvasMetrics> | undefined;
+  nextViewportMetrics: Partial<CanvasMetrics> | undefined;
   viewState: FreeformViewState;
-  targetRect: CanvasViewRect;
-  paddingPx?: number;
-}): FreeformViewState | null {
-  const viewportMetrics = resolveCanvasMetrics(options.viewportMetrics);
+}): FreeformViewState {
+  const previousViewportMetrics = resolveCanvasMetrics(options.previousViewportMetrics);
+  const nextViewportMetrics = resolveCanvasMetrics(options.nextViewportMetrics);
   const zoomLevel = clampCanvasZoom(options.viewState.zoomLevel);
-  const paddingPx = Math.max(0, options.paddingPx ?? VIEWPORT_REVEAL_PADDING_PX);
-  const targetLeftPx = options.targetRect.leftPx * zoomLevel + options.viewState.panXPx;
-  const targetTopPx = options.targetRect.topPx * zoomLevel + options.viewState.panYPx;
-  const targetRightPx = targetLeftPx + options.targetRect.widthPx * zoomLevel;
-  const targetBottomPx = targetTopPx + options.targetRect.heightPx * zoomLevel;
-
-  let nextPanXPx = options.viewState.panXPx;
-  let nextPanYPx = options.viewState.panYPx;
-
-  if (targetLeftPx < paddingPx) {
-    nextPanXPx += paddingPx - targetLeftPx;
-  } else if (targetRightPx > viewportMetrics.widthPx - paddingPx) {
-    nextPanXPx -= targetRightPx - (viewportMetrics.widthPx - paddingPx);
-  }
-
-  if (targetTopPx < paddingPx) {
-    nextPanYPx += paddingPx - targetTopPx;
-  } else if (targetBottomPx > viewportMetrics.heightPx - paddingPx) {
-    nextPanYPx -= targetBottomPx - (viewportMetrics.heightPx - paddingPx);
-  }
-
-  if (
-    nextPanXPx === options.viewState.panXPx &&
-    nextPanYPx === options.viewState.panYPx
-  ) {
-    return null;
-  }
+  const centerWorldPoint = {
+    xPx: (previousViewportMetrics.widthPx / 2 - options.viewState.panXPx) / zoomLevel,
+    yPx: (previousViewportMetrics.heightPx / 2 - options.viewState.panYPx) / zoomLevel,
+  };
 
   return {
-    panXPx: nextPanXPx,
-    panYPx: nextPanYPx,
+    panXPx: nextViewportMetrics.widthPx / 2 - centerWorldPoint.xPx * zoomLevel,
+    panYPx: nextViewportMetrics.heightPx / 2 - centerWorldPoint.yPx * zoomLevel,
     zoomLevel,
   };
 }

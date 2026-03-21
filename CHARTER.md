@@ -164,7 +164,10 @@ V1 support policy:
   - freeform canvas layout changes must adjust the viewport rather than rewriting saved card positions.
   - freeform is an infinite desktop canvas with a local camera/view layer rather than native browser scrollbars.
   - if the viewport becomes smaller than the spread, cards remain reachable through panning.
-  - selected or recently interacted cards receive visibility priority after layout changes.
+  - the world-space coordinate at the center of the visible freeform viewport remains centered after browser resizing or desktop sidebar expand/collapse.
+  - cards may leave the viewport after those layout changes; that is acceptable.
+  - the app must not auto-pan or edge-compensate just to keep a selected or recently touched card visible.
+  - `Fit Spread` is the explicit recovery tool when the reader wants to reframe the spread.
 
 ### 5.2 Core Journey
 1. User logs in with Google.

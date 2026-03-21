@@ -93,7 +93,10 @@ V1 support policy:
   - card positions are stable world coordinates and must not be rewritten because panels collapse, panels resize, or the browser viewport changes,
   - freeform is an infinite desktop canvas driven by a local camera/view layer rather than native browser scrollbars,
   - if the visible viewport becomes smaller than the spread, the canvas remains reachable via panning rather than destructive repositioning,
-  - the selected card, or most recently interacted card when nothing is selected, receives visibility priority after layout changes,
+  - the world-space coordinate at the center of the visible freeform viewport remains centered after browser resizing or desktop sidebar expand/collapse,
+  - cards may leave the viewport after those layout changes; that is acceptable,
+  - the app must not auto-pan or edge-compensate just to keep a selected or recently touched card visible,
+  - `Fit Spread` is the explicit recovery tool when the reader wants to reframe the spread,
   - zoom and pan belong to view state, not canonical reading state,
   - freeform supports background drag panning, middle-mouse panning, `Space + drag`, plain wheel/trackpad panning, and `Ctrl/Cmd + wheel` zoom.
 

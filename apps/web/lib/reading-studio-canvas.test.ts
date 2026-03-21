@@ -8,7 +8,7 @@ import {
   resolveFreeformFitViewState,
   resolveFreeformViewportPoint,
   resolveGridPixelPosition,
-  resolveViewportRevealViewState,
+  resolveViewportCenteredFreeformViewState,
   resolveZoomedFreeformViewState,
   snapGridPosition,
 } from "./reading-studio-canvas";
@@ -136,29 +136,27 @@ describe("reading-studio-canvas", () => {
     });
   });
 
-  it("nudges the camera only enough to keep a card visible", () => {
+  it("stabilizes the center world point across viewport size changes", () => {
     expect(
-      resolveViewportRevealViewState({
-        viewportMetrics: {
-          widthPx: 560,
-          heightPx: 420,
+      resolveViewportCenteredFreeformViewState({
+        previousViewportMetrics: {
+          widthPx: 1000,
+          heightPx: 600,
+        },
+        nextViewportMetrics: {
+          widthPx: 600,
+          heightPx: 400,
         },
         viewState: {
-          panXPx: -120,
-          panYPx: 20,
-          zoomLevel: 1,
-        },
-        targetRect: {
-          leftPx: 620,
-          topPx: 60,
-          widthPx: 124,
-          heightPx: 196,
+          panXPx: 50,
+          panYPx: -30,
+          zoomLevel: 1.5,
         },
       })
     ).toEqual({
-      panXPx: -208,
-      panYPx: 20,
-      zoomLevel: 1,
+      panXPx: -150,
+      panYPx: -130,
+      zoomLevel: 1.5,
     });
   });
 

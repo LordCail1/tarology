@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
 import { resolveGridPixelPosition } from "../../lib/reading-studio-canvas";
@@ -68,82 +68,6 @@ function CanvasPanelHarness(props?: {
   );
 }
 
-function LayoutShiftHarness() {
-  const activeReadingId =
-    readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
-  const [layoutSignature, setLayoutSignature] = useState("desktop:wide");
-  const [workspace, setWorkspace] = useState<ReadingStudioWorkspace>(() => {
-    const seedWorkspace = structuredClone(readingStudioSeedSnapshot.workspaces[activeReadingId]);
-    seedWorkspace.canvas.cards = seedWorkspace.canvas.cards.map((card, index) =>
-      index === 0
-        ? {
-            ...card,
-            freeform: {
-              ...card.freeform,
-              xPx: 860,
-              yPx: 88,
-            },
-          }
-        : card
-    );
-    return seedWorkspace;
-  });
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(
-    workspace.canvas.cards[0]?.id ?? null
-  );
-
-  return (
-    <>
-      <button type="button" onClick={() => setLayoutSignature("desktop:narrow")}>
-        Shrink layout
-      </button>
-      <CanvasPanel
-        workspace={workspace}
-        selectedCardId={selectedCardId}
-        layoutSignature={layoutSignature}
-        isLayoutResizing={false}
-        onOpenLeftPanel={() => undefined}
-        onOpenRightPanel={() => undefined}
-        onSelectCard={setSelectedCardId}
-        onModeChange={(mode) =>
-          setWorkspace((current) =>
-            applyWorkspaceAction(current, {
-              type: "workspace.modeSwitched",
-              mode,
-            })
-          )
-        }
-        onMoveCard={(cardId, payload) =>
-          setWorkspace((current) =>
-            applyWorkspaceAction(current, {
-              type: "workspace.cardMoved",
-              cardId,
-              ...payload,
-            })
-          )
-        }
-        onRotateCard={(cardId, deltaDeg) =>
-          setWorkspace((current) =>
-            applyWorkspaceAction(current, {
-              type: "workspace.cardRotated",
-              cardId,
-              deltaDeg,
-            })
-          )
-        }
-        onFlipCard={(cardId) =>
-          setWorkspace((current) =>
-            applyWorkspaceAction(current, {
-              type: "workspace.cardFlipped",
-              cardId,
-            })
-          )
-        }
-      />
-    </>
-  );
-}
-
 function WideSpreadHarness() {
   const activeReadingId =
     readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
@@ -175,6 +99,19 @@ function WideSpreadHarness() {
   });
 
   return <CanvasPanelHarness workspace={workspace} />;
+}
+
+function LayoutShiftHarness() {
+  const [layoutSignature, setLayoutSignature] = useState("desktop:wide");
+
+  return (
+    <>
+      <button type="button" onClick={() => setLayoutSignature("desktop:narrow")}>
+        Shrink layout
+      </button>
+      <CanvasPanelHarness layoutSignature={layoutSignature} />
+    </>
+  );
 }
 
 function dispatchMouseDrag(
@@ -444,8 +381,41 @@ describe("CanvasPanel", () => {
     render(<CanvasPanelHarness />);
 
     const viewport = screen.getByLabelText("Reading canvas viewport");
+    const wheelEvent = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -200,
+      deltaMode: 0,
+      ctrlKey: true,
+      clientX: 360,
+      clientY: 240,
+    });
+    act(() => {
+      viewport.dispatchEvent(wheelEvent);
+    });
 
-    fireEvent.wheel(viewport, {
+    await waitFor(() => {
+      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeGreaterThan(1);
+    });
+    expect(wheelEvent.defaultPrevented).toBe(true);
+  });
+
+  it("compounds rapid Ctrl plus wheel zoom bursts from the latest view state", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    const firstWheelEvent = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -200,
+      deltaMode: 0,
+      ctrlKey: true,
+      clientX: 360,
+      clientY: 240,
+    });
+    const secondWheelEvent = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
       deltaY: -200,
       deltaMode: 0,
       ctrlKey: true,
@@ -453,17 +423,24 @@ describe("CanvasPanel", () => {
       clientY: 240,
     });
 
-    await waitFor(() => {
-      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeGreaterThan(1);
+    act(() => {
+      viewport.dispatchEvent(firstWheelEvent);
+      viewport.dispatchEvent(secondWheelEvent);
     });
+
+    await waitFor(() => {
+      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeCloseTo(1.8, 3);
+    });
+    expect(firstWheelEvent.defaultPrevented).toBe(true);
+    expect(secondWheelEvent.defaultPrevented).toBe(true);
   });
 
-  it("auto-pans just enough to keep the active card visible after layout tightening", async () => {
+  it("keeps the same world center after layout tightening", async () => {
     render(<LayoutShiftHarness />);
 
     const viewport = screen.getByLabelText("Reading canvas viewport");
-    let viewportWidthPx = 1280;
-    let viewportHeightPx = 620;
+    let viewportWidthPx = 960;
+    let viewportHeightPx = 640;
 
     Object.defineProperty(viewport, "clientWidth", {
       configurable: true,
@@ -483,7 +460,8 @@ describe("CanvasPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Shrink layout" }));
 
     await waitFor(() => {
-      expect(Number(viewport.getAttribute("data-view-pan-x"))).toBeLessThan(0);
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-200");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-50");
     });
   });
 

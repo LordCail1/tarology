@@ -5,7 +5,6 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 import {
   CANVAS_ZOOM_STEP,
@@ -23,7 +22,7 @@ import {
   resolveFreeformFitViewState,
   resolveFreeformViewportPoint,
   resolveGridPixelPosition,
-  resolveViewportRevealViewState,
+  resolveViewportCenteredFreeformViewState,
   resolveZoomedFreeformViewState,
   snapGridPosition,
   type CanvasMetrics,
@@ -214,6 +213,8 @@ export function CanvasPanel({
   onFlipCard,
 }: CanvasPanelProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const hasMeasuredViewportRef = useRef(false);
+  const previousMeasuredViewportRef = useRef<CanvasMetrics | null>(null);
   const storageRef = useRef<Storage | undefined>(
     typeof window === "undefined" ? undefined : window.localStorage
   );
@@ -223,7 +224,6 @@ export function CanvasPanel({
   const [viewportMetrics, setViewportMetrics] = useState(() =>
     resolveCanvasMetrics(undefined)
   );
-  const [lastInteractedCardId, setLastInteractedCardId] = useState<string | null>(null);
   const [freeformViewState, setFreeformViewState] = useState<FreeformViewState>(() =>
     getDefaultFreeformViewState()
   );
@@ -268,14 +268,7 @@ export function CanvasPanel({
       workspace.reading.id
     );
     setFreeformViewState(persistedViewState);
-    setLastInteractedCardId(null);
   }, [workspace.reading.id]);
-
-  useEffect(() => {
-    if (selectedCardId) {
-      setLastInteractedCardId(selectedCardId);
-    }
-  }, [selectedCardId]);
 
   useEffect(() => {
     const timeoutHandle = window.setTimeout(() => {
@@ -337,7 +330,14 @@ export function CanvasPanel({
     }
 
     const measureViewport = () => {
-      setViewportMetrics(readViewportMetrics(viewportElement));
+      const nextViewportMetrics = readViewportMetrics(viewportElement);
+
+      if (!hasMeasuredViewportRef.current) {
+        hasMeasuredViewportRef.current = true;
+        previousMeasuredViewportRef.current = nextViewportMetrics;
+      }
+
+      setViewportMetrics(nextViewportMetrics);
     };
 
     measureViewport();
@@ -355,53 +355,28 @@ export function CanvasPanel({
   }, [layoutSignature]);
 
   useEffect(() => {
-    if (!isFreeformMode || dragState || isPanning) {
+    const previousViewportMetrics = previousMeasuredViewportRef.current;
+
+    if (!isFreeformMode || !hasMeasuredViewportRef.current || !previousViewportMetrics) {
       return;
     }
 
-    const targetCardId = selectedCardId ?? lastInteractedCardId;
-    if (!targetCardId) {
+    if (
+      previousViewportMetrics.widthPx === viewportMetrics.widthPx &&
+      previousViewportMetrics.heightPx === viewportMetrics.heightPx
+    ) {
       return;
     }
 
-    const targetCard = renderedCards.find((card) => card.id === targetCardId);
-    if (!targetCard) {
-      return;
-    }
-
-    const nextViewState = resolveViewportRevealViewState({
-      viewportMetrics,
-      viewState: freeformViewState,
-      targetRect: {
-        leftPx: targetCard.freeform.xPx,
-        topPx: targetCard.freeform.yPx,
-        widthPx: CARD_WIDTH_PX,
-        heightPx: CARD_HEIGHT_PX,
-      },
-    });
-
-    if (!nextViewState) {
-      return;
-    }
-
-    if (isLayoutResizing) {
-      setFreeformViewState(nextViewState);
-      return;
-    }
-
-    setFreeformViewState(nextViewState);
-  }, [
-    dragState,
-    freeformViewState,
-    isFreeformMode,
-    isLayoutResizing,
-    isPanning,
-    lastInteractedCardId,
-    layoutSignature,
-    renderedCards,
-    selectedCardId,
-    viewportMetrics,
-  ]);
+    setFreeformViewState((current) =>
+      resolveViewportCenteredFreeformViewState({
+        previousViewportMetrics,
+        nextViewportMetrics: viewportMetrics,
+        viewState: current,
+      })
+    );
+    previousMeasuredViewportRef.current = viewportMetrics;
+  }, [isFreeformMode, viewportMetrics.heightPx, viewportMetrics.widthPx]);
 
   function scheduleZoom(nextZoomLevel: number) {
     if (!isFreeformMode) {
@@ -448,6 +423,74 @@ export function CanvasPanel({
 
     setFreeformViewState(getDefaultFreeformViewState());
   }
+
+  function applyViewportWheel(event: {
+    deltaX: number;
+    deltaY: number;
+    deltaMode: number;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    clientX: number;
+    clientY: number;
+    preventDefault: () => void;
+  }) {
+    const viewportElement = viewportRef.current;
+
+    if (!viewportElement || !isFreeformMode || (!event.deltaX && !event.deltaY)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const deltaXPx = resolveWheelDeltaPx(
+      event.deltaX,
+      event.deltaMode,
+      viewportElement.clientWidth
+    );
+    const deltaYPx = resolveWheelDeltaPx(
+      event.deltaY,
+      event.deltaMode,
+      viewportElement.clientHeight
+    );
+
+    if (event.ctrlKey || event.metaKey) {
+      const viewportRect = viewportElement.getBoundingClientRect();
+      const anchorPointPx = {
+        xPx: event.clientX - viewportRect.left,
+        yPx: event.clientY - viewportRect.top,
+      };
+      const zoomDeltaPx = deltaYPx !== 0 ? deltaYPx : deltaXPx;
+
+      setFreeformViewState((current) =>
+        resolveZoomedFreeformViewState({
+          current,
+          nextZoomLevel: current.zoomLevel * Math.exp(-zoomDeltaPx / 400),
+          anchorPointPx,
+        })
+      );
+      return;
+    }
+
+    setFreeformViewState((current) => ({
+      ...current,
+      panXPx: current.panXPx - deltaXPx,
+      panYPx: current.panYPx - deltaYPx,
+    }));
+  }
+
+  useEffect(() => {
+    const viewportElement = viewportRef.current;
+    if (!viewportElement) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      applyViewportWheel(event);
+    };
+
+    viewportElement.addEventListener("wheel", handleWheel, { passive: false });
+    return () => viewportElement.removeEventListener("wheel", handleWheel);
+  }, [freeformViewState.zoomLevel, isFreeformMode]);
 
   function beginViewportPan(
     event: PanStartEvent,
@@ -515,57 +558,6 @@ export function CanvasPanel({
     window.addEventListener("blur", endViewportPan);
   }
 
-  function handleViewportWheel(event: ReactWheelEvent<HTMLDivElement>) {
-    const viewportElement = viewportRef.current;
-
-    if (
-      !viewportElement ||
-      !isFreeformMode ||
-      (!event.deltaX && !event.deltaY)
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-
-    const deltaXPx = resolveWheelDeltaPx(
-      event.deltaX,
-      event.deltaMode,
-      viewportElement.clientWidth
-    );
-    const deltaYPx = resolveWheelDeltaPx(
-      event.deltaY,
-      event.deltaMode,
-      viewportElement.clientHeight
-    );
-
-    if (event.ctrlKey || event.metaKey) {
-      const viewportRect = viewportElement.getBoundingClientRect();
-      const anchorPointPx = {
-        xPx: event.clientX - viewportRect.left,
-        yPx: event.clientY - viewportRect.top,
-      };
-      const zoomDeltaPx = deltaYPx !== 0 ? deltaYPx : deltaXPx;
-      const nextZoomLevel =
-        freeformViewState.zoomLevel * Math.exp(-zoomDeltaPx / 400);
-
-      setFreeformViewState((current) =>
-        resolveZoomedFreeformViewState({
-          current,
-          nextZoomLevel,
-          anchorPointPx,
-        })
-      );
-      return;
-    }
-
-    setFreeformViewState((current) => ({
-      ...current,
-      panXPx: current.panXPx - deltaXPx,
-      panYPx: current.panYPx - deltaYPx,
-    }));
-  }
-
   function beginCardDrag(card: ReadingCanvasCard, event: DragStartEvent) {
     if (event.defaultPrevented || event.button !== 0) {
       return;
@@ -574,7 +566,6 @@ export function CanvasPanel({
     event.stopPropagation();
     event.preventDefault();
     onSelectCard(card.id);
-    setLastInteractedCardId(card.id);
 
     const pointer = resolveViewportPoint({
       event,
@@ -887,7 +878,6 @@ export function CanvasPanel({
             beginViewportPan(event, { allowPrimaryButton: true });
           }
         }}
-        onWheel={handleViewportWheel}
         onAuxClick={(event) => {
           if (event.button === 1) {
             event.preventDefault();

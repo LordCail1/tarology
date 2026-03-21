@@ -31,7 +31,7 @@ Execution sequencing:
   - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`),
   - a freeform world/viewport split so sidebar or browser resizing no longer rewrites saved card positions,
   - an infinite freeform camera layer with background drag, middle-mouse, `Space + drag`, and wheel-based panning plus `Ctrl/Cmd + wheel` zoom,
-  - selected or recently interacted cards auto-pan back into view after layout changes.
+  - freeform layout changes now stabilize around the viewport center point rather than left-edge anchoring, and `Fit Spread` is the explicit recovery tool when cards move off-screen.
 - Profile/preferences onboarding baseline is now implemented:
   - Prisma/Postgres persists `users`, `auth_identities`, `profiles`, `user_preferences`, and `decks`
   - Google callback provisioning now creates/updates user, identity, profile, and preference shell records transactionally
@@ -92,9 +92,10 @@ Execution sequencing:
 - Reading Studio canvas viewport refinement:
   - desktop panel collapse/expand now animates through the shell grid rather than snapping instantly
   - freeform cards now live in stable world coordinates while the visible canvas is a local infinite-camera view with no native scrollbars
+  - freeform now stabilizes around the center world point on browser/sidebar layout changes instead of preserving a left-edge anchor
   - zoom, fit, and reset controls are available in the canvas toolbar
-  - selected or recently touched cards auto-reveal after panel and viewport changes without mutating reading state
-  - web regression coverage now includes background drag, wheel pan, zoom, fit-spread, and viewport auto-pan behavior for the right-edge clipping case
+  - selected or recently touched cards are allowed to move off-screen; `Fit Spread` is the explicit reframe tool
+  - web regression coverage now includes background drag, wheel pan, zoom, fit-spread, and center-point stabilization across layout changes
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 - Google auth baseline:
