@@ -182,13 +182,28 @@ function dispatchMouseDrag(
   start: { button?: number; clientX: number; clientY: number },
   end?: { button?: number; clientX: number; clientY: number }
 ) {
-  fireEvent.mouseDown(element, start);
+  const startButton = start.button ?? 0;
+  const activeButtons = startButton === 1 ? 4 : 1;
+
+  fireEvent.mouseDown(element, {
+    ...start,
+    button: startButton,
+    buttons: activeButtons,
+  });
 
   if (end) {
-    fireEvent.mouseMove(window, end);
+    fireEvent.mouseMove(window, {
+      ...end,
+      button: startButton,
+      buttons: activeButtons,
+    });
   }
 
-  fireEvent.mouseUp(window, end ?? start);
+  fireEvent.mouseUp(window, {
+    ...(end ?? start),
+    button: startButton,
+    buttons: 0,
+  });
 }
 
 describe("CanvasPanel", () => {
@@ -252,10 +267,9 @@ describe("CanvasPanel", () => {
     render(<CanvasPanelHarness />);
 
     const viewport = screen.getByLabelText("Reading canvas viewport");
-    const freeformWorld = viewport.querySelector('[data-mode="freeform"]') as HTMLElement;
 
     dispatchMouseDrag(
-      freeformWorld,
+      viewport,
       { button: 0, clientX: 220, clientY: 180 },
       { button: 0, clientX: 300, clientY: 250 }
     );
@@ -263,6 +277,56 @@ describe("CanvasPanel", () => {
     await waitFor(() => {
       expect(viewport).toHaveAttribute("data-view-pan-x", "80");
       expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+    });
+  });
+
+  it("pans freeform through the pointer-event background path", async () => {
+    const originalPointerEvent = window.PointerEvent;
+    Object.defineProperty(window, "PointerEvent", {
+      configurable: true,
+      writable: true,
+      value: MouseEvent,
+    });
+
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      buttons: 1,
+      clientX: 220,
+      clientY: 180,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerMove(window, {
+      button: 0,
+      buttons: 1,
+      clientX: 300,
+      clientY: 250,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+    fireEvent.pointerUp(window, {
+      button: 0,
+      buttons: 0,
+      clientX: 300,
+      clientY: 250,
+      pointerId: 1,
+      pointerType: "mouse",
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+      expect(viewport).toHaveAttribute("data-panning", "false");
+    });
+
+    Object.defineProperty(window, "PointerEvent", {
+      configurable: true,
+      writable: true,
+      value: originalPointerEvent,
     });
   });
 
@@ -276,6 +340,56 @@ describe("CanvasPanel", () => {
       { button: 1, clientX: 260, clientY: 220 },
       { button: 1, clientX: 180, clientY: 150 }
     );
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-70");
+    });
+  });
+
+  it("ends middle-mouse pan if the release event is missed", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    fireEvent.mouseDown(viewport, {
+      button: 1,
+      buttons: 4,
+      clientX: 260,
+      clientY: 220,
+    });
+    fireEvent.mouseMove(window, {
+      button: 1,
+      buttons: 4,
+      clientX: 180,
+      clientY: 150,
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-panning", "true");
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-70");
+    });
+
+    fireEvent.mouseMove(window, {
+      button: 0,
+      buttons: 0,
+      clientX: 150,
+      clientY: 130,
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-panning", "false");
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-70");
+    });
+
+    fireEvent.mouseMove(window, {
+      button: 0,
+      buttons: 0,
+      clientX: 120,
+      clientY: 110,
+    });
 
     await waitFor(() => {
       expect(viewport).toHaveAttribute("data-view-pan-x", "-80");

@@ -89,6 +89,9 @@ interface PanState {
   startClientYPx: number;
   startPanXPx: number;
   startPanYPx: number;
+  requiredButtonsMask: number;
+  moveEventName: "mousemove" | "pointermove";
+  upEventName: "mouseup" | "pointerup";
 }
 
 type DragStartEvent =
@@ -171,6 +174,10 @@ function isTextEntryElement(element: Element | null): boolean {
     element instanceof HTMLSelectElement ||
     element.hasAttribute("contenteditable")
   );
+}
+
+function isCardElement(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(".reading-canvas-card"));
 }
 
 function resolveWheelDeltaPx(
@@ -468,9 +475,27 @@ export function CanvasPanel({
       startClientYPx: event.clientY,
       startPanXPx: freeformViewState.panXPx,
       startPanYPx: freeformViewState.panYPx,
+      requiredButtonsMask: event.button === 1 ? 4 : 1,
+      moveEventName: event.type === "pointerdown" ? "pointermove" : "mousemove",
+      upEventName: event.type === "pointerdown" ? "pointerup" : "mouseup",
     };
 
+    function endViewportPan() {
+      setIsPanning(false);
+      window.removeEventListener(initialPanState.moveEventName, handlePointerMove);
+      window.removeEventListener(initialPanState.upEventName, handlePointerUp);
+      window.removeEventListener("blur", endViewportPan);
+    }
+
     function handlePointerMove(nextEvent: MouseEvent | PointerEvent) {
+      if (
+        typeof nextEvent.buttons === "number" &&
+        (nextEvent.buttons & initialPanState.requiredButtonsMask) === 0
+      ) {
+        endViewportPan();
+        return;
+      }
+
       setFreeformViewState((current) => ({
         ...current,
         panXPx:
@@ -481,14 +506,13 @@ export function CanvasPanel({
     }
 
     function handlePointerUp() {
-      setIsPanning(false);
-      window.removeEventListener("mousemove", handlePointerMove);
-      window.removeEventListener("mouseup", handlePointerUp);
+      endViewportPan();
     }
 
     setIsPanning(true);
-    window.addEventListener("mousemove", handlePointerMove);
-    window.addEventListener("mouseup", handlePointerUp);
+    window.addEventListener(initialPanState.moveEventName, handlePointerMove);
+    window.addEventListener(initialPanState.upEventName, handlePointerUp);
+    window.addEventListener("blur", endViewportPan);
   }
 
   function handleViewportWheel(event: ReactWheelEvent<HTMLDivElement>) {
@@ -847,6 +871,22 @@ export function CanvasPanel({
         data-view-pan-y={Math.round(freeformViewState.panYPx)}
         data-view-zoom={freeformViewState.zoomLevel.toFixed(3)}
         onMouseDownCapture={(event) => beginViewportPan(event)}
+        onPointerDown={(event) => {
+          if (isFreeformMode && !isCardElement(event.target)) {
+            onSelectCard(null);
+            beginViewportPan(event, { allowPrimaryButton: true });
+          }
+        }}
+        onMouseDown={(event) => {
+          if (
+            isFreeformMode &&
+            !supportsPointerEvents &&
+            !isCardElement(event.target)
+          ) {
+            onSelectCard(null);
+            beginViewportPan(event, { allowPrimaryButton: true });
+          }
+        }}
         onWheel={handleViewportWheel}
         onAuxClick={(event) => {
           if (event.button === 1) {
@@ -854,6 +894,8 @@ export function CanvasPanel({
           }
         }}
       >
+        {isFreeformMode ? <div className="reading-canvas-backdrop" aria-hidden="true" /> : null}
+
         <div className="reading-canvas-watermark" aria-hidden="true">
           <img
             src="/magician-logo.png"
@@ -871,18 +913,6 @@ export function CanvasPanel({
             data-mode="freeform"
             style={{
               transform: freeformWorldTransform,
-            }}
-            onPointerDown={(event) => {
-              if (supportsPointerEvents && event.target === event.currentTarget) {
-                onSelectCard(null);
-                beginViewportPan(event, { allowPrimaryButton: true });
-              }
-            }}
-            onMouseDown={(event) => {
-              if (!supportsPointerEvents && event.target === event.currentTarget) {
-                onSelectCard(null);
-                beginViewportPan(event, { allowPrimaryButton: true });
-              }
             }}
           >
             {renderedCards.map((card) => {

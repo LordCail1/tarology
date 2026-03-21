@@ -543,15 +543,21 @@ h4 {
   min-height: 100%;
 }
 
+.reading-canvas-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 48%),
+    linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98));
+}
+
 .reading-canvas-world {
   position: absolute;
   inset: 0;
   overflow: visible;
   transform-origin: top left;
   will-change: transform;
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 48%),
-    linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98));
 }
 
 .reading-canvas-world[data-mode="grid"] {
