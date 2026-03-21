@@ -3,10 +3,44 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
 import { resolveGridPixelPosition } from "../../lib/reading-studio-canvas";
-import { writePersistedFreeformViewState } from "../../lib/reading-studio-freeform-view";
+import {
+  readPersistedFreeformViewState,
+  writePersistedFreeformViewState,
+} from "../../lib/reading-studio-freeform-view";
 import { readingStudioSeedSnapshot } from "../../lib/reading-studio-mock";
 import type { ReadingStudioWorkspace } from "../../lib/reading-studio-types";
 import { CanvasPanel } from "./canvas-panel";
+
+async function withMockPointerEvent(
+  callback: () => Promise<void> | void,
+  value: unknown = MouseEvent
+) {
+  const originalPointerEvent = window.PointerEvent;
+  const hadOwnPointerEvent = Object.prototype.hasOwnProperty.call(
+    window,
+    "PointerEvent"
+  );
+
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    writable: true,
+    value: value as typeof window.PointerEvent,
+  });
+
+  try {
+    await callback();
+  } finally {
+    if (hadOwnPointerEvent) {
+      Object.defineProperty(window, "PointerEvent", {
+        configurable: true,
+        writable: true,
+        value: originalPointerEvent,
+      });
+    } else {
+      Reflect.deleteProperty(window, "PointerEvent");
+    }
+  }
+}
 
 function CanvasPanelHarness(props?: {
   workspace?: ReadingStudioWorkspace;
@@ -115,6 +149,37 @@ function LayoutShiftHarness() {
   );
 }
 
+function ReadingSwitchHarness() {
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const readingIds = readingStudioSeedSnapshot.history.map((reading) => reading.id);
+  const [activeReadingId, setActiveReadingId] = useState(readingIds[0]);
+  const workspace = readingStudioSeedSnapshot.workspaces[activeReadingId];
+
+  return (
+    <>
+      <button type="button" onClick={() => setActiveReadingId(readingIds[0])}>
+        Open first reading
+      </button>
+      <button type="button" onClick={() => setActiveReadingId(readingIds[1])}>
+        Open second reading
+      </button>
+      <CanvasPanel
+        workspace={workspace}
+        selectedCardId={selectedCardId}
+        layoutSignature="desktop:1440:left-open:280:right-closed:320"
+        isLayoutResizing={false}
+        onOpenLeftPanel={() => undefined}
+        onOpenRightPanel={() => undefined}
+        onSelectCard={setSelectedCardId}
+        onModeChange={() => undefined}
+        onMoveCard={() => undefined}
+        onRotateCard={() => undefined}
+        onFlipCard={() => undefined}
+      />
+    </>
+  );
+}
+
 function dispatchMouseDrag(
   element: HTMLElement,
   start: { button?: number; clientX: number; clientY: number },
@@ -163,6 +228,66 @@ describe("CanvasPanel", () => {
     await waitFor(() => {
       expect(magicianCard.style.left).toBe("310px");
       expect(magicianCard.style.top).toBe("252px");
+    });
+  });
+
+  it("tears down touch-driven freeform card drags on pointercancel without persisting them", async () => {
+    await withMockPointerEvent(async () => {
+      render(<CanvasPanelHarness />);
+
+      const magicianCard = screen.getByRole("button", { name: "The Magician card" });
+      expect(magicianCard.style.left).toBe("40px");
+      expect(magicianCard.style.top).toBe("72px");
+
+      fireEvent.pointerDown(magicianCard, {
+        button: 0,
+        buttons: 1,
+        clientX: 80,
+        clientY: 120,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 260,
+        clientY: 280,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(magicianCard.style.left).not.toBe("40px");
+        expect(magicianCard.style.top).not.toBe("72px");
+      });
+
+      fireEvent.pointerCancel(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 260,
+        clientY: 280,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(magicianCard.style.left).toBe("40px");
+        expect(magicianCard.style.top).toBe("72px");
+      });
+
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 360,
+        clientY: 340,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(magicianCard.style.left).toBe("40px");
+        expect(magicianCard.style.top).toBe("72px");
+      });
     });
   });
 
@@ -220,121 +345,99 @@ describe("CanvasPanel", () => {
   });
 
   it("pans freeform through the pointer-event background path", async () => {
-    const originalPointerEvent = window.PointerEvent;
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      writable: true,
-      value: MouseEvent,
-    });
+    await withMockPointerEvent(async () => {
+      render(<CanvasPanelHarness />);
 
-    render(<CanvasPanelHarness />);
+      const viewport = screen.getByLabelText("Reading canvas viewport");
 
-    const viewport = screen.getByLabelText("Reading canvas viewport");
+      fireEvent.pointerDown(viewport, {
+        button: 0,
+        buttons: 1,
+        clientX: 220,
+        clientY: 180,
+        pointerId: 1,
+        pointerType: "mouse",
+      });
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 300,
+        clientY: 250,
+        pointerId: 1,
+        pointerType: "mouse",
+      });
+      fireEvent.pointerUp(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 300,
+        clientY: 250,
+        pointerId: 1,
+        pointerType: "mouse",
+      });
 
-    fireEvent.pointerDown(viewport, {
-      button: 0,
-      buttons: 1,
-      clientX: 220,
-      clientY: 180,
-      pointerId: 1,
-      pointerType: "mouse",
-    });
-    fireEvent.pointerMove(window, {
-      button: 0,
-      buttons: 1,
-      clientX: 300,
-      clientY: 250,
-      pointerId: 1,
-      pointerType: "mouse",
-    });
-    fireEvent.pointerUp(window, {
-      button: 0,
-      buttons: 0,
-      clientX: 300,
-      clientY: 250,
-      pointerId: 1,
-      pointerType: "mouse",
-    });
-
-    await waitFor(() => {
-      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
-      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
-      expect(viewport).toHaveAttribute("data-panning", "false");
-    });
-
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      writable: true,
-      value: originalPointerEvent,
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+        expect(viewport).toHaveAttribute("data-panning", "false");
+      });
     });
   });
 
   it("ends pointer-based freeform panning on pointercancel", async () => {
-    const originalPointerEvent = window.PointerEvent;
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      writable: true,
-      value: MouseEvent,
-    });
+    await withMockPointerEvent(async () => {
+      render(<CanvasPanelHarness />);
 
-    render(<CanvasPanelHarness />);
+      const viewport = screen.getByLabelText("Reading canvas viewport");
 
-    const viewport = screen.getByLabelText("Reading canvas viewport");
+      fireEvent.pointerDown(viewport, {
+        button: 0,
+        buttons: 1,
+        clientX: 220,
+        clientY: 180,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 300,
+        clientY: 250,
+        pointerId: 1,
+        pointerType: "touch",
+      });
 
-    fireEvent.pointerDown(viewport, {
-      button: 0,
-      buttons: 1,
-      clientX: 220,
-      clientY: 180,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-    fireEvent.pointerMove(window, {
-      button: 0,
-      buttons: 1,
-      clientX: 300,
-      clientY: 250,
-      pointerId: 1,
-      pointerType: "touch",
-    });
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-panning", "true");
+        expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+      });
 
-    await waitFor(() => {
-      expect(viewport).toHaveAttribute("data-panning", "true");
-      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
-      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
-    });
+      fireEvent.pointerCancel(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 300,
+        clientY: 250,
+        pointerId: 1,
+        pointerType: "touch",
+      });
 
-    fireEvent.pointerCancel(window, {
-      button: 0,
-      buttons: 0,
-      clientX: 300,
-      clientY: 250,
-      pointerId: 1,
-      pointerType: "touch",
-    });
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-panning", "false");
+      });
 
-    await waitFor(() => {
-      expect(viewport).toHaveAttribute("data-panning", "false");
-    });
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 360,
+        clientY: 320,
+        pointerId: 1,
+        pointerType: "touch",
+      });
 
-    fireEvent.pointerMove(window, {
-      button: 0,
-      buttons: 0,
-      clientX: 360,
-      clientY: 320,
-      pointerId: 1,
-      pointerType: "touch",
-    });
-
-    await waitFor(() => {
-      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
-      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
-    });
-
-    Object.defineProperty(window, "PointerEvent", {
-      configurable: true,
-      writable: true,
-      value: originalPointerEvent,
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+      });
     });
   });
 
@@ -609,6 +712,37 @@ describe("CanvasPanel", () => {
       expect(Number(viewport.getAttribute("data-view-zoom"))).toBeLessThan(0.05);
       expect(Number(viewport.getAttribute("data-view-pan-x"))).not.toBe(0);
       expect(Number(viewport.getAttribute("data-view-pan-y"))).not.toBe(0);
+    });
+  });
+
+  it("flushes pending freeform camera persistence before switching readings", async () => {
+    render(<ReadingSwitchHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    dispatchMouseDrag(
+      viewport,
+      { button: 0, clientX: 220, clientY: 180 },
+      { button: 0, clientX: 300, clientY: 250 }
+    );
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open second reading" }));
+
+    await waitFor(() => {
+      expect(
+        readPersistedFreeformViewState(window.localStorage, "rdg_001", {
+          widthPx: 960,
+          heightPx: 640,
+        })
+      ).toEqual({
+        panXPx: 80,
+        panYPx: 70,
+        zoomLevel: 1,
+      });
     });
   });
 });

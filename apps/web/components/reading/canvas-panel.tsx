@@ -93,6 +93,16 @@ interface PanState {
   upEventName: "mouseup" | "pointerup";
 }
 
+interface PersistableFreeformViewSnapshot {
+  readingId: string;
+  viewState: FreeformViewState;
+  viewportMetrics: CanvasMetrics;
+}
+
+interface PendingViewWrite extends PersistableFreeformViewSnapshot {
+  timeoutHandle: number | null;
+}
+
 type DragStartEvent =
   | ReactMouseEvent<HTMLButtonElement>
   | ReactPointerEvent<HTMLButtonElement>;
@@ -228,6 +238,12 @@ export function CanvasPanel({
   const hasMeasuredViewportRef = useRef(false);
   const previousMeasuredViewportRef = useRef<CanvasMetrics | null>(null);
   const hydratedReadingIdRef = useRef<string | null>(null);
+  const previousPersistenceContextRef = useRef<{
+    readingId: string;
+    isFreeformMode: boolean;
+  } | null>(null);
+  const latestPersistableViewRef = useRef<PersistableFreeformViewSnapshot | null>(null);
+  const pendingViewWriteRef = useRef<PendingViewWrite | null>(null);
   const storageRef = useRef<Storage | undefined>(
     typeof window === "undefined" ? undefined : window.localStorage
   );
@@ -241,7 +257,7 @@ export function CanvasPanel({
     getDefaultFreeformViewState()
   );
   const supportsPointerEvents =
-    typeof window !== "undefined" && "PointerEvent" in window;
+    typeof window !== "undefined" && typeof window.PointerEvent === "function";
 
   const activeMode = workspace.canvas.activeMode;
   const isFreeformMode = activeMode === "freeform";
@@ -274,6 +290,60 @@ export function CanvasPanel({
     () => resolveFreeformContentBounds(renderedCards),
     [renderedCards]
   );
+  const canPersistCurrentFreeformView =
+    isFreeformMode &&
+    hasMeasuredViewportRef.current &&
+    (hydratedReadingIdRef.current === null ||
+      hydratedReadingIdRef.current === workspace.reading.id);
+
+  if (canPersistCurrentFreeformView) {
+    latestPersistableViewRef.current = {
+      readingId: workspace.reading.id,
+      viewState: {
+        ...freeformViewState,
+      },
+      viewportMetrics: resolveCanvasMetrics(viewportMetrics),
+    };
+  } else if (latestPersistableViewRef.current?.readingId === workspace.reading.id) {
+    latestPersistableViewRef.current = null;
+  }
+
+  function flushPendingFreeformViewWrite(readingId?: string) {
+    const pendingWrite = pendingViewWriteRef.current;
+    const latestPersistableView = latestPersistableViewRef.current;
+    const matchedLatestView =
+      latestPersistableView &&
+      (!readingId || latestPersistableView.readingId === readingId)
+        ? latestPersistableView
+        : null;
+    const matchedPendingWrite =
+      pendingWrite && (!readingId || pendingWrite.readingId === readingId)
+        ? pendingWrite
+        : null;
+    const writePayload = matchedLatestView ?? matchedPendingWrite;
+
+    if (!writePayload) {
+      return;
+    }
+
+    const pendingTimeoutHandle = matchedPendingWrite?.timeoutHandle ?? null;
+    if (pendingTimeoutHandle !== null) {
+      window.clearTimeout(pendingTimeoutHandle);
+    }
+
+    writePersistedFreeformViewState(
+      storageRef.current,
+      writePayload.readingId,
+      writePayload.viewState,
+      writePayload.viewportMetrics
+    );
+    if (!readingId || pendingWrite?.readingId === readingId) {
+      pendingViewWriteRef.current = null;
+    }
+    if (!readingId || latestPersistableView?.readingId === readingId) {
+      latestPersistableViewRef.current = null;
+    }
+  }
 
   useEffect(() => {
     hydratedReadingIdRef.current = null;
@@ -305,6 +375,28 @@ export function CanvasPanel({
   ]);
 
   useEffect(() => {
+    const previousContext = previousPersistenceContextRef.current;
+    if (
+      previousContext &&
+      (previousContext.readingId !== workspace.reading.id ||
+        previousContext.isFreeformMode !== isFreeformMode)
+    ) {
+      flushPendingFreeformViewWrite(previousContext.readingId);
+    }
+
+    previousPersistenceContextRef.current = {
+      readingId: workspace.reading.id,
+      isFreeformMode,
+    };
+  }, [isFreeformMode, workspace.reading.id]);
+
+  useEffect(() => {
+    return () => {
+      flushPendingFreeformViewWrite();
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       !isFreeformMode ||
       !hasMeasuredViewportRef.current ||
@@ -313,16 +405,48 @@ export function CanvasPanel({
       return;
     }
 
+    const resolvedViewportMetrics = resolveCanvasMetrics(viewportMetrics);
+    const existingPendingWrite = pendingViewWriteRef.current;
+    if (existingPendingWrite && existingPendingWrite.timeoutHandle !== null) {
+      window.clearTimeout(existingPendingWrite.timeoutHandle);
+    }
+
+    const persistedSnapshot =
+      latestPersistableViewRef.current?.readingId === workspace.reading.id
+        ? latestPersistableViewRef.current
+        : {
+            readingId: workspace.reading.id,
+            viewState: {
+              ...freeformViewState,
+            },
+            viewportMetrics: {
+              ...resolvedViewportMetrics,
+            },
+          };
+    const pendingWrite: PendingViewWrite = {
+      timeoutHandle: null,
+      readingId: persistedSnapshot.readingId,
+      viewState: {
+        ...persistedSnapshot.viewState,
+      },
+      viewportMetrics: {
+        ...persistedSnapshot.viewportMetrics,
+      },
+    };
+
     const timeoutHandle = window.setTimeout(() => {
       writePersistedFreeformViewState(
         storageRef.current,
-        workspace.reading.id,
-        freeformViewState,
-        viewportMetrics
+        pendingWrite.readingId,
+        pendingWrite.viewState,
+        pendingWrite.viewportMetrics
       );
+      if (pendingViewWriteRef.current === pendingWrite) {
+        pendingViewWriteRef.current = null;
+      }
     }, 120);
-
-    return () => window.clearTimeout(timeoutHandle);
+    pendingWrite.timeoutHandle = timeoutHandle;
+    pendingViewWriteRef.current = pendingWrite;
   }, [
     isFreeformMode,
     freeformViewState.panXPx,
@@ -427,11 +551,30 @@ export function CanvasPanel({
     previousMeasuredViewportRef.current = viewportMetrics;
   }, [isFreeformMode, viewportMetrics.heightPx, viewportMetrics.widthPx]);
 
+  function ensureCurrentFreeformPersistenceContext() {
+    if (!isFreeformMode) {
+      return;
+    }
+
+    const viewportElement = viewportRef.current;
+    if (viewportElement && !hasMeasuredViewportRef.current) {
+      const measuredViewportMetrics = readViewportMetrics(viewportElement);
+      hasMeasuredViewportRef.current = true;
+      previousMeasuredViewportRef.current = measuredViewportMetrics;
+      setViewportMetrics(measuredViewportMetrics);
+    }
+
+    if (hydratedReadingIdRef.current !== workspace.reading.id) {
+      hydratedReadingIdRef.current = workspace.reading.id;
+    }
+  }
+
   function scheduleZoom(nextZoomLevel: number) {
     if (!isFreeformMode) {
       return;
     }
 
+    ensureCurrentFreeformPersistenceContext();
     const viewportElement = viewportRef.current;
     const anchorPointPx = viewportElement
       ? {
@@ -460,6 +603,7 @@ export function CanvasPanel({
       return;
     }
 
+    ensureCurrentFreeformPersistenceContext();
     setFreeformViewState(
       resolveFreeformFitViewState({
         bounds: freeformBounds,
@@ -473,6 +617,7 @@ export function CanvasPanel({
       return;
     }
 
+    ensureCurrentFreeformPersistenceContext();
     setFreeformViewState(getDefaultFreeformViewState());
   }
 
@@ -492,6 +637,7 @@ export function CanvasPanel({
       return;
     }
 
+    ensureCurrentFreeformPersistenceContext();
     event.preventDefault();
 
     const deltaXPx = resolveWheelDeltaPx(
@@ -565,6 +711,7 @@ export function CanvasPanel({
       return;
     }
 
+    ensureCurrentFreeformPersistenceContext();
     event.preventDefault();
     event.stopPropagation();
 
@@ -643,6 +790,7 @@ export function CanvasPanel({
     const currentPosition = resolveCardPosition(card, activeMode, gridMetrics);
     const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
     const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
+    const cancelEventName = event.type === "pointerdown" ? "pointercancel" : null;
 
     const initialDragState: DragState = {
       cardId: card.id,
@@ -741,14 +889,14 @@ export function CanvasPanel({
       });
     }
 
-    function handlePointerUp() {
-      if (initialDragState.mode === "freeform" && currentFreeform) {
+    function endCardDrag(commitMove: boolean) {
+      if (commitMove && initialDragState.mode === "freeform" && currentFreeform) {
         onMoveCard(initialDragState.cardId, {
           freeform: currentFreeform,
         });
       }
 
-      if (initialDragState.mode === "grid" && currentGrid) {
+      if (commitMove && initialDragState.mode === "grid" && currentGrid) {
         onMoveCard(initialDragState.cardId, {
           grid: currentGrid,
         });
@@ -757,11 +905,25 @@ export function CanvasPanel({
       setDragState(null);
       window.removeEventListener(moveEventName, handlePointerMove);
       window.removeEventListener(upEventName, handlePointerUp);
+      if (cancelEventName) {
+        window.removeEventListener(cancelEventName, handlePointerCancel);
+      }
+    }
+
+    function handlePointerUp() {
+      endCardDrag(true);
+    }
+
+    function handlePointerCancel() {
+      endCardDrag(false);
     }
 
     setDragState(initialDragState);
     window.addEventListener(moveEventName, handlePointerMove);
     window.addEventListener(upEventName, handlePointerUp);
+    if (cancelEventName) {
+      window.addEventListener(cancelEventName, handlePointerCancel);
+    }
   }
 
   function resolveCardStyle(card: ReadingCanvasCard) {
