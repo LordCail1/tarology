@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
 import { resolveGridPixelPosition } from "../../lib/reading-studio-canvas";
+import { writePersistedFreeformViewState } from "../../lib/reading-studio-freeform-view";
 import { readingStudioSeedSnapshot } from "../../lib/reading-studio-mock";
 import type { ReadingStudioWorkspace } from "../../lib/reading-studio-types";
 import { CanvasPanel } from "./canvas-panel";
@@ -451,6 +452,22 @@ describe("CanvasPanel", () => {
   });
 
   it("keeps the same world center after layout tightening", async () => {
+    const activeReadingId =
+      readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
+    writePersistedFreeformViewState(
+      window.localStorage,
+      activeReadingId,
+      {
+        panXPx: 0,
+        panYPx: 0,
+        zoomLevel: 1,
+      },
+      {
+        widthPx: 960,
+        heightPx: 640,
+      }
+    );
+
     render(<LayoutShiftHarness />);
 
     const viewport = screen.getByLabelText("Reading canvas viewport");

@@ -227,6 +227,7 @@ export function CanvasPanel({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const hasMeasuredViewportRef = useRef(false);
   const previousMeasuredViewportRef = useRef<CanvasMetrics | null>(null);
+  const hydratedReadingIdRef = useRef<string | null>(null);
   const storageRef = useRef<Storage | undefined>(
     typeof window === "undefined" ? undefined : window.localStorage
   );
@@ -275,27 +276,60 @@ export function CanvasPanel({
   );
 
   useEffect(() => {
-    const persistedViewState = readPersistedFreeformViewState(
-      storageRef.current,
-      workspace.reading.id
-    );
-    setFreeformViewState(persistedViewState);
+    hydratedReadingIdRef.current = null;
+    setFreeformViewState(getDefaultFreeformViewState());
   }, [workspace.reading.id]);
 
   useEffect(() => {
+    if (!isFreeformMode || !hasMeasuredViewportRef.current) {
+      return;
+    }
+
+    if (hydratedReadingIdRef.current === workspace.reading.id) {
+      return;
+    }
+
+    const persistedViewState = readPersistedFreeformViewState(
+      storageRef.current,
+      workspace.reading.id,
+      viewportMetrics
+    );
+    setFreeformViewState(persistedViewState);
+    previousMeasuredViewportRef.current = viewportMetrics;
+    hydratedReadingIdRef.current = workspace.reading.id;
+  }, [
+    isFreeformMode,
+    viewportMetrics.heightPx,
+    viewportMetrics.widthPx,
+    workspace.reading.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isFreeformMode ||
+      !hasMeasuredViewportRef.current ||
+      hydratedReadingIdRef.current !== workspace.reading.id
+    ) {
+      return;
+    }
+
     const timeoutHandle = window.setTimeout(() => {
       writePersistedFreeformViewState(
         storageRef.current,
         workspace.reading.id,
-        freeformViewState
+        freeformViewState,
+        viewportMetrics
       );
     }, 120);
 
     return () => window.clearTimeout(timeoutHandle);
   }, [
+    isFreeformMode,
     freeformViewState.panXPx,
     freeformViewState.panYPx,
     freeformViewState.zoomLevel,
+    viewportMetrics.heightPx,
+    viewportMetrics.widthPx,
     workspace.reading.id,
   ]);
 
