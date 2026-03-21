@@ -2,23 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CANVAS_ZOOM,
   clampFreeformPosition,
-  resolveCanvasContentMetrics,
-  resolveCanvasWorldMetrics,
-  resolveFitCanvasZoom,
   getHighestStackOrder,
-  resolveScaledCanvasMetrics,
+  getGridCellSize,
+  resolveFreeformContentBounds,
+  resolveFreeformFitViewState,
+  resolveFreeformViewportPoint,
   resolveGridPixelPosition,
-  resolveViewportRevealScroll,
+  resolveViewportRevealViewState,
+  resolveZoomedFreeformViewState,
   snapGridPosition,
 } from "./reading-studio-canvas";
 
 describe("reading-studio-canvas", () => {
-  it("clamps freeform positions to non-negative coordinates without forcing them back into the visible viewport", () => {
+  it("preserves negative freeform coordinates for the infinite canvas", () => {
     expect(
       clampFreeformPosition(
         {
-          xPx: 1200,
-          yPx: -20,
+          xPx: -220,
+          yPx: -40,
         },
         {
           widthPx: 900,
@@ -26,109 +27,138 @@ describe("reading-studio-canvas", () => {
         }
       )
     ).toEqual({
-      xPx: 1200,
-      yPx: 0,
+      xPx: -220,
+      yPx: -40,
     });
   });
 
-  it("expands freeform content metrics to keep the furthest card reachable", () => {
+  it("resolves freeform viewport points through camera pan and zoom", () => {
     expect(
-      resolveCanvasContentMetrics("freeform", [
+      resolveFreeformViewportPoint({
+        clientXPx: 260,
+        clientYPx: 180,
+        viewportRect: {
+          left: 20,
+          top: 30,
+        },
+        viewState: {
+          panXPx: 80,
+          panYPx: -40,
+          zoomLevel: 1.5,
+        },
+      })
+    ).toEqual({
+      xPx: 106.66666666666667,
+      yPx: 126.66666666666667,
+    });
+  });
+
+  it("computes freeform content bounds across negative and positive card positions", () => {
+    expect(
+      resolveFreeformContentBounds([
         {
           freeform: {
-            xPx: 1180,
-            yPx: 720,
+            xPx: -180,
+            yPx: 60,
             stackOrder: 1,
+          },
+        },
+        {
+          freeform: {
+            xPx: 640,
+            yPx: -120,
+            stackOrder: 2,
           },
         },
       ])
     ).toEqual({
-      widthPx: 1400,
-      heightPx: 1012,
+      leftPx: -276,
+      topPx: -216,
+      widthPx: 1136,
+      heightPx: 568,
     });
   });
 
-  it("keeps the world at least as large as the current viewport after zooming out", () => {
+  it("fits the spread into the viewport without exceeding 100% zoom", () => {
     expect(
-      resolveCanvasWorldMetrics({
-        mode: "freeform",
-        cards: [],
+      resolveFreeformFitViewState({
+        bounds: {
+          leftPx: -276,
+          topPx: -216,
+          widthPx: 1136,
+          heightPx: 572,
+        },
         viewportMetrics: {
-          widthPx: 1000,
-          heightPx: 700,
-        },
-        zoomLevel: 0.5,
-      })
-    ).toEqual({
-      widthPx: 2000,
-      heightPx: 1400,
-    });
-  });
-
-  it("resolves scaled world metrics from zoom level", () => {
-    expect(
-      resolveScaledCanvasMetrics(
-        {
-          widthPx: 1200,
-          heightPx: 800,
-        },
-        1.5
-      )
-    ).toEqual({
-      widthPx: 1800,
-      heightPx: 1200,
-    });
-  });
-
-  it("computes a fit zoom that can zoom out to show a larger spread", () => {
-    expect(
-      resolveFitCanvasZoom(
-        {
-          widthPx: 1800,
-          heightPx: 1200,
-        },
-        {
           widthPx: 900,
           heightPx: 600,
-        }
-      )
-    ).toBeCloseTo(0.5, 4);
-    expect(
-      resolveFitCanvasZoom(
-        {
-          widthPx: 520,
-          heightPx: 420,
         },
-        {
-          widthPx: 1200,
-          heightPx: 900,
-        }
-      )
+      })
+    ).toEqual({
+      panXPx: 218.66197183098586,
+      panYPx: 244.54225352112675,
+      zoomLevel: 0.7922535211267606,
+    });
+
+    expect(
+      resolveFreeformFitViewState({
+        bounds: {
+          leftPx: 20,
+          topPx: 20,
+          widthPx: 320,
+          heightPx: 240,
+        },
+        viewportMetrics: {
+          widthPx: 1280,
+          heightPx: 720,
+        },
+      }).zoomLevel
     ).toBe(DEFAULT_CANVAS_ZOOM);
   });
 
-  it("returns the minimum scroll needed to keep a card visible after the viewport shrinks", () => {
+  it("zooms around the chosen anchor point", () => {
     expect(
-      resolveViewportRevealScroll({
+      resolveZoomedFreeformViewState({
+        current: {
+          panXPx: 120,
+          panYPx: 90,
+          zoomLevel: 1,
+        },
+        nextZoomLevel: 1.5,
+        anchorPointPx: {
+          xPx: 300,
+          yPx: 240,
+        },
+      })
+    ).toEqual({
+      panXPx: 30,
+      panYPx: 15,
+      zoomLevel: 1.5,
+    });
+  });
+
+  it("nudges the camera only enough to keep a card visible", () => {
+    expect(
+      resolveViewportRevealViewState({
         viewportMetrics: {
-          widthPx: 520,
+          widthPx: 560,
           heightPx: 420,
         },
-        scrollPosition: {
-          leftPx: 0,
-          topPx: 0,
+        viewState: {
+          panXPx: -120,
+          panYPx: 20,
+          zoomLevel: 1,
         },
         targetRect: {
-          leftPx: 760,
-          topPx: 80,
+          leftPx: 620,
+          topPx: 60,
           widthPx: 124,
           heightPx: 196,
         },
-        zoomLevel: 1,
       })
     ).toEqual({
-      leftPx: 388,
-      topPx: 0,
+      panXPx: -208,
+      panYPx: 20,
+      zoomLevel: 1,
     });
   });
 
@@ -150,6 +180,18 @@ describe("reading-studio-canvas", () => {
 
     expect(position.xPx).toBeCloseTo(489, 4);
     expect(position.yPx).toBeCloseTo(228.6666666667, 4);
+  });
+
+  it("keeps the current grid cell size behavior", () => {
+    expect(
+      getGridCellSize({
+        widthPx: 960,
+        heightPx: 640,
+      })
+    ).toEqual({
+      cellWidthPx: 212.5,
+      cellHeightPx: 182.66666666666666,
+    });
   });
 
   it("finds the highest freeform stack order", () => {

@@ -14,7 +14,7 @@ export const GRID_ROWS = 3;
 export const GRID_GAP_PX = 18;
 export const GRID_PADDING_PX = 28;
 export const FREEFORM_WORLD_PADDING_PX = 96;
-export const MIN_CANVAS_ZOOM = 0.5;
+export const MIN_CANVAS_ZOOM = 0.05;
 export const MAX_CANVAS_ZOOM = 1.8;
 export const DEFAULT_CANVAS_ZOOM = 1;
 export const CANVAS_ZOOM_STEP = 0.1;
@@ -32,9 +32,10 @@ export interface CanvasViewRect {
   heightPx: number;
 }
 
-export interface CanvasScrollPosition {
-  leftPx: number;
-  topPx: number;
+export interface FreeformViewState {
+  panXPx: number;
+  panYPx: number;
+  zoomLevel: number;
 }
 
 function coerceFiniteNumber(value: number, fallback: number): number {
@@ -57,6 +58,14 @@ export function clampCanvasZoom(proposedZoom: number): number {
   return Math.max(MIN_CANVAS_ZOOM, Math.min(normalizedZoom, MAX_CANVAS_ZOOM));
 }
 
+export function getDefaultFreeformViewState(): FreeformViewState {
+  return {
+    panXPx: 0,
+    panYPx: 0,
+    zoomLevel: DEFAULT_CANVAS_ZOOM,
+  };
+}
+
 export function clampFreeformPosition(
   proposed: Pick<FreeformPosition, "xPx" | "yPx">,
   metrics: Partial<CanvasMetrics> | undefined
@@ -66,8 +75,160 @@ export function clampFreeformPosition(
   const proposedYPx = coerceFiniteNumber(proposed.yPx, 0);
 
   return {
-    xPx: Math.max(0, proposedXPx),
-    yPx: Math.max(0, proposedYPx),
+    xPx: proposedXPx,
+    yPx: proposedYPx,
+  };
+}
+
+export function resolveFreeformViewportPoint(options: {
+  clientXPx: number;
+  clientYPx: number;
+  viewportRect:
+    | Pick<DOMRect, "left" | "top">
+    | {
+        left: number;
+        top: number;
+      };
+  viewState: FreeformViewState;
+}): { xPx: number; yPx: number } {
+  const zoomLevel = clampCanvasZoom(options.viewState.zoomLevel);
+
+  return {
+    xPx: (options.clientXPx - options.viewportRect.left - options.viewState.panXPx) / zoomLevel,
+    yPx: (options.clientYPx - options.viewportRect.top - options.viewState.panYPx) / zoomLevel,
+  };
+}
+
+export function resolveFreeformContentBounds(
+  cards: Pick<ReadingCanvasCard, "freeform">[],
+  paddingPx: number = FREEFORM_WORLD_PADDING_PX
+): CanvasViewRect | null {
+  if (cards.length === 0) {
+    return null;
+  }
+
+  const minLeftPx = cards.reduce(
+    (currentMin, card) => Math.min(currentMin, card.freeform.xPx),
+    Number.POSITIVE_INFINITY
+  );
+  const minTopPx = cards.reduce(
+    (currentMin, card) => Math.min(currentMin, card.freeform.yPx),
+    Number.POSITIVE_INFINITY
+  );
+  const maxRightPx = cards.reduce(
+    (currentMax, card) => Math.max(currentMax, card.freeform.xPx + CARD_WIDTH_PX),
+    Number.NEGATIVE_INFINITY
+  );
+  const maxBottomPx = cards.reduce(
+    (currentMax, card) => Math.max(currentMax, card.freeform.yPx + CARD_HEIGHT_PX),
+    Number.NEGATIVE_INFINITY
+  );
+
+  return {
+    leftPx: minLeftPx - paddingPx,
+    topPx: minTopPx - paddingPx,
+    widthPx: maxRightPx - minLeftPx + paddingPx * 2,
+    heightPx: maxBottomPx - minTopPx + paddingPx * 2,
+  };
+}
+
+export function resolveFreeformFitViewState(options: {
+  bounds: CanvasViewRect | null;
+  viewportMetrics: Partial<CanvasMetrics> | undefined;
+}): FreeformViewState {
+  const viewportMetrics = resolveCanvasMetrics(options.viewportMetrics);
+  const defaultViewState = getDefaultFreeformViewState();
+
+  if (!options.bounds || options.bounds.widthPx <= 0 || options.bounds.heightPx <= 0) {
+    return defaultViewState;
+  }
+
+  const zoomLevel = clampCanvasZoom(
+    Math.min(
+      DEFAULT_CANVAS_ZOOM,
+      viewportMetrics.widthPx / options.bounds.widthPx,
+      viewportMetrics.heightPx / options.bounds.heightPx
+    )
+  );
+
+  return {
+    panXPx:
+      (viewportMetrics.widthPx - options.bounds.widthPx * zoomLevel) / 2 -
+      options.bounds.leftPx * zoomLevel,
+    panYPx:
+      (viewportMetrics.heightPx - options.bounds.heightPx * zoomLevel) / 2 -
+      options.bounds.topPx * zoomLevel,
+    zoomLevel,
+  };
+}
+
+export function resolveZoomedFreeformViewState(options: {
+  current: FreeformViewState;
+  nextZoomLevel: number;
+  anchorPointPx: { xPx: number; yPx: number };
+}): FreeformViewState {
+  const currentZoomLevel = clampCanvasZoom(options.current.zoomLevel);
+  const nextZoomLevel = clampCanvasZoom(options.nextZoomLevel);
+
+  if (currentZoomLevel === nextZoomLevel) {
+    return {
+      ...options.current,
+      zoomLevel: nextZoomLevel,
+    };
+  }
+
+  const anchorWorldPoint = {
+    xPx: (options.anchorPointPx.xPx - options.current.panXPx) / currentZoomLevel,
+    yPx: (options.anchorPointPx.yPx - options.current.panYPx) / currentZoomLevel,
+  };
+
+  return {
+    panXPx: options.anchorPointPx.xPx - anchorWorldPoint.xPx * nextZoomLevel,
+    panYPx: options.anchorPointPx.yPx - anchorWorldPoint.yPx * nextZoomLevel,
+    zoomLevel: nextZoomLevel,
+  };
+}
+
+export function resolveViewportRevealViewState(options: {
+  viewportMetrics: Partial<CanvasMetrics> | undefined;
+  viewState: FreeformViewState;
+  targetRect: CanvasViewRect;
+  paddingPx?: number;
+}): FreeformViewState | null {
+  const viewportMetrics = resolveCanvasMetrics(options.viewportMetrics);
+  const zoomLevel = clampCanvasZoom(options.viewState.zoomLevel);
+  const paddingPx = Math.max(0, options.paddingPx ?? VIEWPORT_REVEAL_PADDING_PX);
+  const targetLeftPx = options.targetRect.leftPx * zoomLevel + options.viewState.panXPx;
+  const targetTopPx = options.targetRect.topPx * zoomLevel + options.viewState.panYPx;
+  const targetRightPx = targetLeftPx + options.targetRect.widthPx * zoomLevel;
+  const targetBottomPx = targetTopPx + options.targetRect.heightPx * zoomLevel;
+
+  let nextPanXPx = options.viewState.panXPx;
+  let nextPanYPx = options.viewState.panYPx;
+
+  if (targetLeftPx < paddingPx) {
+    nextPanXPx += paddingPx - targetLeftPx;
+  } else if (targetRightPx > viewportMetrics.widthPx - paddingPx) {
+    nextPanXPx -= targetRightPx - (viewportMetrics.widthPx - paddingPx);
+  }
+
+  if (targetTopPx < paddingPx) {
+    nextPanYPx += paddingPx - targetTopPx;
+  } else if (targetBottomPx > viewportMetrics.heightPx - paddingPx) {
+    nextPanYPx -= targetBottomPx - (viewportMetrics.heightPx - paddingPx);
+  }
+
+  if (
+    nextPanXPx === options.viewState.panXPx &&
+    nextPanYPx === options.viewState.panYPx
+  ) {
+    return null;
+  }
+
+  return {
+    panXPx: nextPanXPx,
+    panYPx: nextPanYPx,
+    zoomLevel,
   };
 }
 
@@ -139,55 +300,6 @@ export function resolveFitCanvasZoom(
       resolvedViewport.heightPx / resolvedContent.heightPx
     )
   );
-}
-
-export function resolveViewportRevealScroll(options: {
-  viewportMetrics: Partial<CanvasMetrics> | undefined;
-  scrollPosition: CanvasScrollPosition;
-  targetRect: CanvasViewRect;
-  zoomLevel: number;
-  paddingPx?: number;
-}): CanvasScrollPosition | null {
-  const viewportMetrics = resolveCanvasMetrics(options.viewportMetrics);
-  const zoomLevel = clampCanvasZoom(options.zoomLevel);
-  const paddingPx = Math.max(0, options.paddingPx ?? VIEWPORT_REVEAL_PADDING_PX);
-  const scaledLeftPx = options.targetRect.leftPx * zoomLevel;
-  const scaledTopPx = options.targetRect.topPx * zoomLevel;
-  const scaledRightPx = scaledLeftPx + options.targetRect.widthPx * zoomLevel;
-  const scaledBottomPx = scaledTopPx + options.targetRect.heightPx * zoomLevel;
-
-  let nextLeftPx = options.scrollPosition.leftPx;
-  let nextTopPx = options.scrollPosition.topPx;
-
-  if (scaledLeftPx < nextLeftPx + paddingPx) {
-    nextLeftPx = Math.max(0, scaledLeftPx - paddingPx);
-  } else if (scaledRightPx > nextLeftPx + viewportMetrics.widthPx - paddingPx) {
-    nextLeftPx = Math.max(
-      0,
-      scaledRightPx - viewportMetrics.widthPx + paddingPx
-    );
-  }
-
-  if (scaledTopPx < nextTopPx + paddingPx) {
-    nextTopPx = Math.max(0, scaledTopPx - paddingPx);
-  } else if (scaledBottomPx > nextTopPx + viewportMetrics.heightPx - paddingPx) {
-    nextTopPx = Math.max(
-      0,
-      scaledBottomPx - viewportMetrics.heightPx + paddingPx
-    );
-  }
-
-  if (
-    nextLeftPx === options.scrollPosition.leftPx &&
-    nextTopPx === options.scrollPosition.topPx
-  ) {
-    return null;
-  }
-
-  return {
-    leftPx: nextLeftPx,
-    topPx: nextTopPx,
-  };
 }
 
 export function getGridCellSize(metrics: Partial<CanvasMetrics> | undefined): {

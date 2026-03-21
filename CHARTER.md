@@ -162,7 +162,8 @@ V1 support policy:
   - left and right panels are desktop-resizable by drag handle.
   - panel width preference is persisted per user.
   - freeform canvas layout changes must adjust the viewport rather than rewriting saved card positions.
-  - if the viewport becomes smaller than the spread, cards remain reachable through scroll/pan.
+  - freeform is an infinite desktop canvas with a local camera/view layer rather than native browser scrollbars.
+  - if the viewport becomes smaller than the spread, cards remain reachable through panning.
   - selected or recently interacted cards receive visibility priority after layout changes.
 
 ### 5.2 Core Journey

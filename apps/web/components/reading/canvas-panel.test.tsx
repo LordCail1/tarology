@@ -1,27 +1,31 @@
 import React, { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
-import {
-  resolveGridPixelPosition,
-} from "../../lib/reading-studio-canvas";
+import { resolveGridPixelPosition } from "../../lib/reading-studio-canvas";
 import { readingStudioSeedSnapshot } from "../../lib/reading-studio-mock";
 import type { ReadingStudioWorkspace } from "../../lib/reading-studio-types";
 import { CanvasPanel } from "./canvas-panel";
 
-function CanvasPanelHarness() {
+function CanvasPanelHarness(props?: {
+  workspace?: ReadingStudioWorkspace;
+  layoutSignature?: string;
+  selectedCardId?: string | null;
+}) {
   const activeReadingId =
     readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
   const [workspace, setWorkspace] = useState<ReadingStudioWorkspace>(
-    readingStudioSeedSnapshot.workspaces[activeReadingId]
+    props?.workspace ?? readingStudioSeedSnapshot.workspaces[activeReadingId]
   );
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(
+    props?.selectedCardId ?? null
+  );
 
   return (
     <CanvasPanel
       workspace={workspace}
       selectedCardId={selectedCardId}
-      layoutSignature="desktop:1440:left-open:280:right-closed:320"
+      layoutSignature={props?.layoutSignature ?? "desktop:1440:left-open:280:right-closed:320"}
       isLayoutResizing={false}
       onOpenLeftPanel={() => undefined}
       onOpenRightPanel={() => undefined}
@@ -140,10 +144,43 @@ function LayoutShiftHarness() {
   );
 }
 
+function WideSpreadHarness() {
+  const activeReadingId =
+    readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
+  const workspace = structuredClone(readingStudioSeedSnapshot.workspaces[activeReadingId]);
+  workspace.canvas.cards = workspace.canvas.cards.map((card, index) => {
+    if (index === 0) {
+      return {
+        ...card,
+        freeform: {
+          ...card.freeform,
+          xPx: -820,
+          yPx: -540,
+        },
+      };
+    }
+
+    if (index === 1) {
+      return {
+        ...card,
+        freeform: {
+          ...card.freeform,
+          xPx: 2820,
+          yPx: 1920,
+        },
+      };
+    }
+
+    return card;
+  });
+
+  return <CanvasPanelHarness workspace={workspace} />;
+}
+
 function dispatchMouseDrag(
   element: HTMLElement,
-  start: { clientX: number; clientY: number },
-  end?: { clientX: number; clientY: number }
+  start: { button?: number; clientX: number; clientY: number },
+  end?: { button?: number; clientX: number; clientY: number }
 ) {
   fireEvent.mouseDown(element, start);
 
@@ -155,6 +192,10 @@ function dispatchMouseDrag(
 }
 
 describe("CanvasPanel", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("persists freeform drag positions on pointer release", async () => {
     render(<CanvasPanelHarness />);
 
@@ -207,7 +248,103 @@ describe("CanvasPanel", () => {
     });
   });
 
-  it("scrolls the viewport to keep the selected card reachable after the layout tightens", async () => {
+  it("pans freeform by dragging the background", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    const freeformWorld = viewport.querySelector('[data-mode="freeform"]') as HTMLElement;
+
+    dispatchMouseDrag(
+      freeformWorld,
+      { button: 0, clientX: 220, clientY: 180 },
+      { button: 0, clientX: 300, clientY: 250 }
+    );
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+    });
+  });
+
+  it("pans freeform with middle mouse drag", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    dispatchMouseDrag(
+      viewport,
+      { button: 1, clientX: 260, clientY: 220 },
+      { button: 1, clientX: 180, clientY: 150 }
+    );
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-70");
+    });
+  });
+
+  it("pans freeform with Space plus drag", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    fireEvent.keyDown(window, { key: " ", code: "Space", charCode: 32 });
+    await waitFor(() =>
+      expect(viewport).toHaveAttribute("data-pan-ready", "true")
+    );
+
+    dispatchMouseDrag(
+      viewport,
+      { button: 0, clientX: 240, clientY: 210 },
+      { button: 0, clientX: 150, clientY: 120 }
+    );
+    fireEvent.keyUp(window, { key: " ", code: "Space", charCode: 32 });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-90");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-90");
+    });
+    await waitFor(() =>
+      expect(viewport).toHaveAttribute("data-pan-ready", "false")
+    );
+  });
+
+  it("pans freeform immediately on wheel input", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    fireEvent.wheel(viewport, {
+      deltaX: 90,
+      deltaY: 45,
+      deltaMode: 0,
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-90");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-45");
+    });
+  });
+
+  it("zooms freeform on Ctrl plus wheel", async () => {
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    fireEvent.wheel(viewport, {
+      deltaY: -200,
+      deltaMode: 0,
+      ctrlKey: true,
+      clientX: 360,
+      clientY: 240,
+    });
+
+    await waitFor(() => {
+      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeGreaterThan(1);
+    });
+  });
+
+  it("auto-pans just enough to keep the active card visible after layout tightening", async () => {
     render(<LayoutShiftHarness />);
 
     const viewport = screen.getByLabelText("Reading canvas viewport");
@@ -227,31 +364,34 @@ describe("CanvasPanel", () => {
       },
     });
 
-    viewport.scrollLeft = 0;
-    viewport.scrollTop = 0;
-
-    const scrollToMock = vi
-      .fn()
-      .mockImplementation((options?: ScrollToOptions | number, top?: number) => {
-        if (typeof options === "number") {
-          viewport.scrollLeft = options;
-          viewport.scrollTop = top ?? viewport.scrollTop;
-          return;
-        }
-
-        viewport.scrollLeft = options?.left ?? viewport.scrollLeft;
-        viewport.scrollTop = options?.top ?? viewport.scrollTop;
-      });
-    Object.defineProperty(viewport, "scrollTo", {
-      configurable: true,
-      value: scrollToMock,
-    });
-
     viewportWidthPx = 560;
     viewportHeightPx = 540;
     fireEvent.click(screen.getByRole("button", { name: "Shrink layout" }));
 
-    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(viewport.scrollLeft).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(Number(viewport.getAttribute("data-view-pan-x"))).toBeLessThan(0);
+    });
+  });
+
+  it("fits the spread by zooming out and reframing far-apart cards", async () => {
+    render(<WideSpreadHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    Object.defineProperty(viewport, "clientWidth", {
+      configurable: true,
+      value: 960,
+    });
+    Object.defineProperty(viewport, "clientHeight", {
+      configurable: true,
+      value: 640,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fit Spread" }));
+
+    await waitFor(() => {
+      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeLessThan(0.5);
+      expect(Number(viewport.getAttribute("data-view-pan-x"))).not.toBe(0);
+      expect(Number(viewport.getAttribute("data-view-pan-y"))).not.toBe(0);
+    });
   });
 });

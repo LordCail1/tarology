@@ -5,6 +5,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import {
   CANVAS_ZOOM_STEP,
@@ -15,17 +16,23 @@ import {
   GRID_PADDING_PX,
   clampCanvasZoom,
   clampFreeformPosition,
+  getDefaultFreeformViewState,
   getGridCellSize,
   resolveCanvasMetrics,
-  resolveCanvasWorldMetrics,
-  resolveFitCanvasZoom,
+  resolveFreeformContentBounds,
+  resolveFreeformFitViewState,
+  resolveFreeformViewportPoint,
   resolveGridPixelPosition,
-  resolveScaledCanvasMetrics,
-  resolveViewportRevealScroll,
+  resolveViewportRevealViewState,
+  resolveZoomedFreeformViewState,
   snapGridPosition,
   type CanvasMetrics,
-  type CanvasScrollPosition,
+  type FreeformViewState,
 } from "../../lib/reading-studio-canvas";
+import {
+  readPersistedFreeformViewState,
+  writePersistedFreeformViewState,
+} from "../../lib/reading-studio-freeform-view";
 import type {
   CanvasMode,
   ReadingCanvasCard,
@@ -65,8 +72,8 @@ interface DragState {
   upEventName: "mouseup" | "pointerup";
   pointerOffsetXPx: number;
   pointerOffsetYPx: number;
-  metrics: CanvasMetrics;
-  zoomLevel: number;
+  freeformViewState: FreeformViewState | null;
+  gridMetrics: CanvasMetrics | null;
   freeform: {
     xPx: number;
     yPx: number;
@@ -78,21 +85,19 @@ interface DragState {
 }
 
 interface PanState {
-  moveEventName: "mousemove" | "pointermove";
-  upEventName: "mouseup" | "pointerup";
   startClientXPx: number;
   startClientYPx: number;
-  startScrollLeftPx: number;
-  startScrollTopPx: number;
+  startPanXPx: number;
+  startPanYPx: number;
 }
 
 type DragStartEvent =
   | ReactMouseEvent<HTMLButtonElement>
   | ReactPointerEvent<HTMLButtonElement>;
-type DragMoveEvent = MouseEvent | PointerEvent;
 type PanStartEvent =
   | ReactMouseEvent<HTMLDivElement>
   | ReactPointerEvent<HTMLDivElement>;
+type DragMoveEvent = MouseEvent | PointerEvent;
 
 function readViewportMetrics(element: HTMLDivElement | null): CanvasMetrics {
   const rect = element?.getBoundingClientRect();
@@ -101,6 +106,43 @@ function readViewportMetrics(element: HTMLDivElement | null): CanvasMetrics {
     widthPx: element?.clientWidth || rect?.width,
     heightPx: element?.clientHeight || rect?.height,
   });
+}
+
+function resolveClientCoordinate(
+  value: unknown,
+  fallback: number | null = null
+): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function resolveViewportPoint(options: {
+  event: Pick<DragStartEvent | DragMoveEvent, "clientX" | "clientY">;
+  viewportElement: HTMLDivElement | null;
+  mode: CanvasMode;
+  freeformViewState: FreeformViewState;
+}): { xPx: number; yPx: number } | null {
+  const clientXPx = resolveClientCoordinate(options.event.clientX);
+  const clientYPx = resolveClientCoordinate(options.event.clientY);
+
+  if (clientXPx === null || clientYPx === null || !options.viewportElement) {
+    return null;
+  }
+
+  const viewportRect = options.viewportElement.getBoundingClientRect();
+
+  if (options.mode === "freeform") {
+    return resolveFreeformViewportPoint({
+      clientXPx,
+      clientYPx,
+      viewportRect,
+      viewState: options.freeformViewState,
+    });
+  }
+
+  return {
+    xPx: clientXPx - viewportRect.left,
+    yPx: clientYPx - viewportRect.top,
+  };
 }
 
 function resolveCardPosition(
@@ -118,48 +160,6 @@ function resolveCardPosition(
   };
 }
 
-function resolveClientCoordinate(
-  value: unknown,
-  fallback: number | null = null
-): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function resolveViewportPoint(
-  event: Pick<DragStartEvent | DragMoveEvent | PanStartEvent, "clientX" | "clientY">,
-  viewportElement: HTMLDivElement | null,
-  zoomLevel: number,
-  fallback: { xPx: number; yPx: number } | null
-): { xPx: number; yPx: number } | null {
-  const xPx = resolveClientCoordinate(event.clientX, fallback?.xPx ?? null);
-  const yPx = resolveClientCoordinate(event.clientY, fallback?.yPx ?? null);
-
-  if (xPx === null || yPx === null) {
-    return null;
-  }
-
-  const rect = viewportElement?.getBoundingClientRect();
-  const scrollLeftPx = viewportElement?.scrollLeft ?? 0;
-  const scrollTopPx = viewportElement?.scrollTop ?? 0;
-  const safeZoomLevel = clampCanvasZoom(zoomLevel);
-
-  return {
-    xPx: (scrollLeftPx + xPx - (rect?.left ?? 0)) / safeZoomLevel,
-    yPx: (scrollTopPx + yPx - (rect?.top ?? 0)) / safeZoomLevel,
-  };
-}
-
-function readViewportCenterWorldPoint(
-  viewportElement: HTMLDivElement,
-  zoomLevel: number
-): { xPx: number; yPx: number } {
-  const safeZoomLevel = clampCanvasZoom(zoomLevel);
-  return {
-    xPx: (viewportElement.scrollLeft + viewportElement.clientWidth / 2) / safeZoomLevel,
-    yPx: (viewportElement.scrollTop + viewportElement.clientHeight / 2) / safeZoomLevel,
-  };
-}
-
 function isTextEntryElement(element: Element | null): boolean {
   if (!element) {
     return false;
@@ -171,6 +171,26 @@ function isTextEntryElement(element: Element | null): boolean {
     element instanceof HTMLSelectElement ||
     element.hasAttribute("contenteditable")
   );
+}
+
+function resolveWheelDeltaPx(
+  value: number,
+  deltaMode: number,
+  pageSizePx: number
+): number {
+  if (!Number.isFinite(value) || value === 0) {
+    return 0;
+  }
+
+  if (deltaMode === 1) {
+    return value * 16;
+  }
+
+  if (deltaMode === 2) {
+    return value * pageSizePx;
+  }
+
+  return value;
 }
 
 export function CanvasPanel({
@@ -187,20 +207,24 @@ export function CanvasPanel({
   onFlipCard,
 }: CanvasPanelProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollRef = useRef<CanvasScrollPosition | null>(null);
-  const pendingViewportCenterRef = useRef<{ xPx: number; yPx: number } | null>(null);
+  const storageRef = useRef<Storage | undefined>(
+    typeof window === "undefined" ? undefined : window.localStorage
+  );
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [spacePanArmed, setSpacePanArmed] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(DEFAULT_CANVAS_ZOOM);
   const [viewportMetrics, setViewportMetrics] = useState(() =>
     resolveCanvasMetrics(undefined)
   );
   const [lastInteractedCardId, setLastInteractedCardId] = useState<string | null>(null);
+  const [freeformViewState, setFreeformViewState] = useState<FreeformViewState>(() =>
+    getDefaultFreeformViewState()
+  );
   const supportsPointerEvents =
     typeof window !== "undefined" && "PointerEvent" in window;
 
   const activeMode = workspace.canvas.activeMode;
+  const isFreeformMode = activeMode === "freeform";
   const renderedCards = useMemo(
     () =>
       workspace.canvas.cards.map((card) =>
@@ -222,38 +246,21 @@ export function CanvasPanel({
   );
   const selectedCard =
     renderedCards.find((card) => card.id === selectedCardId) ?? null;
-  const contentMetrics = useMemo(
-    () => resolveCanvasWorldMetrics({
-      mode: activeMode,
-      cards: renderedCards,
-      viewportMetrics: undefined,
-      zoomLevel: DEFAULT_CANVAS_ZOOM,
-    }),
-    [activeMode, renderedCards]
+  const gridMetrics = useMemo(
+    () => resolveCanvasMetrics(viewportMetrics),
+    [viewportMetrics]
   );
-  const worldMetrics = useMemo(
-    () =>
-      resolveCanvasWorldMetrics({
-        mode: activeMode,
-        cards: renderedCards,
-        viewportMetrics,
-        zoomLevel,
-      }),
-    [activeMode, renderedCards, viewportMetrics, zoomLevel]
-  );
-  const scaledWorldMetrics = useMemo(
-    () => resolveScaledCanvasMetrics(worldMetrics, zoomLevel),
-    [worldMetrics, zoomLevel]
+  const freeformBounds = useMemo(
+    () => resolveFreeformContentBounds(renderedCards),
+    [renderedCards]
   );
 
   useEffect(() => {
-    const viewportElement = viewportRef.current;
-    if (viewportElement) {
-      viewportElement.scrollLeft = 0;
-      viewportElement.scrollTop = 0;
-    }
-
-    setZoomLevel(DEFAULT_CANVAS_ZOOM);
+    const persistedViewState = readPersistedFreeformViewState(
+      storageRef.current,
+      workspace.reading.id
+    );
+    setFreeformViewState(persistedViewState);
     setLastInteractedCardId(null);
   }, [workspace.reading.id]);
 
@@ -262,6 +269,23 @@ export function CanvasPanel({
       setLastInteractedCardId(selectedCardId);
     }
   }, [selectedCardId]);
+
+  useEffect(() => {
+    const timeoutHandle = window.setTimeout(() => {
+      writePersistedFreeformViewState(
+        storageRef.current,
+        workspace.reading.id,
+        freeformViewState
+      );
+    }, 120);
+
+    return () => window.clearTimeout(timeoutHandle);
+  }, [
+    freeformViewState.panXPx,
+    freeformViewState.panYPx,
+    freeformViewState.zoomLevel,
+    workspace.reading.id,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -274,6 +298,7 @@ export function CanvasPanel({
         return;
       }
 
+      event.preventDefault();
       setSpacePanArmed(true);
     }
 
@@ -323,54 +348,12 @@ export function CanvasPanel({
   }, [layoutSignature]);
 
   useEffect(() => {
-    const viewportElement = viewportRef.current;
-    if (!viewportElement) {
-      return;
-    }
-
-    const pendingScroll = pendingScrollRef.current;
-    const pendingViewportCenter = pendingViewportCenterRef.current;
-
-    if (!pendingScroll && !pendingViewportCenter) {
-      return;
-    }
-
-    const frameHandle = window.requestAnimationFrame(() => {
-      const nextViewport = viewportRef.current;
-      if (!nextViewport) {
-        return;
-      }
-
-      if (pendingScrollRef.current) {
-        nextViewport.scrollLeft = pendingScrollRef.current.leftPx;
-        nextViewport.scrollTop = pendingScrollRef.current.topPx;
-        pendingScrollRef.current = null;
-      } else if (pendingViewportCenterRef.current) {
-        nextViewport.scrollLeft = Math.max(
-          0,
-          pendingViewportCenterRef.current.xPx * zoomLevel -
-            nextViewport.clientWidth / 2
-        );
-        nextViewport.scrollTop = Math.max(
-          0,
-          pendingViewportCenterRef.current.yPx * zoomLevel -
-            nextViewport.clientHeight / 2
-        );
-        pendingViewportCenterRef.current = null;
-      }
-    });
-
-    return () => window.cancelAnimationFrame(frameHandle);
-  }, [zoomLevel, scaledWorldMetrics.heightPx, scaledWorldMetrics.widthPx]);
-
-  useEffect(() => {
-    if (dragState) {
+    if (!isFreeformMode || dragState || isPanning) {
       return;
     }
 
     const targetCardId = selectedCardId ?? lastInteractedCardId;
-    const viewportElement = viewportRef.current;
-    if (!targetCardId || !viewportElement) {
+    if (!targetCardId) {
       return;
     }
 
@@ -379,106 +362,100 @@ export function CanvasPanel({
       return;
     }
 
-    const targetPosition = resolveCardPosition(targetCard, activeMode, worldMetrics);
-    const nextScroll = resolveViewportRevealScroll({
+    const nextViewState = resolveViewportRevealViewState({
       viewportMetrics,
-      scrollPosition: {
-        leftPx: viewportElement.scrollLeft,
-        topPx: viewportElement.scrollTop,
-      },
+      viewState: freeformViewState,
       targetRect: {
-        leftPx: targetPosition.xPx,
-        topPx: targetPosition.yPx,
+        leftPx: targetCard.freeform.xPx,
+        topPx: targetCard.freeform.yPx,
         widthPx: CARD_WIDTH_PX,
         heightPx: CARD_HEIGHT_PX,
       },
-      zoomLevel,
     });
 
-    if (!nextScroll) {
+    if (!nextViewState) {
       return;
     }
 
     if (isLayoutResizing) {
-      viewportElement.scrollLeft = nextScroll.leftPx;
-      viewportElement.scrollTop = nextScroll.topPx;
+      setFreeformViewState(nextViewState);
       return;
     }
 
-    if (typeof viewportElement.scrollTo === "function") {
-      viewportElement.scrollTo({
-        left: nextScroll.leftPx,
-        top: nextScroll.topPx,
-        behavior: "smooth",
-      });
-      return;
-    }
-
-    viewportElement.scrollLeft = nextScroll.leftPx;
-    viewportElement.scrollTop = nextScroll.topPx;
+    setFreeformViewState(nextViewState);
   }, [
-    activeMode,
     dragState,
+    freeformViewState,
+    isFreeformMode,
     isLayoutResizing,
+    isPanning,
     lastInteractedCardId,
     layoutSignature,
     renderedCards,
     selectedCardId,
     viewportMetrics,
-    worldMetrics,
-    zoomLevel,
   ]);
 
-  function scheduleZoom(nextZoomLevel: number, options?: {
-    preserveViewportCenter?: boolean;
-    scrollTo?: CanvasScrollPosition;
-  }) {
-    const resolvedZoomLevel = clampCanvasZoom(nextZoomLevel);
-    const viewportElement = viewportRef.current;
-
-    if (options?.scrollTo) {
-      pendingScrollRef.current = options.scrollTo;
-      pendingViewportCenterRef.current = null;
-    } else if (options?.preserveViewportCenter !== false && viewportElement) {
-      pendingViewportCenterRef.current = readViewportCenterWorldPoint(
-        viewportElement,
-        zoomLevel
-      );
-      pendingScrollRef.current = null;
+  function scheduleZoom(nextZoomLevel: number) {
+    if (!isFreeformMode) {
+      return;
     }
 
-    setZoomLevel(resolvedZoomLevel);
+    const viewportElement = viewportRef.current;
+    const anchorPointPx = viewportElement
+      ? {
+          xPx: viewportElement.clientWidth / 2,
+          yPx: viewportElement.clientHeight / 2,
+        }
+      : {
+          xPx: viewportMetrics.widthPx / 2,
+          yPx: viewportMetrics.heightPx / 2,
+        };
+
+    setFreeformViewState((current) =>
+      resolveZoomedFreeformViewState({
+        current,
+        nextZoomLevel,
+        anchorPointPx,
+      })
+    );
   }
 
   function handleFitSpread() {
-    const fitZoomLevel = resolveFitCanvasZoom(contentMetrics, viewportMetrics);
-    scheduleZoom(fitZoomLevel, {
-      preserveViewportCenter: false,
-      scrollTo: {
-        leftPx: 0,
-        topPx: 0,
-      },
-    });
+    if (!isFreeformMode) {
+      return;
+    }
+
+    setFreeformViewState(
+      resolveFreeformFitViewState({
+        bounds: freeformBounds,
+        viewportMetrics,
+      })
+    );
   }
 
   function handleResetView() {
-    scheduleZoom(DEFAULT_CANVAS_ZOOM, {
-      preserveViewportCenter: false,
-      scrollTo: {
-        leftPx: 0,
-        topPx: 0,
-      },
-    });
+    if (!isFreeformMode) {
+      return;
+    }
+
+    setFreeformViewState(getDefaultFreeformViewState());
   }
 
-  function beginViewportPan(event: PanStartEvent) {
-    const viewportElement = viewportRef.current;
-    if (!viewportElement) {
+  function beginViewportPan(
+    event: PanStartEvent,
+    options?: {
+      allowPrimaryButton?: boolean;
+    }
+  ) {
+    if (!isFreeformMode) {
       return;
     }
 
     const shouldStartPan =
-      event.button === 1 || (event.button === 0 && spacePanArmed);
+      event.button === 1 ||
+      (event.button === 0 && (spacePanArmed || options?.allowPrimaryButton));
+
     if (!shouldStartPan) {
       return;
     }
@@ -487,41 +464,82 @@ export function CanvasPanel({
     event.stopPropagation();
 
     const initialPanState: PanState = {
-      moveEventName: event.type === "mousedown" ? "mousemove" : "pointermove",
-      upEventName: event.type === "mousedown" ? "mouseup" : "pointerup",
       startClientXPx: event.clientX,
       startClientYPx: event.clientY,
-      startScrollLeftPx: viewportElement.scrollLeft,
-      startScrollTopPx: viewportElement.scrollTop,
+      startPanXPx: freeformViewState.panXPx,
+      startPanYPx: freeformViewState.panYPx,
     };
 
     function handlePointerMove(nextEvent: MouseEvent | PointerEvent) {
-      const nextViewport = viewportRef.current;
-      if (!nextViewport) {
-        return;
-      }
-
-      nextViewport.scrollLeft = Math.max(
-        0,
-        initialPanState.startScrollLeftPx -
-          (nextEvent.clientX - initialPanState.startClientXPx)
-      );
-      nextViewport.scrollTop = Math.max(
-        0,
-        initialPanState.startScrollTopPx -
-          (nextEvent.clientY - initialPanState.startClientYPx)
-      );
+      setFreeformViewState((current) => ({
+        ...current,
+        panXPx:
+          initialPanState.startPanXPx + (nextEvent.clientX - initialPanState.startClientXPx),
+        panYPx:
+          initialPanState.startPanYPx + (nextEvent.clientY - initialPanState.startClientYPx),
+      }));
     }
 
     function handlePointerUp() {
       setIsPanning(false);
-      window.removeEventListener(initialPanState.moveEventName, handlePointerMove);
-      window.removeEventListener(initialPanState.upEventName, handlePointerUp);
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
     }
 
     setIsPanning(true);
-    window.addEventListener(initialPanState.moveEventName, handlePointerMove);
-    window.addEventListener(initialPanState.upEventName, handlePointerUp);
+    window.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("mouseup", handlePointerUp);
+  }
+
+  function handleViewportWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    const viewportElement = viewportRef.current;
+
+    if (
+      !viewportElement ||
+      !isFreeformMode ||
+      (!event.deltaX && !event.deltaY)
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const deltaXPx = resolveWheelDeltaPx(
+      event.deltaX,
+      event.deltaMode,
+      viewportElement.clientWidth
+    );
+    const deltaYPx = resolveWheelDeltaPx(
+      event.deltaY,
+      event.deltaMode,
+      viewportElement.clientHeight
+    );
+
+    if (event.ctrlKey || event.metaKey) {
+      const viewportRect = viewportElement.getBoundingClientRect();
+      const anchorPointPx = {
+        xPx: event.clientX - viewportRect.left,
+        yPx: event.clientY - viewportRect.top,
+      };
+      const zoomDeltaPx = deltaYPx !== 0 ? deltaYPx : deltaXPx;
+      const nextZoomLevel =
+        freeformViewState.zoomLevel * Math.exp(-zoomDeltaPx / 400);
+
+      setFreeformViewState((current) =>
+        resolveZoomedFreeformViewState({
+          current,
+          nextZoomLevel,
+          anchorPointPx,
+        })
+      );
+      return;
+    }
+
+    setFreeformViewState((current) => ({
+      ...current,
+      panXPx: current.panXPx - deltaXPx,
+      panYPx: current.panYPx - deltaYPx,
+    }));
   }
 
   function beginCardDrag(card: ReadingCanvasCard, event: DragStartEvent) {
@@ -534,18 +552,18 @@ export function CanvasPanel({
     onSelectCard(card.id);
     setLastInteractedCardId(card.id);
 
-    const pointer = resolveViewportPoint(
+    const pointer = resolveViewportPoint({
       event,
-      viewportRef.current,
-      zoomLevel,
-      resolveCardPosition(card, activeMode, worldMetrics)
-    );
+      viewportElement: viewportRef.current,
+      mode: activeMode,
+      freeformViewState,
+    });
 
     if (!pointer) {
       return;
     }
 
-    const currentPosition = resolveCardPosition(card, activeMode, worldMetrics);
+    const currentPosition = resolveCardPosition(card, activeMode, gridMetrics);
     const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
     const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
 
@@ -556,8 +574,18 @@ export function CanvasPanel({
       upEventName,
       pointerOffsetXPx: pointer.xPx - currentPosition.xPx,
       pointerOffsetYPx: pointer.yPx - currentPosition.yPx,
-      metrics: worldMetrics,
-      zoomLevel,
+      freeformViewState:
+        activeMode === "freeform"
+          ? {
+              ...freeformViewState,
+            }
+          : null,
+      gridMetrics:
+        activeMode === "grid"
+          ? {
+              ...gridMetrics,
+            }
+          : null,
       freeform:
         activeMode === "freeform"
           ? {
@@ -578,12 +606,13 @@ export function CanvasPanel({
     let currentGrid = initialDragState.grid;
 
     function handlePointerMove(nextEvent: DragMoveEvent) {
-      const nextPoint = resolveViewportPoint(
-        nextEvent,
-        viewportRef.current,
-        initialDragState.zoomLevel,
-        null
-      );
+      const nextPoint = resolveViewportPoint({
+        event: nextEvent,
+        viewportElement: viewportRef.current,
+        mode: initialDragState.mode,
+        freeformViewState:
+          initialDragState.freeformViewState ?? getDefaultFreeformViewState(),
+      });
 
       if (!nextPoint) {
         return;
@@ -595,7 +624,7 @@ export function CanvasPanel({
             xPx: nextPoint.xPx - initialDragState.pointerOffsetXPx,
             yPx: nextPoint.yPx - initialDragState.pointerOffsetYPx,
           },
-          initialDragState.metrics
+          undefined
         );
 
         setDragState({
@@ -606,7 +635,9 @@ export function CanvasPanel({
         return;
       }
 
-      const { cellWidthPx, cellHeightPx } = getGridCellSize(initialDragState.metrics);
+      const { cellWidthPx, cellHeightPx } = getGridCellSize(
+        initialDragState.gridMetrics ?? gridMetrics
+      );
       const relativeXPx =
         nextPoint.xPx -
         initialDragState.pointerOffsetXPx +
@@ -623,7 +654,7 @@ export function CanvasPanel({
           column: Math.round(relativeXPx / (cellWidthPx + GRID_GAP_PX)),
           row: Math.round(relativeYPx / (cellHeightPx + GRID_GAP_PX)),
         },
-        initialDragState.metrics
+        initialDragState.gridMetrics ?? gridMetrics
       );
 
       setDragState({
@@ -657,7 +688,7 @@ export function CanvasPanel({
   }
 
   function resolveCardStyle(card: ReadingCanvasCard) {
-    const position = resolveCardPosition(card, activeMode, worldMetrics);
+    const position = resolveCardPosition(card, activeMode, gridMetrics);
 
     return {
       left: `${position.xPx}px`,
@@ -669,6 +700,9 @@ export function CanvasPanel({
       transform: `rotate(${card.rotationDeg}deg)`,
     };
   }
+
+  const viewControlsDisabled = !isFreeformMode;
+  const freeformWorldTransform = `translate3d(${freeformViewState.panXPx}px, ${freeformViewState.panYPx}px, 0) scale(${freeformViewState.zoomLevel})`;
 
   return (
     <section
@@ -720,18 +754,24 @@ export function CanvasPanel({
               type="button"
               className="reading-canvas-toolbar-button"
               aria-label="Zoom out"
-              onClick={() => scheduleZoom(zoomLevel - CANVAS_ZOOM_STEP)}
+              onClick={() =>
+                scheduleZoom(freeformViewState.zoomLevel - CANVAS_ZOOM_STEP)
+              }
+              disabled={viewControlsDisabled}
             >
               -
             </button>
             <span className="reading-canvas-zoom-readout" aria-live="polite">
-              {Math.round(zoomLevel * 100)}%
+              {Math.round(freeformViewState.zoomLevel * 100)}%
             </span>
             <button
               type="button"
               className="reading-canvas-toolbar-button"
               aria-label="Zoom in"
-              onClick={() => scheduleZoom(zoomLevel + CANVAS_ZOOM_STEP)}
+              onClick={() =>
+                scheduleZoom(freeformViewState.zoomLevel + CANVAS_ZOOM_STEP)
+              }
+              disabled={viewControlsDisabled}
             >
               +
             </button>
@@ -739,6 +779,7 @@ export function CanvasPanel({
               type="button"
               className="reading-canvas-toolbar-button"
               onClick={handleFitSpread}
+              disabled={viewControlsDisabled}
             >
               Fit Spread
             </button>
@@ -746,6 +787,7 @@ export function CanvasPanel({
               type="button"
               className="reading-canvas-toolbar-button"
               onClick={handleResetView}
+              disabled={viewControlsDisabled}
             >
               Reset View
             </button>
@@ -787,7 +829,9 @@ export function CanvasPanel({
             </button>
           </div>
           <p className="reading-canvas-view-hint">
-            Pan with middle mouse or Space + drag.
+            {isFreeformMode
+              ? "Drag the background to pan. Wheel pans. Ctrl/Cmd + wheel zooms."
+              : "Grid stays bounded. Switch to freeform for infinite pan and zoom."}
           </p>
         </div>
       </div>
@@ -797,52 +841,50 @@ export function CanvasPanel({
         className="reading-canvas-surface"
         aria-label="Reading canvas viewport"
         data-mode={activeMode}
-        data-pan-ready={spacePanArmed ? "true" : "false"}
+        data-pan-ready={isFreeformMode && spacePanArmed ? "true" : "false"}
         data-panning={isPanning ? "true" : "false"}
-        onPointerDownCapture={
-          supportsPointerEvents ? (event) => beginViewportPan(event) : undefined
-        }
-        onMouseDownCapture={
-          supportsPointerEvents ? undefined : (event) => beginViewportPan(event)
-        }
+        data-view-pan-x={Math.round(freeformViewState.panXPx)}
+        data-view-pan-y={Math.round(freeformViewState.panYPx)}
+        data-view-zoom={freeformViewState.zoomLevel.toFixed(3)}
+        onMouseDownCapture={(event) => beginViewportPan(event)}
+        onWheel={handleViewportWheel}
+        onAuxClick={(event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+          }
+        }}
       >
-        <div
-          className="reading-canvas-stage"
-          style={{
-            width: `${scaledWorldMetrics.widthPx}px`,
-            height: `${scaledWorldMetrics.heightPx}px`,
-          }}
-        >
+        <div className="reading-canvas-watermark" aria-hidden="true">
+          <img
+            src="/magician-logo.png"
+            alt=""
+            className="reading-canvas-watermark-image"
+          />
+          <p className="reading-canvas-watermark-text">
+            Tarology reflective reading studio
+          </p>
+        </div>
+
+        {isFreeformMode ? (
           <div
             className="reading-canvas-world"
-            data-mode={activeMode}
+            data-mode="freeform"
             style={{
-              width: `${worldMetrics.widthPx}px`,
-              height: `${worldMetrics.heightPx}px`,
-              transform: `scale(${zoomLevel})`,
+              transform: freeformWorldTransform,
             }}
             onPointerDown={(event) => {
-              if (event.target === event.currentTarget) {
+              if (supportsPointerEvents && event.target === event.currentTarget) {
                 onSelectCard(null);
+                beginViewportPan(event, { allowPrimaryButton: true });
               }
             }}
             onMouseDown={(event) => {
               if (!supportsPointerEvents && event.target === event.currentTarget) {
                 onSelectCard(null);
+                beginViewportPan(event, { allowPrimaryButton: true });
               }
             }}
           >
-            <div className="reading-canvas-watermark" aria-hidden="true">
-              <img
-                src="/magician-logo.png"
-                alt=""
-                className="reading-canvas-watermark-image"
-              />
-              <p className="reading-canvas-watermark-text">
-                Tarology reflective reading studio
-              </p>
-            </div>
-
             {renderedCards.map((card) => {
               const isSelected = card.id === selectedCardId;
 
@@ -885,7 +927,76 @@ export function CanvasPanel({
               );
             })}
           </div>
-        </div>
+        ) : (
+          <div
+            className="reading-canvas-stage"
+            style={{
+              width: `${gridMetrics.widthPx}px`,
+              height: `${gridMetrics.heightPx}px`,
+            }}
+          >
+            <div
+              className="reading-canvas-world"
+              data-mode="grid"
+              style={{
+                width: `${gridMetrics.widthPx}px`,
+                height: `${gridMetrics.heightPx}px`,
+              }}
+              onPointerDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  onSelectCard(null);
+                }
+              }}
+              onMouseDown={(event) => {
+                if (!supportsPointerEvents && event.target === event.currentTarget) {
+                  onSelectCard(null);
+                }
+              }}
+            >
+              {renderedCards.map((card) => {
+                const isSelected = card.id === selectedCardId;
+
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    aria-label={`${card.label} card`}
+                    aria-pressed={isSelected}
+                    className="reading-canvas-card"
+                    data-face={card.isFaceUp ? "up" : "down"}
+                    data-selected={isSelected ? "true" : "false"}
+                    style={resolveCardStyle(card)}
+                    onPointerDown={
+                      supportsPointerEvents ? (event) => beginCardDrag(card, event) : undefined
+                    }
+                    onMouseDown={
+                      supportsPointerEvents ? undefined : (event) => beginCardDrag(card, event)
+                    }
+                  >
+                    {card.isFaceUp ? (
+                      <>
+                        <span className="reading-canvas-card-suit">Drawn Card</span>
+                        <strong className="reading-canvas-card-label">{card.label}</strong>
+                        <span className="reading-canvas-card-meta">
+                          Rotation {card.rotationDeg}°
+                        </span>
+                        {card.assignedReversal ? (
+                          <span className="reading-canvas-card-badge">Reversed</span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <span className="reading-canvas-card-suit">Face-down</span>
+                        <strong className="reading-canvas-card-label">Hidden card</strong>
+                        <span className="reading-canvas-card-meta">Tap Flip to reveal</span>
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <form className="reading-canvas-composer" aria-label="Reading composer">

@@ -86,6 +86,7 @@ h4 {
   width: min(88vw, 360px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   transition: transform 160ms ease, width 160ms ease;
@@ -116,11 +117,20 @@ h4 {
   align-items: center;
   border-bottom: 1px solid var(--color-border);
   padding: 0 0.75rem;
+  flex-shrink: 0;
 }
 
 .reading-shell-sidebar-content {
+  min-height: 0;
   overflow: auto;
   padding: 0.9rem 0.8rem 1.15rem;
+}
+
+.reading-shell-sidebar-panel {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .reading-shell-toggle {
@@ -511,10 +521,12 @@ h4 {
   min-height: 540px;
   border: 1px solid var(--color-border);
   border-radius: 1.15rem;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scroll-behavior: smooth;
+  overflow: hidden;
   background: rgba(12, 13, 15, 0.98);
+}
+
+.reading-canvas-surface[data-mode="freeform"] {
+  cursor: grab;
 }
 
 .reading-canvas-surface[data-pan-ready="true"] {
@@ -525,16 +537,6 @@ h4 {
   cursor: grabbing;
 }
 
-.reading-canvas-surface::-webkit-scrollbar {
-  height: 0.72rem;
-  width: 0.72rem;
-}
-
-.reading-canvas-surface::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-}
-
 .reading-canvas-stage {
   position: relative;
   min-width: 100%;
@@ -542,14 +544,20 @@ h4 {
 }
 
 .reading-canvas-world {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  overflow: visible;
   transform-origin: top left;
+  will-change: transform;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 48%),
     linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98));
 }
 
 .reading-canvas-world[data-mode="grid"] {
+  position: relative;
+  inset: auto;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98)),
     repeating-linear-gradient(
@@ -702,6 +710,7 @@ h4 {
 @media (min-width: 1024px) {
   .reading-shell {
     display: grid;
+    height: 100dvh;
     grid-template-columns: var(--left-size) minmax(420px, 1fr) var(--right-size);
   }
 
@@ -726,9 +735,14 @@ h4 {
     top: auto;
     bottom: auto;
     width: auto;
+    height: 100dvh;
     min-height: 100dvh;
     transform: none;
     border: 0;
+  }
+
+  .reading-shell-sidebar-panel {
+    animation: reading-shell-sidebar-panel-enter 150ms ease 90ms both;
   }
 
   .reading-shell-sidebar-left {
@@ -777,10 +791,31 @@ h4 {
 
   .reading-canvas {
     min-height: 0;
+    overflow: hidden;
     padding: 1rem 1.25rem 1.5rem;
+  }
+
+  .reading-shell-main {
+    min-height: 0;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .reading-canvas-surface {
+    min-height: 0;
   }
 
   .reading-canvas-mobile-controls {
     display: none;
+  }
+}
+
+@keyframes reading-shell-sidebar-panel-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }
