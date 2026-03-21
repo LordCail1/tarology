@@ -11,6 +11,17 @@ import { readingStudioSeedSnapshot } from "../../lib/reading-studio-mock";
 import type { ReadingStudioWorkspace } from "../../lib/reading-studio-types";
 import { CanvasPanel } from "./canvas-panel";
 
+class MockPointerEvent extends MouseEvent {
+  pointerId: number;
+  pointerType: string;
+
+  constructor(type: string, init: MouseEventInit & { pointerId?: number; pointerType?: string }) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 0;
+    this.pointerType = init.pointerType ?? "";
+  }
+}
+
 async function withMockPointerEvent(
   callback: () => Promise<void> | void,
   value: unknown = MouseEvent
@@ -441,6 +452,87 @@ describe("CanvasPanel", () => {
     });
   });
 
+  it("ignores non-initiating pointers during freeform viewport pan", async () => {
+    await withMockPointerEvent(async () => {
+      render(<CanvasPanelHarness />);
+
+      const viewport = screen.getByLabelText("Reading canvas viewport");
+
+      fireEvent.pointerDown(viewport, {
+        button: 0,
+        buttons: 1,
+        clientX: 220,
+        clientY: 180,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 300,
+        clientY: 250,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-panning", "true");
+        expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+      });
+
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 520,
+        clientY: 460,
+        pointerId: 2,
+        pointerType: "touch",
+      });
+      fireEvent.pointerUp(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 520,
+        clientY: 460,
+        pointerId: 2,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-panning", "true");
+        expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+      });
+
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 340,
+        clientY: 280,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-view-pan-x", "120");
+        expect(viewport).toHaveAttribute("data-view-pan-y", "100");
+      });
+
+      fireEvent.pointerUp(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 340,
+        clientY: 280,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(viewport).toHaveAttribute("data-panning", "false");
+      });
+    }, MockPointerEvent);
+  });
+
   it("pans freeform with middle mouse drag", async () => {
     render(<CanvasPanelHarness />);
 
@@ -743,6 +835,48 @@ describe("CanvasPanel", () => {
         panYPx: 70,
         zoomLevel: 1,
       });
+    });
+  });
+
+  it("switches readings without briefly rendering the previous freeform camera", async () => {
+    const [, secondReadingId] = readingStudioSeedSnapshot.history.map((reading) => reading.id);
+    writePersistedFreeformViewState(
+      window.localStorage,
+      secondReadingId,
+      {
+        panXPx: -240,
+        panYPx: -160,
+        zoomLevel: 0.8,
+      },
+      {
+        widthPx: 960,
+        heightPx: 640,
+      }
+    );
+
+    render(<ReadingSwitchHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    dispatchMouseDrag(
+      viewport,
+      { button: 0, clientX: 220, clientY: 180 },
+      { button: 0, clientX: 340, clientY: 270 }
+    );
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "120");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "90");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open second reading" }));
+
+    expect(viewport).not.toHaveAttribute("data-view-pan-x", "120");
+    expect(viewport).not.toHaveAttribute("data-view-pan-y", "90");
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "-240");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "-160");
+      expect(viewport).toHaveAttribute("data-view-zoom", "0.800");
     });
   });
 });

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -88,6 +89,7 @@ interface PanState {
   startClientYPx: number;
   startPanXPx: number;
   startPanYPx: number;
+  pointerId: number | null;
   requiredButtonsMask: number;
   moveEventName: "mousemove" | "pointermove";
   upEventName: "mouseup" | "pointerup";
@@ -125,6 +127,19 @@ function resolveClientCoordinate(
   fallback: number | null = null
 ): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function resolvePointerIdentifier(event: unknown): number | null {
+  const pointerId =
+    event && typeof event === "object" && "pointerId" in event
+      ? (event as { pointerId?: unknown }).pointerId
+      : null;
+
+  return typeof pointerId === "number" && Number.isFinite(pointerId) ? pointerId : null;
+}
+
+function resolveReactNativeEvent(event: DragStartEvent | PanStartEvent): Event | undefined {
+  return "nativeEvent" in event ? event.nativeEvent : undefined;
 }
 
 function resolveViewportPoint(options: {
@@ -345,12 +360,12 @@ export function CanvasPanel({
     }
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     hydratedReadingIdRef.current = null;
     setFreeformViewState(getDefaultFreeformViewState());
   }, [workspace.reading.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isFreeformMode || !hasMeasuredViewportRef.current) {
       return;
     }
@@ -720,6 +735,10 @@ export function CanvasPanel({
       startClientYPx: event.clientY,
       startPanXPx: freeformViewState.panXPx,
       startPanYPx: freeformViewState.panYPx,
+      pointerId:
+        event.type === "pointerdown"
+          ? resolvePointerIdentifier(resolveReactNativeEvent(event) ?? event)
+          : null,
       requiredButtonsMask: event.button === 1 ? 4 : 1,
       moveEventName: event.type === "pointerdown" ? "pointermove" : "mousemove",
       upEventName: event.type === "pointerdown" ? "pointerup" : "mouseup",
@@ -738,6 +757,13 @@ export function CanvasPanel({
 
     function handlePointerMove(nextEvent: MouseEvent | PointerEvent) {
       if (
+        initialPanState.pointerId !== null &&
+        resolvePointerIdentifier(nextEvent) !== initialPanState.pointerId
+      ) {
+        return;
+      }
+
+      if (
         typeof nextEvent.buttons === "number" &&
         (nextEvent.buttons & initialPanState.requiredButtonsMask) === 0
       ) {
@@ -754,7 +780,15 @@ export function CanvasPanel({
       }));
     }
 
-    function handlePointerUp() {
+    function handlePointerUp(nextEvent?: MouseEvent | PointerEvent) {
+      if (
+        initialPanState.pointerId !== null &&
+        nextEvent &&
+        resolvePointerIdentifier(nextEvent) !== initialPanState.pointerId
+      ) {
+        return;
+      }
+
       endViewportPan();
     }
 
