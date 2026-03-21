@@ -29,7 +29,7 @@ This version merges:
 12. Git workflow is branch + PR based; direct pushes to `main` are disallowed.
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
-15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign.
+15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign; freeform treats card placement as stable world coordinates while pan/zoom/scroll remain view state.
 16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, the built-in starter path creates a user-owned editable deck instance, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
 17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
@@ -161,6 +161,13 @@ V1 support policy:
   - left and right panels can collapse/expand with motion.
   - left and right panels are desktop-resizable by drag handle.
   - panel width preference is persisted per user.
+  - freeform canvas layout changes must adjust the viewport rather than rewriting saved card positions.
+  - freeform is an infinite desktop canvas with a local camera/view layer rather than native browser scrollbars.
+  - if the viewport becomes smaller than the spread, cards remain reachable through panning.
+  - the world-space coordinate at the center of the visible freeform viewport remains centered after browser resizing or desktop sidebar expand/collapse.
+  - cards may leave the viewport after those layout changes; that is acceptable.
+  - the app must not auto-pan or edge-compensate just to keep a selected or recently touched card visible.
+  - `Fit Spread` is the explicit recovery tool when the reader wants to reframe the spread.
 
 ### 5.2 Core Journey
 1. User logs in with Google.

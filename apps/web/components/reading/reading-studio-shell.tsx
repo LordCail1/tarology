@@ -662,6 +662,14 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
     "--left-expanded-width": `${layoutPreferences.leftWidthPx}px`,
     "--right-expanded-width": `${layoutPreferences.rightWidthPx}px`,
   } as CSSProperties;
+  const layoutSignature = [
+    isDesktop ? "desktop" : "mobile",
+    viewportWidth,
+    layoutPreferences.leftOpen ? "left-open" : "left-closed",
+    layoutPreferences.leftWidthPx,
+    layoutPreferences.rightOpen ? "right-open" : "right-closed",
+    layoutPreferences.rightWidthPx,
+  ].join(":");
 
   return (
     <div
@@ -698,31 +706,33 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
       >
         {layoutPreferences.leftOpen ? (
           <>
-            <div className="reading-shell-sidebar-header">
-              <button
-                type="button"
-                className="reading-shell-toggle"
-                aria-label={isDesktop ? "Collapse history sidebar" : "Close history drawer"}
-                aria-controls="desktop-history-panel"
-                aria-expanded={layoutPreferences.leftOpen}
-                onClick={() => togglePanel("left")}
-              >
-                <span aria-hidden="true">&lt;</span>
-              </button>
-            </div>
-            <div className="reading-shell-sidebar-content">
-              <HistoryRail
-                profile={profile}
-                preferences={preferences}
-                groupedReadings={groupedReadings}
-                activeReadingId={activeReading.id}
-                searchQuery={historySearchQuery}
-                statusFilter={historyStatusFilter}
-                totalCount={studioSnapshot.history.length}
-                onSearchQueryChange={setHistorySearchQuery}
-                onStatusFilterChange={setHistoryStatusFilter}
-                onReadingSelect={(readingId) => void activateReading(readingId)}
-              />
+            <div className="reading-shell-sidebar-panel">
+              <div className="reading-shell-sidebar-header">
+                <button
+                  type="button"
+                  className="reading-shell-toggle"
+                  aria-label={isDesktop ? "Collapse history sidebar" : "Close history drawer"}
+                  aria-controls="desktop-history-panel"
+                  aria-expanded={layoutPreferences.leftOpen}
+                  onClick={() => togglePanel("left")}
+                >
+                  <span aria-hidden="true">&lt;</span>
+                </button>
+              </div>
+              <div className="reading-shell-sidebar-content">
+                <HistoryRail
+                  profile={profile}
+                  preferences={preferences}
+                  groupedReadings={groupedReadings}
+                  activeReadingId={activeReading.id}
+                  searchQuery={historySearchQuery}
+                  statusFilter={historyStatusFilter}
+                  totalCount={studioSnapshot.history.length}
+                  onSearchQueryChange={setHistorySearchQuery}
+                  onStatusFilterChange={setHistoryStatusFilter}
+                  onReadingSelect={(readingId) => void activateReading(readingId)}
+                />
+              </div>
             </div>
             {isDesktop ? (
               <ResizeHandle
@@ -780,6 +790,8 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
         <CanvasPanel
           workspace={activeWorkspace}
           selectedCardId={selectedCardId}
+          layoutSignature={layoutSignature}
+          isLayoutResizing={Boolean(resizeState)}
           onOpenLeftPanel={() => setPanelOpen("left", true)}
           onOpenRightPanel={() => setPanelOpen("right", true)}
           onSelectCard={setSelectedCardId}
@@ -821,25 +833,27 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
       >
         {layoutPreferences.rightOpen ? (
           <>
-            <div className="reading-shell-sidebar-header">
-              <button
-                type="button"
-                className="reading-shell-toggle"
-                aria-label={isDesktop ? "Collapse analysis sidebar" : "Close analysis drawer"}
-                aria-controls="desktop-analysis-panel"
-                aria-expanded={layoutPreferences.rightOpen}
-                onClick={() => togglePanel("right")}
-              >
-                <span aria-hidden="true">&gt;</span>
-              </button>
-            </div>
-            <div className="reading-shell-sidebar-content">
-              <AnalysisPanel
-                activeTab={analysisTab}
-                threads={activeWorkspace.threads}
-                interpretations={activeWorkspace.interpretations}
-                onTabChange={setAnalysisTab}
-              />
+            <div className="reading-shell-sidebar-panel">
+              <div className="reading-shell-sidebar-header">
+                <button
+                  type="button"
+                  className="reading-shell-toggle"
+                  aria-label={isDesktop ? "Collapse analysis sidebar" : "Close analysis drawer"}
+                  aria-controls="desktop-analysis-panel"
+                  aria-expanded={layoutPreferences.rightOpen}
+                  onClick={() => togglePanel("right")}
+                >
+                  <span aria-hidden="true">&gt;</span>
+                </button>
+              </div>
+              <div className="reading-shell-sidebar-content">
+                <AnalysisPanel
+                  activeTab={analysisTab}
+                  threads={activeWorkspace.threads}
+                  interpretations={activeWorkspace.interpretations}
+                  onTabChange={setAnalysisTab}
+                />
+              </div>
             </div>
             {isDesktop ? (
               <ResizeHandle

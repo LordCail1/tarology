@@ -1,6 +1,6 @@
 # Tarology v2 Plan
 
-Last updated: 2026-03-15 (America/Toronto)
+Last updated: 2026-03-20 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
@@ -28,7 +28,10 @@ Execution sequencing:
   - durable API-backed reading history/create/restore flows,
   - semantic canvas command persistence for mode switch, move, rotate, and flip,
   - local adapter seams limited to layout preferences and active-reading selection,
-  - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`).
+  - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`),
+  - a freeform world/viewport split so sidebar or browser resizing no longer rewrites saved card positions,
+  - an infinite freeform camera layer with background drag, middle-mouse, `Space + drag`, and wheel-based panning plus `Ctrl/Cmd + wheel` zoom,
+  - freeform layout changes now stabilize around the viewport center point rather than left-edge anchoring, and `Fit Spread` is the explicit recovery tool when cards move off-screen.
 - Profile/preferences onboarding baseline is now implemented:
   - Prisma/Postgres persists `users`, `auth_identities`, `profiles`, `user_preferences`, and `decks`
   - Google callback provisioning now creates/updates user, identity, profile, and preference shell records transactionally
@@ -86,6 +89,13 @@ Execution sequencing:
 - CI/CD baseline and Vercel preview/production pipeline.
 - Engineering workflow now includes a local post-merge branch cleanup command, with GitHub remote branch auto-delete enabled.
 - Reading Studio shell redesign with persisted panel state and mobile drawers.
+- Reading Studio canvas viewport refinement:
+  - desktop panel collapse/expand now animates through the shell grid rather than snapping instantly
+  - freeform cards now live in stable world coordinates while the visible canvas is a local infinite-camera view with no native scrollbars
+  - freeform now stabilizes around the center world point on browser/sidebar layout changes instead of preserving a left-edge anchor
+  - zoom, fit, and reset controls are available in the canvas toolbar
+  - selected or recently touched cards are allowed to move off-screen; `Fit Spread` is the explicit reframe tool
+  - web regression coverage now includes background drag, wheel pan, zoom, fit-spread, and center-point stabilization across layout changes
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 - Google auth baseline:
@@ -245,6 +255,7 @@ Execution sequencing:
 - Sources are minimal but visible in V1; import/export UI is basic; deck/card images are view-only.
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
 - Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
+- Freeform canvas uses stable world coordinates; pan/zoom camera state is local view state and must not rewrite persisted reading layout.
 - User default deck is captured during onboarding and can be overridden per reading.
 - Reading lifecycle status is `active` / `archived` / `deleted`; reader-facing organization labels are a separate concern.
 - MVP threshold is durable multi-reading behavior:
@@ -396,6 +407,7 @@ Deck-knowledge pivot follow-ups:
 - The current deck catalog is intentionally narrow: only the built-in Thoth deck is selectable, and card-image filename normalization is still deferred.
 - Deck assets are temporarily sourced from `tarology_old` with project-owner approval; broader licensing policy still needs a durable product decision.
 - Local WSL2 validation with `@prisma/adapter-pg` against `prisma dev` TCP URLs was unstable in this session; DB-backed API verification should be re-run against CI or a stable local Postgres service before merge.
+- Canvas viewport state (zoom and pan camera position) is intentionally local view state today; if cross-device view restore becomes important, add it separately from canonical reading state.
 
 ## Next Agent Start Commands
 ```bash
@@ -421,6 +433,12 @@ git status --short --branch
 npm run test --workspace @tarology/web
 npm run build --workspace @tarology/web
 # for full branch verification, start Prisma dev in apps/api and rerun root ci:checks with DATABASE_URL and TEST_DATABASE_URL set
+
+# if resuming the Reading Studio viewport refinement feature branch:
+cd /home/ram2c/gitclones/.worktrees/tarology/fix/reading-studio-panel-canvas-viewport
+git status --short --branch
+npm run test --workspace @tarology/web -- components/reading/canvas-panel.test.tsx components/reading/reading-studio-shell.test.tsx lib/reading-studio-canvas.test.ts
+npm run build --workspace @tarology/web
 ```
 
 ## Codex Continuity Note
