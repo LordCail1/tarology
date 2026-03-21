@@ -269,6 +269,75 @@ describe("CanvasPanel", () => {
     });
   });
 
+  it("ends pointer-based freeform panning on pointercancel", async () => {
+    const originalPointerEvent = window.PointerEvent;
+    Object.defineProperty(window, "PointerEvent", {
+      configurable: true,
+      writable: true,
+      value: MouseEvent,
+    });
+
+    render(<CanvasPanelHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      buttons: 1,
+      clientX: 220,
+      clientY: 180,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(window, {
+      button: 0,
+      buttons: 1,
+      clientX: 300,
+      clientY: 250,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-panning", "true");
+      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+    });
+
+    fireEvent.pointerCancel(window, {
+      button: 0,
+      buttons: 0,
+      clientX: 300,
+      clientY: 250,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-panning", "false");
+    });
+
+    fireEvent.pointerMove(window, {
+      button: 0,
+      buttons: 0,
+      clientX: 360,
+      clientY: 320,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+    });
+
+    Object.defineProperty(window, "PointerEvent", {
+      configurable: true,
+      writable: true,
+      value: originalPointerEvent,
+    });
+  });
+
   it("pans freeform with middle mouse drag", async () => {
     render(<CanvasPanelHarness />);
 
@@ -375,6 +444,29 @@ describe("CanvasPanel", () => {
       expect(viewport).toHaveAttribute("data-pan-ready", "false");
     });
     expect(document.activeElement).toBe(fitSpreadButton);
+  });
+
+  it("does not arm Space panning or prevent default in grid mode", async () => {
+    render(<CanvasPanelHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    const keyDownEvent = new KeyboardEvent("keydown", {
+      key: " ",
+      code: "Space",
+      bubbles: true,
+      cancelable: true,
+    });
+
+    act(() => {
+      window.dispatchEvent(keyDownEvent);
+    });
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-pan-ready", "false");
+    });
+    expect(keyDownEvent.defaultPrevented).toBe(false);
   });
 
   it("pans freeform immediately on wheel input", async () => {

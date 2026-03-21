@@ -335,7 +335,7 @@ export function CanvasPanel({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== " " || event.repeat) {
+      if (!isFreeformMode || event.key !== " " || event.repeat) {
         return;
       }
 
@@ -370,7 +370,7 @@ export function CanvasPanel({
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, []);
+  }, [isFreeformMode]);
 
   useEffect(() => {
     const viewportElement = viewportRef.current;
@@ -577,11 +577,15 @@ export function CanvasPanel({
       moveEventName: event.type === "pointerdown" ? "pointermove" : "mousemove",
       upEventName: event.type === "pointerdown" ? "pointerup" : "mouseup",
     };
+    const cancelEventName = event.type === "pointerdown" ? "pointercancel" : null;
 
     function endViewportPan() {
       setIsPanning(false);
       window.removeEventListener(initialPanState.moveEventName, handlePointerMove);
       window.removeEventListener(initialPanState.upEventName, handlePointerUp);
+      if (cancelEventName) {
+        window.removeEventListener(cancelEventName, handlePointerUp);
+      }
       window.removeEventListener("blur", endViewportPan);
     }
 
@@ -610,6 +614,9 @@ export function CanvasPanel({
     setIsPanning(true);
     window.addEventListener(initialPanState.moveEventName, handlePointerMove);
     window.addEventListener(initialPanState.upEventName, handlePointerUp);
+    if (cancelEventName) {
+      window.addEventListener(cancelEventName, handlePointerUp);
+    }
     window.addEventListener("blur", endViewportPan);
   }
 
