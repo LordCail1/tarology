@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CANVAS_ZOOM,
+  MIN_INTERACTIVE_CANVAS_ZOOM,
+  clampInteractiveCanvasZoom,
   clampFreeformPosition,
   getHighestStackOrder,
   getGridCellSize,
@@ -113,6 +115,40 @@ describe("reading-studio-canvas", () => {
         },
       }).zoomLevel
     ).toBe(DEFAULT_CANVAS_ZOOM);
+  });
+
+  it("lets Fit Spread zoom below the interactive minimum when the spread is huge", () => {
+    const viewState = resolveFreeformFitViewState({
+      bounds: {
+        leftPx: -18000,
+        topPx: -12000,
+        widthPx: 42000,
+        heightPx: 26000,
+      },
+      viewportMetrics: {
+        widthPx: 960,
+        heightPx: 640,
+      },
+    });
+
+    expect(viewState.zoomLevel).toBeLessThan(MIN_INTERACTIVE_CANVAS_ZOOM);
+    expect(viewState.zoomLevel).toBeCloseTo(960 / 42000, 6);
+  });
+
+  it("does not snap sub-floor fit zoom back up on a further zoom-out request", () => {
+    expect(
+      clampInteractiveCanvasZoom({
+        currentZoom: 0.02,
+        proposedZoom: 0.01,
+      })
+    ).toBeCloseTo(0.02, 6);
+
+    expect(
+      clampInteractiveCanvasZoom({
+        currentZoom: 0.02,
+        proposedZoom: 0.03,
+      })
+    ).toBeCloseTo(0.03, 6);
   });
 
   it("zooms around the chosen anchor point", () => {

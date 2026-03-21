@@ -13,7 +13,7 @@ import {
   DEFAULT_CANVAS_ZOOM,
   GRID_GAP_PX,
   GRID_PADDING_PX,
-  clampCanvasZoom,
+  clampInteractiveCanvasZoom,
   clampFreeformPosition,
   getDefaultFreeformViewState,
   getGridCellSize,
@@ -446,7 +446,10 @@ export function CanvasPanel({
     setFreeformViewState((current) =>
       resolveZoomedFreeformViewState({
         current,
-        nextZoomLevel,
+        nextZoomLevel: clampInteractiveCanvasZoom({
+          currentZoom: current.zoomLevel,
+          proposedZoom: nextZoomLevel,
+        }),
         anchorPointPx,
       })
     );
@@ -513,7 +516,10 @@ export function CanvasPanel({
       setFreeformViewState((current) =>
         resolveZoomedFreeformViewState({
           current,
-          nextZoomLevel: current.zoomLevel * Math.exp(-zoomDeltaPx / 400),
+          nextZoomLevel: clampInteractiveCanvasZoom({
+            currentZoom: current.zoomLevel,
+            proposedZoom: current.zoomLevel * Math.exp(-zoomDeltaPx / 400),
+          }),
           anchorPointPx,
         })
       );
@@ -912,6 +918,9 @@ export function CanvasPanel({
         data-view-pan-x={Math.round(freeformViewState.panXPx)}
         data-view-pan-y={Math.round(freeformViewState.panYPx)}
         data-view-zoom={freeformViewState.zoomLevel.toFixed(3)}
+        style={{
+          touchAction: isFreeformMode ? "none" : "auto",
+        }}
         onMouseDownCapture={(event) => beginViewportPan(event)}
         onPointerDown={(event) => {
           if (isFreeformMode && !isCardElement(event.target)) {

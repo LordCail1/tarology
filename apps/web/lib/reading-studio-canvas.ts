@@ -14,7 +14,8 @@ export const GRID_ROWS = 3;
 export const GRID_GAP_PX = 18;
 export const GRID_PADDING_PX = 28;
 export const FREEFORM_WORLD_PADDING_PX = 96;
-export const MIN_CANVAS_ZOOM = 0.05;
+export const MIN_CANVAS_ZOOM = 0.0001;
+export const MIN_INTERACTIVE_CANVAS_ZOOM = 0.05;
 export const MAX_CANVAS_ZOOM = 1.8;
 export const DEFAULT_CANVAS_ZOOM = 1;
 export const CANVAS_ZOOM_STEP = 0.1;
@@ -52,9 +53,33 @@ export function resolveCanvasMetrics(
   };
 }
 
-export function clampCanvasZoom(proposedZoom: number): number {
+export function clampCanvasZoom(
+  proposedZoom: number,
+  minimumZoom: number = MIN_CANVAS_ZOOM
+): number {
   const normalizedZoom = coerceFiniteNumber(proposedZoom, DEFAULT_CANVAS_ZOOM);
-  return Math.max(MIN_CANVAS_ZOOM, Math.min(normalizedZoom, MAX_CANVAS_ZOOM));
+  const normalizedMinimumZoom = Math.max(
+    MIN_CANVAS_ZOOM,
+    coerceFiniteNumber(minimumZoom, MIN_CANVAS_ZOOM)
+  );
+  return Math.max(normalizedMinimumZoom, Math.min(normalizedZoom, MAX_CANVAS_ZOOM));
+}
+
+export function clampInteractiveCanvasZoom(options: {
+  currentZoom: number;
+  proposedZoom: number;
+}): number {
+  const currentZoom = clampCanvasZoom(options.currentZoom);
+  const proposedZoom = clampCanvasZoom(options.proposedZoom);
+
+  if (
+    currentZoom < MIN_INTERACTIVE_CANVAS_ZOOM &&
+    proposedZoom < MIN_INTERACTIVE_CANVAS_ZOOM
+  ) {
+    return Math.max(currentZoom, proposedZoom);
+  }
+
+  return clampCanvasZoom(proposedZoom, MIN_INTERACTIVE_CANVAS_ZOOM);
 }
 
 export function getDefaultFreeformViewState(): FreeformViewState {

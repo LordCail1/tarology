@@ -79,8 +79,8 @@ function WideSpreadHarness() {
         ...card,
         freeform: {
           ...card.freeform,
-          xPx: -820,
-          yPx: -540,
+          xPx: -18240,
+          yPx: -10480,
         },
       };
     }
@@ -90,8 +90,8 @@ function WideSpreadHarness() {
         ...card,
         freeform: {
           ...card.freeform,
-          xPx: 2820,
-          yPx: 1920,
+          xPx: 21480,
+          yPx: 14420,
         },
       };
     }
@@ -205,6 +205,7 @@ describe("CanvasPanel", () => {
     render(<CanvasPanelHarness />);
 
     const viewport = screen.getByLabelText("Reading canvas viewport");
+    expect((viewport as HTMLDivElement).style.touchAction).toBe("none");
 
     dispatchMouseDrag(
       viewport,
@@ -513,7 +514,7 @@ describe("CanvasPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fit Spread" }));
 
     await waitFor(() => {
-      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeLessThan(0.5);
+      expect(Number(viewport.getAttribute("data-view-zoom"))).toBeLessThan(0.05);
       expect(Number(viewport.getAttribute("data-view-pan-x"))).not.toBe(0);
       expect(Number(viewport.getAttribute("data-view-pan-y"))).not.toBe(0);
     });
