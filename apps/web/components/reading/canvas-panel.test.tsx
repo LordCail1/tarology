@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
 import {
   resolveGridPixelPosition,
@@ -21,6 +21,8 @@ function CanvasPanelHarness() {
     <CanvasPanel
       workspace={workspace}
       selectedCardId={selectedCardId}
+      layoutSignature="desktop:1440:left-open:280:right-closed:320"
+      isLayoutResizing={false}
       onOpenLeftPanel={() => undefined}
       onOpenRightPanel={() => undefined}
       onSelectCard={setSelectedCardId}
@@ -59,6 +61,82 @@ function CanvasPanelHarness() {
         )
       }
     />
+  );
+}
+
+function LayoutShiftHarness() {
+  const activeReadingId =
+    readingStudioSeedSnapshot.activeReadingId ?? readingStudioSeedSnapshot.history[0].id;
+  const [layoutSignature, setLayoutSignature] = useState("desktop:wide");
+  const [workspace, setWorkspace] = useState<ReadingStudioWorkspace>(() => {
+    const seedWorkspace = structuredClone(readingStudioSeedSnapshot.workspaces[activeReadingId]);
+    seedWorkspace.canvas.cards = seedWorkspace.canvas.cards.map((card, index) =>
+      index === 0
+        ? {
+            ...card,
+            freeform: {
+              ...card.freeform,
+              xPx: 860,
+              yPx: 88,
+            },
+          }
+        : card
+    );
+    return seedWorkspace;
+  });
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(
+    workspace.canvas.cards[0]?.id ?? null
+  );
+
+  return (
+    <>
+      <button type="button" onClick={() => setLayoutSignature("desktop:narrow")}>
+        Shrink layout
+      </button>
+      <CanvasPanel
+        workspace={workspace}
+        selectedCardId={selectedCardId}
+        layoutSignature={layoutSignature}
+        isLayoutResizing={false}
+        onOpenLeftPanel={() => undefined}
+        onOpenRightPanel={() => undefined}
+        onSelectCard={setSelectedCardId}
+        onModeChange={(mode) =>
+          setWorkspace((current) =>
+            applyWorkspaceAction(current, {
+              type: "workspace.modeSwitched",
+              mode,
+            })
+          )
+        }
+        onMoveCard={(cardId, payload) =>
+          setWorkspace((current) =>
+            applyWorkspaceAction(current, {
+              type: "workspace.cardMoved",
+              cardId,
+              ...payload,
+            })
+          )
+        }
+        onRotateCard={(cardId, deltaDeg) =>
+          setWorkspace((current) =>
+            applyWorkspaceAction(current, {
+              type: "workspace.cardRotated",
+              cardId,
+              deltaDeg,
+            })
+          )
+        }
+        onFlipCard={(cardId) =>
+          setWorkspace((current) =>
+            applyWorkspaceAction(current, {
+              type: "workspace.cardFlipped",
+              cardId,
+            })
+          )
+        }
+      />
+    </>
   );
 }
 
@@ -127,5 +205,53 @@ describe("CanvasPanel", () => {
       expect(Number.parseFloat(magicianCard.style.left)).toBeCloseTo(snappedPosition.xPx, 4);
       expect(Number.parseFloat(magicianCard.style.top)).toBeCloseTo(snappedPosition.yPx, 4);
     });
+  });
+
+  it("scrolls the viewport to keep the selected card reachable after the layout tightens", async () => {
+    render(<LayoutShiftHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    let viewportWidthPx = 1280;
+    let viewportHeightPx = 620;
+
+    Object.defineProperty(viewport, "clientWidth", {
+      configurable: true,
+      get() {
+        return viewportWidthPx;
+      },
+    });
+    Object.defineProperty(viewport, "clientHeight", {
+      configurable: true,
+      get() {
+        return viewportHeightPx;
+      },
+    });
+
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+
+    const scrollToMock = vi
+      .fn()
+      .mockImplementation((options?: ScrollToOptions | number, top?: number) => {
+        if (typeof options === "number") {
+          viewport.scrollLeft = options;
+          viewport.scrollTop = top ?? viewport.scrollTop;
+          return;
+        }
+
+        viewport.scrollLeft = options?.left ?? viewport.scrollLeft;
+        viewport.scrollTop = options?.top ?? viewport.scrollTop;
+      });
+    Object.defineProperty(viewport, "scrollTo", {
+      configurable: true,
+      value: scrollToMock,
+    });
+
+    viewportWidthPx = 560;
+    viewportHeightPx = 540;
+    fireEvent.click(screen.getByRole("button", { name: "Shrink layout" }));
+
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+    expect(viewport.scrollLeft).toBeGreaterThan(0);
   });
 });

@@ -662,6 +662,14 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
     "--left-expanded-width": `${layoutPreferences.leftWidthPx}px`,
     "--right-expanded-width": `${layoutPreferences.rightWidthPx}px`,
   } as CSSProperties;
+  const layoutSignature = [
+    isDesktop ? "desktop" : "mobile",
+    viewportWidth,
+    layoutPreferences.leftOpen ? "left-open" : "left-closed",
+    layoutPreferences.leftWidthPx,
+    layoutPreferences.rightOpen ? "right-open" : "right-closed",
+    layoutPreferences.rightWidthPx,
+  ].join(":");
 
   return (
     <div
@@ -780,6 +788,8 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
         <CanvasPanel
           workspace={activeWorkspace}
           selectedCardId={selectedCardId}
+          layoutSignature={layoutSignature}
+          isLayoutResizing={Boolean(resizeState)}
           onOpenLeftPanel={() => setPanelOpen("left", true)}
           onOpenRightPanel={() => setPanelOpen("right", true)}
           onSelectCard={setSelectedCardId}

@@ -63,11 +63,13 @@ h4 {
   min-height: 100dvh;
   background: transparent;
   overflow: hidden;
+  transition: grid-template-columns 180ms ease;
 }
 
 .reading-shell[data-resizing="true"] {
   cursor: col-resize;
   user-select: none;
+  transition: none;
 }
 
 .reading-shell-main {
@@ -444,8 +446,20 @@ h4 {
   backdrop-filter: blur(18px);
 }
 
+.reading-canvas-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.reading-canvas-toolbar-group-end {
+  justify-content: flex-end;
+}
+
 .reading-canvas-mode-switch,
-.reading-canvas-toolbar-actions {
+.reading-canvas-toolbar-actions,
+.reading-canvas-view-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
@@ -474,19 +488,68 @@ h4 {
   opacity: 0.48;
 }
 
+.reading-canvas-zoom-readout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.3rem;
+  padding: 0.5rem 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.reading-canvas-view-hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+}
+
 .reading-canvas-surface {
   position: relative;
   flex: 1;
   min-height: 540px;
   border: 1px solid var(--color-border);
   border-radius: 1.15rem;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  background: rgba(12, 13, 15, 0.98);
+}
+
+.reading-canvas-surface[data-pan-ready="true"] {
+  cursor: grab;
+}
+
+.reading-canvas-surface[data-panning="true"] {
+  cursor: grabbing;
+}
+
+.reading-canvas-surface::-webkit-scrollbar {
+  height: 0.72rem;
+  width: 0.72rem;
+}
+
+.reading-canvas-surface::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.reading-canvas-stage {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.reading-canvas-world {
+  position: relative;
+  transform-origin: top left;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 48%),
     linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98));
 }
 
-.reading-canvas-surface[data-mode="grid"] {
+.reading-canvas-world[data-mode="grid"] {
   background:
     linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98)),
     repeating-linear-gradient(
@@ -563,6 +626,10 @@ h4 {
 }
 
 .reading-canvas-card:active {
+  cursor: grabbing;
+}
+
+.reading-canvas[data-panning="true"] .reading-canvas-card {
   cursor: grabbing;
 }
 

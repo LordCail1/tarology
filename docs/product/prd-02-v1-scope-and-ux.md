@@ -89,6 +89,11 @@ V1 support policy:
   - left and right panels can collapse/expand with motion.
   - left and right panels are desktop-resizable by drag handle.
   - panel width preference is persisted per user.
+- Freeform canvas behavior:
+  - card positions are stable world coordinates and must not be rewritten because panels collapse, panels resize, or the browser viewport changes,
+  - if the visible viewport becomes smaller than the spread, the canvas remains reachable via scrolling/panning rather than destructive repositioning,
+  - the selected card, or most recently interacted card when nothing is selected, receives visibility priority after layout changes,
+  - zoom and pan belong to view state, not canonical reading state.
 
 ### 5.1.1 Reading Lifecycle and Reader Labels
 - Canonical reading lifecycle is `active`, `archived`, or `deleted`.
