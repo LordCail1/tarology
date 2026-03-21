@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
@@ -191,6 +191,42 @@ function ReadingSwitchHarness() {
   );
 }
 
+function ReadingSwitchUnmountHarness() {
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const readingIds = readingStudioSeedSnapshot.history.map((reading) => reading.id);
+  const [activeReadingId, setActiveReadingId] = useState(readingIds[0]);
+  const [isMounted, setIsMounted] = useState(true);
+
+  useLayoutEffect(() => {
+    if (activeReadingId === readingIds[1]) {
+      setIsMounted(false);
+    }
+  }, [activeReadingId, readingIds]);
+
+  return (
+    <>
+      <button type="button" onClick={() => setActiveReadingId(readingIds[1])}>
+        Switch and unmount
+      </button>
+      {isMounted ? (
+        <CanvasPanel
+          workspace={readingStudioSeedSnapshot.workspaces[activeReadingId]}
+          selectedCardId={selectedCardId}
+          layoutSignature="desktop:1440:left-open:280:right-closed:320"
+          isLayoutResizing={false}
+          onOpenLeftPanel={() => undefined}
+          onOpenRightPanel={() => undefined}
+          onSelectCard={setSelectedCardId}
+          onModeChange={() => undefined}
+          onMoveCard={() => undefined}
+          onRotateCard={() => undefined}
+          onFlipCard={() => undefined}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function dispatchMouseDrag(
   element: HTMLElement,
   start: { button?: number; clientX: number; clientY: number },
@@ -300,6 +336,86 @@ describe("CanvasPanel", () => {
         expect(magicianCard.style.top).toBe("72px");
       });
     });
+  });
+
+  it("ignores non-initiating pointers during freeform card drags", async () => {
+    await withMockPointerEvent(async () => {
+      render(<CanvasPanelHarness />);
+
+      const magicianCard = screen.getByRole("button", { name: "The Magician card" });
+      expect(magicianCard.style.left).toBe("40px");
+      expect(magicianCard.style.top).toBe("72px");
+
+      fireEvent.pointerDown(magicianCard, {
+        button: 0,
+        buttons: 1,
+        clientX: 80,
+        clientY: 120,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 260,
+        clientY: 280,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(magicianCard.style.left).not.toBe("40px");
+        expect(magicianCard.style.top).not.toBe("72px");
+      });
+
+      const leftAfterInitiatingMove = magicianCard.style.left;
+      const topAfterInitiatingMove = magicianCard.style.top;
+
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 460,
+        clientY: 420,
+        pointerId: 2,
+        pointerType: "touch",
+      });
+      fireEvent.pointerUp(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 460,
+        clientY: 420,
+        pointerId: 2,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(magicianCard.style.left).toBe(leftAfterInitiatingMove);
+        expect(magicianCard.style.top).toBe(topAfterInitiatingMove);
+      });
+
+      fireEvent.pointerMove(window, {
+        button: 0,
+        buttons: 1,
+        clientX: 320,
+        clientY: 340,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+
+      await waitFor(() => {
+        expect(magicianCard.style.left).not.toBe(leftAfterInitiatingMove);
+        expect(magicianCard.style.top).not.toBe(topAfterInitiatingMove);
+      });
+
+      fireEvent.pointerUp(window, {
+        button: 0,
+        buttons: 0,
+        clientX: 320,
+        clientY: 340,
+        pointerId: 1,
+        pointerType: "touch",
+      });
+    }, MockPointerEvent);
   });
 
   it("rotates and flips only the selected card", async () => {
@@ -840,6 +956,38 @@ describe("CanvasPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open second reading" }));
 
     await waitFor(() => {
+      expect(
+        readPersistedFreeformViewState(window.localStorage, "rdg_001", {
+          widthPx: 960,
+          heightPx: 640,
+        })
+      ).toEqual({
+        panXPx: 80,
+        panYPx: 70,
+        zoomLevel: 1,
+      });
+    });
+  });
+
+  it("flushes both freeform camera snapshots when a reading switch unmounts before passive effects", async () => {
+    render(<ReadingSwitchUnmountHarness />);
+
+    const viewport = screen.getByLabelText("Reading canvas viewport");
+    dispatchMouseDrag(
+      viewport,
+      { button: 0, clientX: 220, clientY: 180 },
+      { button: 0, clientX: 300, clientY: 250 }
+    );
+
+    await waitFor(() => {
+      expect(viewport).toHaveAttribute("data-view-pan-x", "80");
+      expect(viewport).toHaveAttribute("data-view-pan-y", "70");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch and unmount" }));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Reading canvas viewport")).not.toBeInTheDocument();
       expect(
         readPersistedFreeformViewState(window.localStorage, "rdg_001", {
           widthPx: 960,

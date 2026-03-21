@@ -70,6 +70,7 @@ interface DragState {
   mode: CanvasMode;
   moveEventName: "mousemove" | "pointermove";
   upEventName: "mouseup" | "pointerup";
+  pointerId: number | null;
   pointerOffsetXPx: number;
   pointerOffsetYPx: number;
   freeformViewState: FreeformViewState | null;
@@ -336,9 +337,7 @@ export function CanvasPanel({
       pendingWrite && (!readingId || pendingWrite.readingId === readingId)
         ? pendingWrite
         : null;
-    const writePayload = matchedLatestView ?? matchedPendingWrite;
-
-    if (!writePayload) {
+    if (!matchedLatestView && !matchedPendingWrite) {
       return;
     }
 
@@ -347,12 +346,25 @@ export function CanvasPanel({
       window.clearTimeout(pendingTimeoutHandle);
     }
 
-    writePersistedFreeformViewState(
-      storageRef.current,
-      writePayload.readingId,
-      writePayload.viewState,
-      writePayload.viewportMetrics
-    );
+    if (matchedPendingWrite && matchedPendingWrite.readingId !== matchedLatestView?.readingId) {
+      writePersistedFreeformViewState(
+        storageRef.current,
+        matchedPendingWrite.readingId,
+        matchedPendingWrite.viewState,
+        matchedPendingWrite.viewportMetrics
+      );
+    }
+
+    const writePayload = matchedLatestView ?? matchedPendingWrite;
+    if (writePayload) {
+      writePersistedFreeformViewState(
+        storageRef.current,
+        writePayload.readingId,
+        writePayload.viewState,
+        writePayload.viewportMetrics
+      );
+    }
+
     if (!readingId || pendingWrite?.readingId === readingId) {
       pendingViewWriteRef.current = null;
     }
@@ -862,6 +874,10 @@ export function CanvasPanel({
       mode: activeMode,
       moveEventName,
       upEventName,
+      pointerId:
+        event.type === "pointerdown"
+          ? resolvePointerIdentifier(resolveReactNativeEvent(event) ?? event)
+          : null,
       pointerOffsetXPx: pointer.xPx - currentPosition.xPx,
       pointerOffsetYPx: pointer.yPx - currentPosition.yPx,
       freeformViewState:
@@ -896,6 +912,13 @@ export function CanvasPanel({
     let currentGrid = initialDragState.grid;
 
     function handlePointerMove(nextEvent: DragMoveEvent) {
+      if (
+        initialDragState.pointerId !== null &&
+        resolvePointerIdentifier(nextEvent) !== initialDragState.pointerId
+      ) {
+        return;
+      }
+
       const nextPoint = resolveViewportPoint({
         event: nextEvent,
         viewportElement: viewportRef.current,
@@ -975,11 +998,27 @@ export function CanvasPanel({
       }
     }
 
-    function handlePointerUp() {
+    function handlePointerUp(nextEvent?: DragMoveEvent) {
+      if (
+        initialDragState.pointerId !== null &&
+        nextEvent &&
+        resolvePointerIdentifier(nextEvent) !== initialDragState.pointerId
+      ) {
+        return;
+      }
+
       endCardDrag(true);
     }
 
-    function handlePointerCancel() {
+    function handlePointerCancel(nextEvent?: DragMoveEvent) {
+      if (
+        initialDragState.pointerId !== null &&
+        nextEvent &&
+        resolvePointerIdentifier(nextEvent) !== initialDragState.pointerId
+      ) {
+        return;
+      }
+
       endCardDrag(false);
     }
 
