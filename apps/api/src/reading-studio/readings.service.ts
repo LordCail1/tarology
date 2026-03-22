@@ -48,7 +48,10 @@ import {
   normalizeRotation,
 } from "./domain/reading-canvas.js";
 import { buildDeterministicCardAssignment } from "./domain/deterministic-shuffle.js";
-import { normalizeLegacyReadingDetail } from "./domain/legacy-grid-compat.js";
+import {
+  normalizeLegacyReadingDetail,
+  resolveLegacyGridFreeformPosition,
+} from "./domain/legacy-grid-compat.js";
 import { CreateReadingDto } from "./dto/create-reading.dto.js";
 import { ReadingCommandDto } from "./dto/reading-command.dto.js";
 import { ReadingEventsRepository } from "./repositories/reading-events.repository.js";
@@ -60,6 +63,21 @@ interface CreateReadingResult {
   created: boolean;
   response: CreateReadingResponse;
 }
+
+type LegacyCanvasMode = "freeform" | "grid";
+
+interface LegacySwitchCanvasModePayload {
+  canvasMode: LegacyCanvasMode;
+}
+
+interface LegacySwitchCanvasModeCommandRequest {
+  commandId: string;
+  expectedVersion: number;
+  type: "switch_canvas_mode";
+  payload: LegacySwitchCanvasModePayload;
+}
+
+type NormalizedReadingCommand = ReadingCommandRequest | LegacySwitchCanvasModeCommandRequest;
 
 class VersionConflictError extends Error {}
 class MissingCardError extends Error {}
@@ -110,6 +128,12 @@ function hashRequest(value: unknown): string {
 
 function isEmptyObject(value: unknown): value is Record<string, never> {
   return !!value && !Array.isArray(value) && typeof value === "object" && Object.keys(value).length === 0;
+}
+
+function isLegacySwitchCanvasModeCommand(
+  command: NormalizedReadingCommand
+): command is LegacySwitchCanvasModeCommandRequest {
+  return command.type === "switch_canvas_mode";
 }
 
 function buildConflict(
@@ -365,6 +389,17 @@ export class ReadingsService {
       );
     }
 
+    if (isLegacySwitchCanvasModeCommand(command)) {
+      return this.applyLegacyCanvasModeCompatibilityCommand({
+        user,
+        readingId,
+        idempotencyKey,
+        requestHash,
+        command,
+        currentDetail,
+      });
+    }
+
     let nextEvent: ReadingStoredEvent;
     let nextProjection: ReadingDetail;
     let commandTimestamp: Date;
@@ -516,9 +551,65 @@ export class ReadingsService {
     return toCreateReadingResponseFromJson(responseJson);
   }
 
+  private async applyLegacyCanvasModeCompatibilityCommand(input: {
+    user: AuthenticatedUser;
+    readingId: string;
+    idempotencyKey: string;
+    requestHash: string;
+    command: LegacySwitchCanvasModeCommandRequest;
+    currentDetail: ReadingDetail;
+  }): Promise<ReadingCommandResponse> {
+    const compatibilityReading = normalizeLegacyReadingDetail({
+      ...input.currentDetail,
+      canvasMode: input.command.payload.canvasMode,
+      canvas: {
+        ...input.currentDetail.canvas,
+        activeMode: input.command.payload.canvasMode,
+      },
+    } as ReadingDetail & {
+      canvasMode: LegacyCanvasMode;
+      canvas: ReadingDetail["canvas"] & { activeMode: LegacyCanvasMode };
+    });
+    const response = {
+      reading: compatibilityReading,
+    } satisfies ReadingCommandResponse;
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.readingIdempotencyRepository.createCommandReceipt(tx, {
+          id: randomUUID(),
+          readingId: input.readingId,
+          ownerUserId: input.user.userId,
+          commandId: input.command.commandId,
+          idempotencyKey: input.idempotencyKey,
+          requestHash: input.requestHash,
+          resultingVersion: input.currentDetail.version,
+          responseJson: toJson(response),
+          createdAt: new Date(input.currentDetail.updatedAt),
+        });
+      });
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        const duplicateReplay = await this.getCommandReplay(
+          input.readingId,
+          input.command,
+          input.idempotencyKey,
+          input.requestHash
+        );
+        if (duplicateReplay) {
+          return duplicateReplay;
+        }
+      }
+
+      throw error;
+    }
+
+    return response;
+  }
+
   private async getCommandReplay(
     readingId: string,
-    payload: ReadingCommandRequest,
+    payload: NormalizedReadingCommand,
     idempotencyKey: string,
     requestHash: string
   ): Promise<ReadingCommandResponse | null> {
@@ -836,32 +927,52 @@ export class ReadingsService {
     }
   }
 
-  private normalizeCommandPayload(payload: ReadingCommandDto): ReadingCommandRequest {
+  private normalizeCommandPayload(payload: ReadingCommandDto): NormalizedReadingCommand {
     switch (payload.type) {
       case "archive_reading":
       case "reopen_reading":
-      case "delete_reading":
+      case "delete_reading": {
         if (!isEmptyObject(payload.payload)) {
           throw new BadRequestException("Reading lifecycle command payload must be an empty object.");
         }
 
-        return payload;
+        return {
+          commandId: payload.commandId,
+          expectedVersion: payload.expectedVersion,
+          type: payload.type,
+          payload: {},
+        };
+      }
+
+      case "switch_canvas_mode":
+        return {
+          commandId: payload.commandId,
+          expectedVersion: payload.expectedVersion,
+          type: "switch_canvas_mode",
+          payload: this.parseCanvasModePayload(payload.payload),
+        };
 
       case "move_card":
         return {
-          ...payload,
+          commandId: payload.commandId,
+          expectedVersion: payload.expectedVersion,
+          type: "move_card",
           payload: this.parseMoveCardPayload(payload.payload),
         };
 
       case "rotate_card":
         return {
-          ...payload,
+          commandId: payload.commandId,
+          expectedVersion: payload.expectedVersion,
+          type: "rotate_card",
           payload: this.parseRotateCardPayload(payload.payload),
         };
 
       case "flip_card":
         return {
-          ...payload,
+          commandId: payload.commandId,
+          expectedVersion: payload.expectedVersion,
+          type: "flip_card",
           payload: this.parseFlipCardPayload(payload.payload),
         };
 
@@ -870,14 +981,33 @@ export class ReadingsService {
     }
   }
 
+  private parseCanvasModePayload(payload: unknown): LegacySwitchCanvasModePayload {
+    if (
+      !payload ||
+      Array.isArray(payload) ||
+      typeof payload !== "object" ||
+      !("canvasMode" in payload)
+    ) {
+      throw new BadRequestException("switch_canvas_mode payload requires a canvasMode.");
+    }
+
+    const { canvasMode } = payload as { canvasMode?: unknown };
+    if (canvasMode !== "freeform" && canvasMode !== "grid") {
+      throw new BadRequestException("switch_canvas_mode canvasMode must be freeform or grid.");
+    }
+
+    return { canvasMode };
+  }
+
   private parseMoveCardPayload(payload: unknown): MoveCardPayload {
     if (!payload || Array.isArray(payload) || typeof payload !== "object") {
       throw new BadRequestException("move_card payload must be an object.");
     }
 
-    const { cardId, freeform } = payload as {
+    const { cardId, freeform, grid } = payload as {
       cardId?: unknown;
       freeform?: { xPx?: unknown; yPx?: unknown };
+      grid?: { column?: unknown; row?: unknown };
     };
 
     if (typeof cardId !== "string" || cardId.trim().length === 0) {
@@ -894,7 +1024,16 @@ export class ReadingsService {
             xPx: Math.round(freeform.xPx),
             yPx: Math.round(freeform.yPx),
           }
-        : undefined;
+        : grid &&
+            typeof grid.column === "number" &&
+            Number.isFinite(grid.column) &&
+            typeof grid.row === "number" &&
+            Number.isFinite(grid.row)
+          ? resolveLegacyGridFreeformPosition({
+              column: Math.round(grid.column),
+              row: Math.round(grid.row),
+            })
+          : undefined;
 
     if (!normalizedFreeform) {
       throw new BadRequestException("move_card payload requires freeform coordinates.");
@@ -902,7 +1041,10 @@ export class ReadingsService {
 
     return {
       cardId,
-      freeform: normalizedFreeform,
+      freeform: {
+        xPx: normalizedFreeform.xPx,
+        yPx: normalizedFreeform.yPx,
+      },
     };
   }
 

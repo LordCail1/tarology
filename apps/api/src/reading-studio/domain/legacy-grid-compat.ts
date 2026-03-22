@@ -75,7 +75,7 @@ export function resolveLegacyGridFreeformPosition(
   };
 }
 
-function resolveLegacyGridPositionFromFreeform(
+export function resolveLegacyGridPositionFromFreeform(
   position: LegacyFreeformPosition
 ): LegacyGridPosition {
   return clampLegacyGridPosition({

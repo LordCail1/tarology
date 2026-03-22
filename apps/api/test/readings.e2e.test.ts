@@ -421,6 +421,73 @@ describe("Reading durability and history API", () => {
     await closeTrackedApp(app);
   });
 
+  it("accepts stale grid-era canvas commands during rollout", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "legacy-canvas-command-create")
+      .send({
+        rootQuestion: "Can old clients survive the rollout?",
+        deckId: testUserDeckId,
+        deckSpecVersion: "thoth-v1",
+      })
+      .expect(201);
+
+    const targetCardId = created.body.canvas.cards[0].cardId as string;
+
+    const switched = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "legacy-switch-mode")
+      .send({
+        commandId: "6b6dfde2-5988-4ec2-8ef9-5422ae4ae8a4",
+        expectedVersion: 1,
+        type: "switch_canvas_mode",
+        payload: {
+          canvasMode: "grid",
+        },
+      })
+      .expect(200);
+
+    expect(switched.body.reading.version).toBe(1);
+    expect(switched.body.reading.canvasMode).toBe("grid");
+    expect(switched.body.reading.canvas.activeMode).toBe("grid");
+
+    const moved = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "legacy-grid-move")
+      .send({
+        commandId: "160295eb-3cf9-492f-a12b-3d783f11a2c1",
+        expectedVersion: 1,
+        type: "move_card",
+        payload: {
+          cardId: targetCardId,
+          grid: {
+            column: 2,
+            row: 1,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(moved.body.reading.version).toBe(2);
+    expect(
+      moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 489,
+        yPx: 229,
+      },
+      grid: {
+        column: 2,
+        row: 1,
+      },
+    });
+
+    await closeTrackedApp(app);
+  });
+
   it("returns 404 when a canvas command targets a card outside the reading", async () => {
     const app = await createAuthorizedApp(TEST_USER);
 

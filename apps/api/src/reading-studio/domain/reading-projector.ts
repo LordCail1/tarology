@@ -15,6 +15,7 @@ import {
 } from "./reading-events.js";
 import {
   normalizeLegacyReadingDetail,
+  resolveLegacyGridPositionFromFreeform,
   resolveLegacyGridFreeformPosition,
 } from "./legacy-grid-compat.js";
 import { normalizeRotation } from "./reading-canvas.js";
@@ -156,6 +157,11 @@ export function applyReadingEvent(
         : hasLegacyGridPayload(payload)
           ? resolveLegacyGridFreeformPosition(payload.grid)
           : null;
+      const nextGrid = hasLegacyGridPayload(payload)
+        ? payload.grid
+        : nextFreeform
+          ? resolveLegacyGridPositionFromFreeform(nextFreeform)
+          : null;
 
       if (!nextFreeform) {
         throw new Error(`${event.eventType} payload is invalid.`);
@@ -176,6 +182,7 @@ export function applyReadingEvent(
                     yPx: nextFreeform.yPx,
                     stackOrder: nextFreeform.stackOrder,
                   },
+                  ...(nextGrid ? { grid: nextGrid } : {}),
                 }
               : card
           ),
