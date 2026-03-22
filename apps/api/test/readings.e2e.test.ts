@@ -109,11 +109,22 @@ describe("Reading durability and history API", () => {
       rootQuestion: "What continues after a reset?",
       deckId: testUserDeckId,
       deckSpecVersion: "thoth-v1",
-      canvasMode: "grid",
       status: "active",
       version: 1,
       archivedAt: null,
       deletedAt: null,
+    });
+    expect(createResponse.body.canvasMode).toBe("freeform");
+    expect(detailResponse.body.canvasMode).toBe("freeform");
+    expect(createResponse.body.canvas.activeMode).toBe("freeform");
+    expect(detailResponse.body.canvas.activeMode).toBe("freeform");
+    expect(createResponse.body.canvas.cards[0].grid).toMatchObject({
+      column: expect.any(Number),
+      row: expect.any(Number),
+    });
+    expect(detailResponse.body.canvas.cards[0].grid).toMatchObject({
+      column: expect.any(Number),
+      row: expect.any(Number),
     });
     expect(detailResponse.body.assignments).toHaveLength(78);
     expect(detailResponse.body.assignments).toEqual(createResponse.body.assignments);
@@ -207,6 +218,18 @@ describe("Reading durability and history API", () => {
       second.body.readingId,
       first.body.readingId,
     ]);
+    expect(listResponse.body.readings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          readingId: first.body.readingId,
+          canvasMode: "freeform",
+        }),
+        expect.objectContaining({
+          readingId: second.body.readingId,
+          canvasMode: "freeform",
+        }),
+      ])
+    );
 
     await closeTrackedApp(listApp);
   });
@@ -285,47 +308,25 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "canvas-commands-create")
       .send({
         rootQuestion: "How does the workspace evolve?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       })
       .expect(201);
 
     const targetCardId = created.body.canvas.cards[0].cardId as string;
-
-    const modeSwitched = await request(app.getHttpServer())
-      .post(`/v1/readings/${created.body.readingId}/commands`)
-      .set("Idempotency-Key", "canvas-mode-switch")
-      .send({
-        commandId: "77964457-d6f5-40d8-b612-71468dbc145a",
-        expectedVersion: 1,
-        type: "switch_canvas_mode",
-        payload: {
-          canvasMode: "grid",
-        },
-      })
-      .expect(200);
-
-    expect(modeSwitched.body.reading).toMatchObject({
-      canvasMode: "grid",
-      version: 2,
-      canvas: {
-        activeMode: "grid",
-      },
-    });
 
     const moved = await request(app.getHttpServer())
       .post(`/v1/readings/${created.body.readingId}/commands`)
       .set("Idempotency-Key", "canvas-card-move")
       .send({
         commandId: "edb75f6e-a3f9-42db-8659-351a1110f413",
-        expectedVersion: 2,
+        expectedVersion: 1,
         type: "move_card",
         payload: {
           cardId: targetCardId,
-          grid: {
-            column: 7,
-            row: 5,
+          freeform: {
+            xPx: 420,
+            yPx: 210,
           },
         },
       })
@@ -335,9 +336,9 @@ describe("Reading durability and history API", () => {
       moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
     ).toMatchObject({
       cardId: targetCardId,
-      grid: {
-        column: 7,
-        row: 5,
+      freeform: {
+        xPx: 420,
+        yPx: 210,
       },
     });
 
@@ -346,7 +347,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "canvas-card-rotate")
       .send({
         commandId: "2680a949-f4ff-48eb-a592-dad687518b76",
-        expectedVersion: 3,
+        expectedVersion: 2,
         type: "rotate_card",
         payload: {
           cardId: targetCardId,
@@ -369,7 +370,7 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "canvas-card-flip")
       .send({
         commandId: "4654cbf5-c00c-42bf-be0a-d0f33458dfe4",
-        expectedVersion: 4,
+        expectedVersion: 3,
         type: "flip_card",
         payload: {
           cardId: targetCardId,
@@ -386,49 +387,11 @@ describe("Reading durability and history API", () => {
       isFaceUp: true,
     });
 
-    const returnedToFreeform = await request(app.getHttpServer())
-      .post(`/v1/readings/${created.body.readingId}/commands`)
-      .set("Idempotency-Key", "canvas-mode-return")
-      .send({
-        commandId: "c78829cb-39b6-4043-8072-b2db1fb13584",
-        expectedVersion: 5,
-        type: "switch_canvas_mode",
-        payload: {
-          canvasMode: "freeform",
-        },
-      })
-      .expect(200);
-
-    const movedFreeform = await request(app.getHttpServer())
-      .post(`/v1/readings/${created.body.readingId}/commands`)
-      .set("Idempotency-Key", "canvas-card-freeform-move")
-      .send({
-        commandId: "39300c56-3461-4079-8254-eb689742516f",
-        expectedVersion: 6,
-        type: "move_card",
-        payload: {
-          cardId: targetCardId,
-          freeform: {
-            xPx: 420,
-            yPx: 210,
-          },
-        },
-      })
-      .expect(200);
-
-    expect(movedFreeform.body.reading).toMatchObject({
-      canvasMode: "freeform",
-      version: 7,
-      canvas: {
-        activeMode: "freeform",
-      },
-    });
     expect(
-      movedFreeform.body.reading.canvas.cards.find(
+      flipped.body.reading.canvas.cards.find(
         (card: {
           cardId: string;
           freeform: { xPx: number; yPx: number; stackOrder: number };
-          grid: { column: number; row: number };
           isFaceUp: boolean;
           rotationDeg: number;
         }) => card.cardId === targetCardId
@@ -439,10 +402,6 @@ describe("Reading durability and history API", () => {
         xPx: 420,
         yPx: 210,
       },
-      grid: {
-        column: 7,
-        row: 5,
-      },
       isFaceUp: true,
       rotationDeg: 47,
     });
@@ -451,13 +410,178 @@ describe("Reading durability and history API", () => {
       .get(ReadingsService)
       .restoreReadingFromHistory(TEST_USER.userId, created.body.readingId);
 
-    expect(restored).toEqual(movedFreeform.body.reading);
+    expect(restored).toEqual(flipped.body.reading);
 
     const detail = await request(app.getHttpServer())
       .get(`/v1/readings/${created.body.readingId}`)
       .expect(200);
 
-    expect(detail.body).toEqual(movedFreeform.body.reading);
+    expect(detail.body).toEqual(flipped.body.reading);
+
+    await closeTrackedApp(app);
+  });
+
+  it("accepts stale grid-era canvas commands during rollout", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "legacy-canvas-command-create")
+      .send({
+        rootQuestion: "Can old clients survive the rollout?",
+        deckId: testUserDeckId,
+        deckSpecVersion: "thoth-v1",
+      })
+      .expect(201);
+
+    const targetCardId = created.body.canvas.cards[0].cardId as string;
+    const targetCardBeforeSwitch = created.body.canvas.cards.find(
+      (card: { cardId: string }) => card.cardId === targetCardId
+    );
+
+    const switched = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "legacy-switch-mode")
+      .send({
+        commandId: "6b6dfde2-5988-4ec2-8ef9-5422ae4ae8a4",
+        expectedVersion: 1,
+        type: "switch_canvas_mode",
+        payload: {
+          canvasMode: "grid",
+        },
+      })
+      .expect(200);
+
+    expect(switched.body.reading.version).toBe(2);
+    expect(switched.body.reading.canvasMode).toBe("grid");
+    expect(switched.body.reading.canvas.activeMode).toBe("grid");
+    expect(
+      switched.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: targetCardBeforeSwitch?.freeform,
+    });
+
+    const switchedDetail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(switchedDetail.body.readingId).toBe(created.body.readingId);
+    expect(switchedDetail.body.version).toBe(2);
+    expect(switchedDetail.body.canvasMode).toBe("grid");
+    expect(switchedDetail.body.canvas.activeMode).toBe("grid");
+
+    const moved = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "legacy-grid-move")
+      .send({
+        commandId: "160295eb-3cf9-492f-a12b-3d783f11a2c1",
+        expectedVersion: 2,
+        type: "move_card",
+        payload: {
+          cardId: targetCardId,
+          grid: {
+            column: 2,
+            row: 1,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(moved.body.reading.version).toBe(3);
+    expect(
+      moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 489,
+        yPx: 229,
+      },
+      grid: {
+        column: 2,
+        row: 1,
+      },
+    });
+    expect(moved.body.reading.canvasMode).toBe("grid");
+    expect(moved.body.reading.canvas.activeMode).toBe("grid");
+
+    await closeTrackedApp(app);
+  });
+
+  it("keeps freeform moves after a legacy grid toggle during rollout", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "legacy-grid-toggle-freeform-create")
+      .send({
+        rootQuestion: "Does the freeform layout survive after a stale toggle?",
+        deckId: testUserDeckId,
+        deckSpecVersion: "thoth-v1",
+      })
+      .expect(201);
+
+    const targetCardId = created.body.canvas.cards[0].cardId as string;
+
+    await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "legacy-grid-toggle")
+      .send({
+        commandId: "4a804c37-4de3-4ad5-9d3b-80a6a689c650",
+        expectedVersion: 1,
+        type: "switch_canvas_mode",
+        payload: {
+          canvasMode: "grid",
+        },
+      })
+      .expect(200);
+
+    const moved = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "modern-freeform-move-after-legacy-toggle")
+      .send({
+        commandId: "f3c46a7d-c4b3-436a-b5fb-ebef6f4aa7ab",
+        expectedVersion: 2,
+        type: "move_card",
+        payload: {
+          cardId: targetCardId,
+          freeform: {
+            xPx: 377,
+            yPx: 241,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(
+      moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 377,
+        yPx: 241,
+      },
+    });
+    expect(moved.body.reading.canvasMode).toBe("freeform");
+    expect(moved.body.reading.canvas.activeMode).toBe("freeform");
+    expect((moved.body.reading as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(
+      detail.body.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 377,
+        yPx: 241,
+      },
+    });
+    expect(detail.body.canvasMode).toBe("freeform");
+    expect(detail.body.canvas.activeMode).toBe("freeform");
+    expect((detail.body as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
 
     await closeTrackedApp(app);
   });
@@ -470,9 +594,8 @@ describe("Reading durability and history API", () => {
       .set("Idempotency-Key", "missing-card-create")
       .send({
         rootQuestion: "What happens when the card is missing?",
-        deckId: "thoth",
+        deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       })
       .expect(201);
 

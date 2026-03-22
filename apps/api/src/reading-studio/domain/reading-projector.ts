@@ -15,6 +15,13 @@ import {
   type ReadingLifecycleEventPayload,
   type ReadingStoredEvent,
 } from "./reading-events.js";
+import {
+  forceFreeformCanvasCompatibility,
+  normalizeLegacyReadingDetail,
+  resolveLegacyGridPositionFromFreeform,
+  resolveLegacyGridFreeformPosition,
+  usesLegacyCanvasModeCompat,
+} from "./legacy-grid-compat.js";
 import { normalizeRotation } from "./reading-canvas.js";
 
 function isReadingDetail(payload: unknown): payload is ReadingDetail {
@@ -36,6 +43,16 @@ function isLifecyclePayload(payload: unknown): payload is ReadingLifecycleEventP
   );
 }
 
+function isCardMovedPayload(payload: unknown): payload is ReadingCardMovedEventPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "cardId" in payload &&
+    "version" in payload &&
+    "updatedAt" in payload
+  );
+}
+
 function isCanvasModePayload(payload: unknown): payload is ReadingCanvasModeSwitchedEventPayload {
   return (
     typeof payload === "object" &&
@@ -46,13 +63,41 @@ function isCanvasModePayload(payload: unknown): payload is ReadingCanvasModeSwit
   );
 }
 
-function isCardMovedPayload(payload: unknown): payload is ReadingCardMovedEventPayload {
+function hasFreeformPayload(
+  payload: ReadingCardMovedEventPayload
+): payload is ReadingCardMovedEventPayload & {
+  freeform: {
+    xPx: number;
+    yPx: number;
+    stackOrder: number;
+  };
+} {
   return (
-    typeof payload === "object" &&
-    payload !== null &&
-    "cardId" in payload &&
-    "version" in payload &&
-    "updatedAt" in payload
+    typeof payload.freeform === "object" &&
+    payload.freeform !== null &&
+    typeof payload.freeform.xPx === "number" &&
+    typeof payload.freeform.yPx === "number" &&
+    typeof payload.freeform.stackOrder === "number"
+  );
+}
+
+function hasLegacyGridPayload(
+  payload: ReadingCardMovedEventPayload
+): payload is ReadingCardMovedEventPayload & {
+  grid: {
+    column: number;
+    row: number;
+  };
+} {
+  const candidate = payload as ReadingCardMovedEventPayload & {
+    grid?: { column?: unknown; row?: unknown };
+  };
+
+  return (
+    typeof candidate.grid === "object" &&
+    candidate.grid !== null &&
+    typeof candidate.grid.column === "number" &&
+    typeof candidate.grid.row === "number"
   );
 }
 
@@ -87,7 +132,7 @@ export function applyReadingEvent(
       if (!isReadingDetail(event.payload)) {
         throw new Error("reading.created payload is invalid.");
       }
-      return event.payload;
+      return normalizeLegacyReadingDetail(event.payload);
     }
 
     case READING_ARCHIVED_EVENT:
@@ -120,16 +165,24 @@ export function applyReadingEvent(
         throw new Error(`${event.eventType} payload is invalid.`);
       }
 
+      if (event.payload.canvasMode === "freeform") {
+        return forceFreeformCanvasCompatibility({
+          ...current,
+          version: event.payload.version,
+          updatedAt: event.payload.updatedAt,
+        });
+      }
+
       return {
         ...current,
-        canvasMode: event.payload.canvasMode,
         version: event.payload.version,
         updatedAt: event.payload.updatedAt,
+        canvasMode: "grid",
         canvas: {
           ...current.canvas,
-          activeMode: event.payload.canvasMode,
+          activeMode: "grid",
         },
-      };
+      } as ReadingDetail;
     }
 
     case READING_CARD_MOVED_EVENT: {
@@ -142,8 +195,22 @@ export function applyReadingEvent(
       }
 
       const payload = event.payload;
+      const nextFreeform = hasFreeformPayload(payload)
+        ? payload.freeform
+        : hasLegacyGridPayload(payload)
+          ? resolveLegacyGridFreeformPosition(payload.grid)
+          : null;
+      const nextGrid = hasLegacyGridPayload(payload)
+        ? payload.grid
+        : nextFreeform
+          ? resolveLegacyGridPositionFromFreeform(nextFreeform)
+          : null;
 
-      return {
+      if (!nextFreeform) {
+        throw new Error(`${event.eventType} payload is invalid.`);
+      }
+
+      const movedProjection = {
         ...current,
         version: payload.version,
         updatedAt: payload.updatedAt,
@@ -153,24 +220,23 @@ export function applyReadingEvent(
             card.cardId === payload.cardId
               ? {
                   ...card,
-                  freeform: payload.freeform
-                    ? {
-                        xPx: payload.freeform.xPx,
-                        yPx: payload.freeform.yPx,
-                        stackOrder: payload.freeform.stackOrder,
-                      }
-                    : card.freeform,
-                  grid: payload.grid
-                    ? {
-                        column: payload.grid.column,
-                        row: payload.grid.row,
-                      }
-                    : card.grid,
+                  freeform: {
+                    xPx: nextFreeform.xPx,
+                    yPx: nextFreeform.yPx,
+                    stackOrder: nextFreeform.stackOrder,
+                  },
+                  ...(nextGrid ? { grid: nextGrid } : {}),
                 }
               : card
           ),
         },
       };
+
+      if (hasFreeformPayload(payload) && !hasLegacyGridPayload(payload) && usesLegacyCanvasModeCompat(current)) {
+        return forceFreeformCanvasCompatibility(movedProjection);
+      }
+
+      return movedProjection;
     }
 
     case READING_CARD_ROTATED_EVENT: {

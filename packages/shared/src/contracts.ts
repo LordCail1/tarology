@@ -2,7 +2,6 @@ export const TOTAL_TAROT_CARDS = 78;
 export const SHUFFLE_ALGORITHM_VERSION = "seeded-fisher-yates-v1";
 
 export type AppAuthProvider = "google";
-export type CanvasMode = "freeform" | "grid";
 export type DeckInitializationMode =
   | "starter_content"
   | "empty_template"
@@ -23,7 +22,6 @@ export type ReadingCommandType =
   | "archive_reading"
   | "reopen_reading"
   | "delete_reading"
-  | "switch_canvas_mode"
   | "move_card"
   | "rotate_card"
   | "flip_card";
@@ -426,7 +424,6 @@ export interface CreateReadingRequest {
   rootQuestion: string;
   deckId?: string;
   deckSpecVersion: string;
-  canvasMode?: CanvasMode;
 }
 export interface ReadingCardAssignment {
   deckIndex: number;
@@ -442,20 +439,13 @@ export interface FreeformPositionDto {
   stackOrder: number;
 }
 
-export interface GridPositionDto {
-  column: number;
-  row: number;
-}
-
 export interface ReadingCanvasCardState extends ReadingCardAssignment {
   isFaceUp: boolean;
   rotationDeg: number;
   freeform: FreeformPositionDto;
-  grid: GridPositionDto;
 }
 
 export interface ReadingCanvasStateDto {
-  activeMode: CanvasMode;
   cards: ReadingCanvasCardState[];
 }
 
@@ -465,7 +455,6 @@ export interface ReadingSummary {
   deckId: string | null;
   deckSpecVersion: string;
   cardCount: number;
-  canvasMode: CanvasMode;
   status: ReadingLifecycleStatus;
   version: number;
   createdAt: string;
@@ -488,7 +477,6 @@ export interface CreateReadingResponse {
   deckId: string | null;
   deckSpecVersion: string;
   cardCount: number;
-  canvasMode: CanvasMode;
   status: ReadingLifecycleStatus;
   version: number;
   shuffleAlgorithmVersion: string;
@@ -508,14 +496,9 @@ export interface ListReadingsResponse {
 
 export type GetReadingResponse = ReadingDetail;
 
-export interface SwitchCanvasModePayload {
-  canvasMode: CanvasMode;
-}
-
 export interface MoveCardPayload {
   cardId: string;
-  freeform?: Pick<FreeformPositionDto, "xPx" | "yPx">;
-  grid?: GridPositionDto;
+  freeform: Pick<FreeformPositionDto, "xPx" | "yPx">;
 }
 
 export interface RotateCardPayload {
@@ -529,7 +512,6 @@ export interface FlipCardPayload {
 
 export type ReadingCommandPayload =
   | Record<string, never>
-  | SwitchCanvasModePayload
   | MoveCardPayload
   | RotateCardPayload
   | FlipCardPayload;

@@ -15,7 +15,6 @@ Store at reading creation:
 - `seedCommitment`
 - `orderHash`
 - `assignedReversalBits`
-- `canvasMode`
 - `createdAt`
 
 ### 6.3 Algorithm
@@ -27,4 +26,3 @@ Store at reading creation:
 
 ### 6.4 V1.1 Extension
 Add public randomness proof page (commit-reveal with optional beacon integration) after V1 stability.
-

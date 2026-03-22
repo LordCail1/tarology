@@ -141,7 +141,7 @@ Maintain benchmark cases for:
 - command idempotency tests,
 - snapshot restore tests,
 - deck preference default/override tests,
-- canvas mode switch and grid-snap behavior tests,
+- freeform canvas move/rotate/flip persistence tests,
 - sidebar resize persistence tests,
 - JSON contract tests,
 - safety phrase policy tests,

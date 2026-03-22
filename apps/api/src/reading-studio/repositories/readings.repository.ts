@@ -14,7 +14,6 @@ export interface CreateReadingRecordInput {
   shuffleAlgorithmVersion: string;
   seedCommitment: string;
   orderHash: string;
-  canvasMode: string;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -29,8 +28,6 @@ export interface CreateReadingRecordInput {
     freeformXPx: number;
     freeformYPx: number;
     freeformStackOrder: number;
-    gridColumn: number;
-    gridRow: number;
     createdAt: Date;
   }>;
 }
@@ -57,7 +54,6 @@ export class ReadingsRepository {
         shuffleAlgorithmVersion: input.shuffleAlgorithmVersion,
         seedCommitment: input.seedCommitment,
         orderHash: input.orderHash,
-        canvasMode: input.canvasMode,
         version: input.version,
         createdAt: input.createdAt,
         updatedAt: input.updatedAt,
@@ -77,8 +73,6 @@ export class ReadingsRepository {
         freeformXPx: card.freeformXPx,
         freeformYPx: card.freeformYPx,
         freeformStackOrder: card.freeformStackOrder,
-        gridColumn: card.gridColumn,
-        gridRow: card.gridRow,
         createdAt: card.createdAt,
       })),
     });
@@ -163,13 +157,12 @@ export class ReadingsRepository {
     return result.count;
   }
 
-  async updateCanvasMode(
+  async updateVersion(
     tx: ReadingTransaction,
     input: {
       readingId: string;
       ownerUserId: string;
       expectedVersion: number;
-      canvasMode: string;
       version: number;
       updatedAt: Date;
     }
@@ -182,7 +175,6 @@ export class ReadingsRepository {
         deletedAt: null,
       },
       data: {
-        canvasMode: input.canvasMode,
         version: input.version,
         updatedAt: input.updatedAt,
       },
@@ -202,8 +194,6 @@ export class ReadingsRepository {
         freeformXPx?: number;
         freeformYPx?: number;
         freeformStackOrder?: number;
-        gridColumn?: number;
-        gridRow?: number;
       };
     }
   ): Promise<number> {

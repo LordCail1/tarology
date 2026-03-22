@@ -7,7 +7,7 @@ import {
 } from "class-validator";
 import type { CreateReadingRequest } from "@tarology/shared";
 
-const CANVAS_MODES = ["freeform", "grid"] as const;
+type LegacyCanvasMode = "freeform" | "grid";
 
 export class CreateReadingDto implements CreateReadingRequest {
   @IsString()
@@ -25,7 +25,8 @@ export class CreateReadingDto implements CreateReadingRequest {
   @MaxLength(64)
   deckSpecVersion!: string;
 
+  // Backward-compatibility shim for cached older clients during rollout.
   @IsOptional()
-  @IsIn(CANVAS_MODES)
-  canvasMode?: CreateReadingRequest["canvasMode"];
+  @IsIn(["freeform", "grid"] satisfies LegacyCanvasMode[])
+  canvasMode?: LegacyCanvasMode;
 }

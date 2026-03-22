@@ -58,7 +58,7 @@ Data invariants:
 - decks may be initialized from starter content or empty templates.
 - deck exports must preserve cards, symbols, knowledge entries, and card-symbol links.
 - each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
-- each reading stores active `canvasMode` and mode-switch history as semantic events.
+- each reading stores durable freeform card layout state through semantic events/projections.
 - reading lifecycle status is limited to `active`, `archived`, and `deleted`; `reopened` is an event/action, not a persisted status value.
 - reader-facing organization markers such as `completed`, `paused`, or custom labels belong to a separate label/tag layer and must not redefine lifecycle status in stored projections or API contracts.
 - interpretation/storyboard/fusion/dialogue requests store frozen context tuple (`readingId`, `questionId`, `groupId`, `stateVersion`).
@@ -134,7 +134,6 @@ V1 integration/read-model sync extensions:
 - Every mutation request includes `Idempotency-Key` header.
 - Duplicate command IDs for same aggregate are no-op and return prior result.
 - `POST /v1/readings` accepts optional `deckId`; if omitted, server uses user default deck preference.
-- `POST /v1/readings` accepts optional initial `canvasMode` (`freeform` or `grid`), default `freeform`.
 - Storyboard/fusion/dialogue requests require frozen context tuple fields.
 
 ### 10.5 Provider Connection Rules

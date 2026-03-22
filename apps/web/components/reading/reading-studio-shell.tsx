@@ -795,12 +795,6 @@ export function ReadingStudioShell({ profile, preferences }: ReadingStudioShellP
           onOpenLeftPanel={() => setPanelOpen("left", true)}
           onOpenRightPanel={() => setPanelOpen("right", true)}
           onSelectCard={setSelectedCardId}
-          onModeChange={(mode) =>
-            dispatchWorkspaceAction({
-              type: "workspace.modeSwitched",
-              mode,
-            })
-          }
           onMoveCard={(cardId, payload) =>
             dispatchWorkspaceAction({
               type: "workspace.cardMoved",

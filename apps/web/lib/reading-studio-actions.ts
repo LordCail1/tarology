@@ -58,7 +58,6 @@ export function applyWorkspaceAction(
     ReadingStudioAction,
     {
       type:
-        | "workspace.modeSwitched"
         | "workspace.cardMoved"
         | "workspace.cardRotated"
         | "workspace.cardFlipped";
@@ -66,18 +65,6 @@ export function applyWorkspaceAction(
   >
 ): ReadingStudioWorkspace {
   switch (action.type) {
-    case "workspace.modeSwitched":
-      return {
-        ...current,
-        reading: {
-          ...buildNextWorkspaceMetadata(current),
-          canvasMode: action.mode,
-        },
-        canvas: {
-          ...current.canvas,
-          activeMode: action.mode,
-        },
-      };
     case "workspace.cardMoved":
       return {
         ...current,
@@ -91,20 +78,12 @@ export function applyWorkspaceAction(
 
             return {
               ...card,
-              freeform: action.freeform
-                ? {
-                    ...card.freeform,
-                    xPx: action.freeform.xPx,
-                    yPx: action.freeform.yPx,
-                    stackOrder: getHighestStackOrder(current.canvas.cards) + 1,
-                  }
-                : card.freeform,
-              grid: action.grid
-                ? {
-                    column: action.grid.column,
-                    row: action.grid.row,
-                  }
-                : card.grid,
+              freeform: {
+                ...card.freeform,
+                xPx: action.freeform.xPx,
+                yPx: action.freeform.yPx,
+                stackOrder: getHighestStackOrder(current.canvas.cards) + 1,
+              },
             };
           }),
         },

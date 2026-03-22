@@ -19,7 +19,7 @@ Important current behavior:
 - auth, profile, preferences, deck catalog, and reading durability APIs are real and backed by Postgres
 - the Reading Studio shell now loads reading history/workspace state from the API
 - `New Reading` is enabled and creates durable readings through the API
-- canvas mode switches and card move/rotate/flip interactions persist durably
+- freeform card move/rotate/flip interactions persist durably
 - browser `localStorage` now only keeps layout widths and the last active reading selection
 
 That means a good smoke pass needs to cover both:
@@ -153,10 +153,9 @@ Verify:
 ### 6. Canvas behavior
 
 Verify:
-- `freeform` and `grid` modes can be toggled
 - card drag/flip/rotate interactions work
- - refreshing the page restores the current workspace state from the backend
- - switching to another reading and back restores the prior reading's exact canvas state
+- refreshing the page restores the current workspace state from the backend
+- switching to another reading and back restores the prior reading's exact canvas state
 
 ### 7. Optional restart check
 
@@ -178,6 +177,10 @@ The easiest path is the browser devtools console while you are already on `http:
 ```js
 const api = "http://localhost:3001";
 
+const preferences = await fetch(`${api}/v1/preferences`, {
+  credentials: "include",
+}).then((response) => response.json());
+
 const created = await fetch(`${api}/v1/readings`, {
   method: "POST",
   credentials: "include",
@@ -187,9 +190,8 @@ const created = await fetch(`${api}/v1/readings`, {
   },
   body: JSON.stringify({
     rootQuestion: "What should I focus on next?",
-    deckId: "thoth",
-    deckSpecVersion: "thoth-v1",
-    canvasMode: "freeform",
+    deckId: preferences.defaultDeckId,
+    deckSpecVersion: preferences.defaultDeck.specVersion,
   }),
 }).then((response) => response.json());
 
@@ -201,23 +203,6 @@ const detail = await fetch(`${api}/v1/readings/${created.readingId}`, {
   credentials: "include",
 }).then((response) => response.json());
 
-const switched = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
-  method: "POST",
-  credentials: "include",
-  headers: {
-    "Content-Type": "application/json",
-    "Idempotency-Key": crypto.randomUUID(),
-  },
-  body: JSON.stringify({
-    commandId: crypto.randomUUID(),
-    expectedVersion: 1,
-    type: "switch_canvas_mode",
-    payload: {
-      canvasMode: "grid",
-    },
-  }),
-}).then((response) => response.json());
-
 const moved = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
   method: "POST",
   credentials: "include",
@@ -227,11 +212,11 @@ const moved = await fetch(`${api}/v1/readings/${created.readingId}/commands`, {
   },
   body: JSON.stringify({
     commandId: crypto.randomUUID(),
-    expectedVersion: 2,
+    expectedVersion: 1,
     type: "move_card",
     payload: {
       cardId: created.canvas.cards[0].cardId,
-      grid: { column: 7, row: 5 },
+      freeform: { xPx: 420, yPx: 210 },
     },
   }),
 }).then((response) => response.json());
@@ -245,7 +230,7 @@ const rotated = await fetch(`${api}/v1/readings/${created.readingId}/commands`, 
   },
   body: JSON.stringify({
     commandId: crypto.randomUUID(),
-    expectedVersion: 3,
+    expectedVersion: 2,
     type: "rotate_card",
     payload: {
       cardId: created.canvas.cards[0].cardId,
@@ -263,7 +248,7 @@ const flipped = await fetch(`${api}/v1/readings/${created.readingId}/commands`, 
   },
   body: JSON.stringify({
     commandId: crypto.randomUUID(),
-    expectedVersion: 4,
+    expectedVersion: 3,
     type: "flip_card",
     payload: {
       cardId: created.canvas.cards[0].cardId,
@@ -280,7 +265,7 @@ const archived = await fetch(`${api}/v1/readings/${created.readingId}/commands`,
   },
   body: JSON.stringify({
     commandId: crypto.randomUUID(),
-    expectedVersion: 1,
+    expectedVersion: 4,
     type: "archive_reading",
     payload: {},
   }),
@@ -295,7 +280,7 @@ const reopened = await fetch(`${api}/v1/readings/${created.readingId}/commands`,
   },
   body: JSON.stringify({
     commandId: crypto.randomUUID(),
-    expectedVersion: 2,
+    expectedVersion: 5,
     type: "reopen_reading",
     payload: {},
   }),
@@ -310,7 +295,7 @@ const deleted = await fetch(`${api}/v1/readings/${created.readingId}/commands`, 
   },
   body: JSON.stringify({
     commandId: crypto.randomUUID(),
-    expectedVersion: 3,
+    expectedVersion: 6,
     type: "delete_reading",
     payload: {},
   }),
@@ -321,7 +306,7 @@ Expected API results:
 - create returns a UUID reading with 78 fixed card assignments
 - list includes the new reading
 - detail matches the created reading
-- switch/move/rotate/flip update the `canvas` projection and increment `version`
+- move/rotate/flip update the `canvas` projection and increment `version`
 - archive changes the reading to `archived`
 - reopen changes it back to `active`
 - delete changes it to `deleted`
@@ -356,5 +341,5 @@ Common failure modes:
   - `TEST_DATABASE_URL` / `DATABASE_URL` are not exported in the shell running the command
 - `/reading` loops through onboarding:
   - preferences/default deck was not saved successfully
-- studio history looks "fake":
-  - that is currently expected; the web shell has not yet been wired to the durable reading endpoints
+- deck-management changes disappear in a different browser session:
+  - the `/decks` surface is still adapter-backed and has not been rewired to the durable knowledge API yet

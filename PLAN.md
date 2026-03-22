@@ -1,6 +1,6 @@
 # Tarology v2 Plan
 
-Last updated: 2026-03-20 (America/Toronto)
+Last updated: 2026-03-22 (America/Toronto)
 Owner: Product + Engineering
 
 ## Goal
@@ -26,9 +26,9 @@ Execution sequencing:
   - desktop drag-resize sidebars with persisted widths,
   - mobile drawers plus desktop-specific panel rails/toggles,
   - durable API-backed reading history/create/restore flows,
-  - semantic canvas command persistence for mode switch, move, rotate, and flip,
+  - semantic canvas command persistence for move, rotate, and flip,
   - local adapter seams limited to layout preferences and active-reading selection,
-  - integrated topbar, tabbed analysis panel, and multi-mode canvas (`freeform`, `grid`),
+  - integrated topbar, tabbed analysis panel, and a freeform canvas workspace,
   - a freeform world/viewport split so sidebar or browser resizing no longer rewrites saved card positions,
   - an infinite freeform camera layer with background drag, middle-mouse, `Space + drag`, and wheel-based panning plus `Ctrl/Cmd + wheel` zoom,
   - freeform layout changes now stabilize around the viewport center point rather than left-edge anchoring, and `Fit Spread` is the explicit recovery tool when cards move off-screen.
@@ -44,7 +44,7 @@ Execution sequencing:
   - card assignments now return stable string `cardId` values instead of numeric ordinals
 - Product docs explicitly require:
   - desktop sidebar drag-resize with smooth motion,
-  - multi-mode canvas architecture (`freeform`, `grid`),
+  - a durable freeform canvas with stable world coordinates,
   - first-run default deck selection + per-reading override.
 - Deck knowledge backend baseline is now implemented in this branch:
   - decks are user-owned instances rather than shared editable catalog rows,
@@ -90,12 +90,22 @@ Execution sequencing:
 - Engineering workflow now includes a local post-merge branch cleanup command, with GitHub remote branch auto-delete enabled.
 - Reading Studio shell redesign with persisted panel state and mobile drawers.
 - Reading Studio canvas viewport refinement:
-  - desktop panel collapse/expand now animates through the shell grid rather than snapping instantly
+  - desktop panel collapse/expand now animates through the shell layout columns rather than snapping instantly
   - freeform cards now live in stable world coordinates while the visible canvas is a local infinite-camera view with no native scrollbars
   - freeform now stabilizes around the center world point on browser/sidebar layout changes instead of preserving a left-edge anchor
   - zoom, fit, and reset controls are available in the canvas toolbar
   - selected or recently touched cards are allowed to move off-screen; `Fit Spread` is the explicit reframe tool
   - web regression coverage now includes background drag, wheel pan, zoom, fit-spread, and center-point stabilization across layout changes
+- Grid-removal compatibility hardening:
+  - legacy grid-mode snapshots are now normalized to their migrated freeform positions during restore
+  - legacy grid-only `reading.card_moved` events now replay safely by translating their stored grid coordinates into freeform placement
+  - stale cached web bundles are temporarily tolerated during rollout by accepting legacy `switch_canvas_mode` as a no-op compatibility command and translating grid-only `move_card` payloads into freeform placement
+  - legacy `switch_canvas_mode` compatibility commands now advance reading version plus snapshot state so stale optimistic clients do not trip the next command on a false 409
+  - detail and command reads now hydrate from restored snapshots during the rollout shim so legacy `card.grid` metadata survives even though the live persistence model is freeform-only
+  - the legacy mode-switch shim now preserves the reader's saved freeform coordinates while only toggling compatibility-facing `canvasMode` / `canvas.activeMode` fields for stale clients
+- rollout-only legacy grid compatibility is now marked internally in snapshots so restores can preserve newer freeform moves without exposing extra internal fields in API responses
+- real freeform moves now clear rollout-only `grid` mode compatibility, while legacy grid-origin moves still preserve stale-client behavior during the brief migration window
+- legacy snapshot normalization is now explicitly freeform-first for the modern client, while old `grid` fields and historical `reading.canvas_mode_switched` events remain replayable as rollout-only compatibility metadata
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 - Google auth baseline:
@@ -177,13 +187,13 @@ Execution sequencing:
   - desktop sidebar drag-resize now works with persisted widths and keyboard fallback
   - history is grouped by recency with explicit active-reading restore behavior
   - `ReadingStudioPreferenceAdapter` and `ReadingStudioDataSource` exist as web-local seams for later branch integration
-  - center canvas supports `freeform` and `grid` with local drag, snap, rotate, flip, and per-mode layout memory
+  - center canvas supports freeform drag, rotate, and flip with durable layout memory
   - local workspace/layout restore survives refresh via adapter-backed localStorage persistence
   - web regression coverage now includes drag-resize persistence and canvas workspace restore flows
 - Reading Studio durable wiring branch:
   - `/reading` now loads durable reading history/detail state from the API instead of seeded client-side workspaces
   - `New Reading` now creates durable readings from the Studio using the saved default deck
-  - semantic canvas actions (`switch_canvas_mode`, `move_card`, `rotate_card`, `flip_card`) now persist through the reading command API and round-trip through detail/restore
+  - semantic canvas actions (`move_card`, `rotate_card`, `flip_card`) now persist through the reading command API and round-trip through detail/restore
   - API-backed Reading Studio state now persists exact active workspace state across refresh and API restart
   - local browser persistence is limited to layout widths and last active reading selection
   - regression coverage now includes API command round-trip/restore and API-datasource command mapping in the web layer
@@ -254,8 +264,7 @@ Execution sequencing:
 - V1 first-party knowledge editing supports `plain_text` and `markdown`; `json` remains internal/import-facing.
 - Sources are minimal but visible in V1; import/export UI is basic; deck/card images are view-only.
 - Reading sidebars must support animation + desktop drag-resize with persisted widths.
-- Canvas architecture is mode-capable (`freeform`, `grid`) behind one state/command model.
-- Freeform canvas uses stable world coordinates; pan/zoom camera state is local view state and must not rewrite persisted reading layout.
+- Reading canvas is freeform-first with stable world coordinates; pan/zoom camera state is local view state and must not rewrite persisted reading layout.
 - User default deck is captured during onboarding and can be overridden per reading.
 - Reading lifecycle status is `active` / `archived` / `deleted`; reader-facing organization labels are a separate concern.
 - MVP threshold is durable multi-reading behavior:
@@ -280,7 +289,7 @@ Status note:
 - Queue items 1 and 2 are complete with persisted profile shell and first-run default deck onboarding.
 - Queue items 3, 4, 5, 6, and 7 are complete for DB-backed reading durability, semantic workspace command persistence, restore projection, and multi-reading history.
 - Queue item 9 is complete for the OpenAI-first provider-connections baseline.
-- Queue items 12 and 13 are complete in the web shell, and `canvasMode` now round-trips through the API read model.
+- Queue items 12 and 13 are complete in the web shell for the freeform canvas interaction baseline and durable workspace restore.
 - Product pivot note: before the interpretation workflow is treated as complete, the app now needs a deck knowledge domain and deck-management surface that match the updated charter.
 - Remaining work is centered on question trees/card groups, interpretation jobs, deck-management, provider-backed workflow integration, and per-reading deck override UI.
 
@@ -315,7 +324,7 @@ Deck-knowledge pivot follow-ups:
 
 5. Persist semantic card/layout mutations.
 - Acceptance: draw/flip/drag/rotate/group actions persist as semantic events and survive refresh/reopen without corrupting deterministic assignment.
-  Status: complete for current canvas mode switch, move, rotate, and flip commands.
+  Status: complete for current move, rotate, and flip commands.
 
 6. Build read-model restore path.
 - Acceptance: `GET /v1/readings/:id` returns current projection including layout state; snapshots/events replay strategy is in place.
@@ -342,8 +351,8 @@ Deck-knowledge pivot follow-ups:
 - Acceptance: left/right panels resize by drag on desktop and persist per user widths.
   Status: complete as web-shell scaffolding.
 
-13. Introduce multi-mode canvas architecture.
-- Acceptance: reading state tracks `canvasMode`; placement model supports both freeform and grid snap.
+13. Refine the freeform canvas interaction architecture.
+- Acceptance: reading state preserves durable freeform placement, rotation, and face-up state while pan/zoom remains local view state.
   Status: complete in the web shell and persisted in the reading detail projection.
 
 14. Extend deck preference flow with per-reading deck override.

@@ -13,7 +13,6 @@ Coverage: section 11
 
 Rules:
 - Persist drag/rotate end events, not every movement tick.
-- Persist grid-snap placement events as semantic updates (not per-pointer tick).
 - Persist panel width preference updates on drag-end (not continuously) as user preference changes.
 - Snapshot every 25-50 semantic events or milestone actions.
 - Restore path: latest snapshot + tail events.

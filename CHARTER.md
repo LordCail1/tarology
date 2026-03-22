@@ -1,7 +1,7 @@
 # Tarology v2 Charter and Execution Spec
 
 Status: Draft v0.3  
-Last updated: 2026-03-15  
+Last updated: 2026-03-22  
 Owner: Product + Engineering  
 Purpose: Canonical map for all contributors (human and AI) building Tarology v2.
 
@@ -29,7 +29,7 @@ This version merges:
 12. Git workflow is branch + PR based; direct pushes to `main` are disallowed.
 13. CI/CD is established from day one: GitHub Actions for CI and Vercel deployments for web preview/production.
 14. Reading Studio side panels support smooth expand/collapse animation and desktop drag-to-resize with per-user persisted widths.
-15. Reading canvas architecture is multi-modal (`freeform`, `grid`) with one shared command/state model so new modes can be added without redesign; freeform treats card placement as stable world coordinates while pan/zoom/scroll remain view state.
+15. Reading canvas is a freeform workspace with stable world coordinates while pan/zoom/scroll remain local view state; future layout assistance can expand without changing persisted reading semantics.
 16. Users choose a default tarot deck during first-time onboarding; decks may be initialized from starter content or empty templates, the built-in starter path creates a user-owned editable deck instance, and new readings use the chosen default unless the user explicitly overrides deck selection before creation.
 17. Post-core symbolic expansion is sequenced as: Visual Storytelling -> Fusion Lab -> Dialogue Mode -> Deck Creation + Moderation -> Private Sharing + Monetization.
 18. Card-voice features use an `Archetypal Persona` posture (interpretive construct, not literal entity claims).
@@ -95,15 +95,12 @@ Primary JTBD:
   - deck/card images are viewable in V1 but not yet user-editable.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
-  - center: card fan + canvas with mode selection,
+  - center: card fan + freeform canvas,
   - right: question threads + interpretation history (collapsible, animated, desktop-resizable).
 - First-run preference capture for default tarot deck.
 - New reading creation with deterministic deck order and reversal assignment.
 - New reading preflight supports deck override before shuffle/assignment.
-- Card interactions: draw, flip, drag, rotate, select, group, rename group, and grid-snap placement in grid mode.
-- Canvas modes:
-  - `freeform` mode for unconstrained positioning.
-  - `grid` mode for snap-to-cell placement.
+- Card interactions: draw, flip, drag, rotate, select, group, and rename group on the freeform canvas.
 - Question tree:
   - 1 root question,
   - unlimited child questions.
@@ -152,7 +149,7 @@ V1 support policy:
 - Main Workspace:
   - reading title + status bar,
   - fan of face-down cards,
-  - mode-aware card canvas (`freeform` / `grid`).
+  - freeform card canvas.
 - Right Panel:
   - question thread tree,
   - card groups,
@@ -176,7 +173,7 @@ V1 support policy:
 4. User starts a new reading, can override deck selection, and writes root question.
 5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
 6. User draws cards; each draw reveals the pre-assigned card.
-7. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
+7. User arranges cards on the freeform canvas, groups selected cards, and asks sub-questions.
 8. User requests interpretation for selected group under selected thread.
 9. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
 10. User can stop/cancel interpretation at any time from a visible control.
@@ -185,7 +182,7 @@ V1 support policy:
   - “why” layer with card/symbol/deck-knowledge evidence,
   - optional deep layer with attached knowledge references.
 12. All meaningful actions persist continuously.
-13. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
+13. User returns later and sees exact reading state restored, including chosen deck and freeform card layout.
 
 ## 6) Deterministic Deck and Randomness
 ### 6.1 Hard Rule
@@ -199,7 +196,6 @@ Store at reading creation:
 - `seedCommitment`
 - `orderHash`
 - `assignedReversalBits`
-- `canvasMode`
 - `createdAt`
 
 ### 6.3 Algorithm
@@ -386,7 +382,7 @@ Data invariants:
 - decks may be initialized from starter content or empty templates.
 - deck exports must preserve cards, symbols, knowledge entries, and card-symbol links.
 - each reading stores immutable deck selection metadata (`deckId`, `deckSpecVersion`) once created.
-- each reading stores active `canvasMode` and mode-switch history as semantic events.
+- each reading stores durable freeform card layout state through semantic events/projections.
 - reading lifecycle status is limited to `active`, `archived`, and `deleted`; `reopened` is an event/action, not a persisted status value.
 - reader-defined organization states (for example `completed` or custom labels) belong to a separate label/tag layer and must not replace canonical lifecycle status in persistence or API contracts.
 - each interpretation request stores frozen target context.
@@ -444,7 +440,6 @@ V1 integration/read-model sync extensions:
 - Every mutation request must include `Idempotency-Key` header.
 - Duplicate command IDs for same reading must be no-op and return prior result.
 - `POST /v1/readings` accepts optional `deckId`; if omitted, server uses user default deck preference.
-- `POST /v1/readings` accepts optional initial `canvasMode` (`freeform` or `grid`), default `freeform`.
 
 ### 10.4 Provider Connection Rules
 - Connections are scoped per user account.
@@ -475,7 +470,6 @@ Interpretation execution rules:
 
 Rules:
 - Persist drag/rotate end events, not every movement tick.
-- Persist grid-snap placement events as semantic updates (not per-pointer tick).
 - Persist panel width preference updates on drag-end (not continuously) as user preference changes.
 - Snapshot every 25-50 semantic events or milestone actions.
 - Restore path: latest snapshot + tail events.
@@ -600,7 +594,7 @@ Maintain 200-300 benchmark cases:
 - command idempotency tests,
 - snapshot restore tests,
 - deck preference default/override tests,
-- canvas mode switch and grid-snap behavior tests,
+- freeform canvas move/rotate/flip persistence tests,
 - sidebar resize persistence tests,
 - JSON contract tests,
 - safety phrase policy tests,
@@ -619,7 +613,7 @@ Maintain 200-300 benchmark cases:
 - event log + snapshots + restore path,
 - question/groups persistence,
 - interpretation warning + cancellation,
-- canvas mode baseline (`freeform` + `grid`).
+- freeform canvas baseline with durable semantic workspace actions.
 
 ### 16.3 Core 12-Week Build Window
 Weeks 1-2:
@@ -632,7 +626,7 @@ Weeks 1-2:
 
 Weeks 3-4:
 - chat shell motion + panel resize persistence,
-- canvas mode abstraction (`freeform` + `grid` contract),
+- freeform canvas interaction and persistence layer,
 - command API,
 - event log + snapshots,
 - restore reliability,

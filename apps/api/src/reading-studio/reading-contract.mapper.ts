@@ -1,12 +1,15 @@
 import type { Reading, ReadingCard } from "@prisma/client";
 import type {
-  CanvasMode,
   CreateReadingResponse,
   ReadingCanvasCardState,
   ReadingDetail,
   ReadingLifecycleStatus,
   ReadingSummary,
 } from "@tarology/shared";
+import {
+  normalizeLegacyReadingDetail,
+  withLegacyReadingSummaryFields,
+} from "./domain/legacy-grid-compat.js";
 
 type ReadingWithCards = Reading & {
   cards: ReadingCard[];
@@ -37,28 +40,23 @@ function toCanvasCards(cards: ReadingCard[]): ReadingCanvasCardState[] {
         yPx: card.freeformYPx,
         stackOrder: card.freeformStackOrder,
       },
-      grid: {
-        column: card.gridColumn,
-        row: card.gridRow,
-      },
     }));
 }
 
 function toSummaryBase(reading: ReadingWithCount): ReadingSummary {
-  return {
+  return withLegacyReadingSummaryFields({
     readingId: reading.id,
     rootQuestion: reading.rootQuestion,
     deckId: reading.deckId,
     deckSpecVersion: reading.deckSpecVersion,
     cardCount: reading._count?.cards ?? 0,
-    canvasMode: reading.canvasMode as CanvasMode,
     status: reading.status as ReadingLifecycleStatus,
     version: reading.version,
     createdAt: reading.createdAt.toISOString(),
     updatedAt: reading.updatedAt.toISOString(),
     archivedAt: toIsoString(reading.archivedAt),
     deletedAt: toIsoString(reading.deletedAt),
-  };
+  });
 }
 
 export function toReadingSummary(reading: ReadingWithCount): ReadingSummary {
@@ -68,7 +66,7 @@ export function toReadingSummary(reading: ReadingWithCount): ReadingSummary {
 export function toReadingDetail(reading: ReadingWithCards): ReadingDetail {
   const canvasCards = toCanvasCards(reading.cards);
 
-  return {
+  return normalizeLegacyReadingDetail({
     ...toSummaryBase({
       ...reading,
       _count: {
@@ -85,12 +83,11 @@ export function toReadingDetail(reading: ReadingWithCards): ReadingDetail {
         deckIndex: card.deckIndex,
         cardId: card.cardId,
         assignedReversal: card.assignedReversal,
-      })),
+    })),
     canvas: {
-      activeMode: reading.canvasMode as CanvasMode,
       cards: canvasCards,
     },
-  };
+  });
 }
 
 export function toCreateReadingResponse(reading: ReadingWithCards): CreateReadingResponse {

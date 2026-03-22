@@ -17,7 +17,7 @@ Coverage: sections 16 through 19
 - event log + snapshots + restore path,
 - question/groups persistence,
 - interpretation warning + cancellation,
-- canvas mode baseline (`freeform` + `grid`).
+- freeform canvas baseline with durable semantic workspace actions.
 
 Gate 0 exit rule:
 - user can create multiple readings, switch between them, and see exact prior card state/layout restored without data loss.

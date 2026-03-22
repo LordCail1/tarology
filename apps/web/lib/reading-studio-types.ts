@@ -1,5 +1,4 @@
-import type { CanvasMode, ReadingLifecycleStatus } from "@tarology/shared";
-export type { CanvasMode } from "@tarology/shared";
+import type { ReadingLifecycleStatus } from "@tarology/shared";
 
 export type PanelSide = "left" | "right";
 export type AnalysisTab = "threads" | "interpretations";
@@ -19,7 +18,6 @@ export interface ReadingHistoryItem {
   version: number;
   deckId: string | null;
   deckSpecVersion: string;
-  canvasMode: CanvasMode;
 }
 
 export interface QuestionThreadItem {
@@ -46,11 +44,6 @@ export interface FreeformPosition {
   stackOrder: number;
 }
 
-export interface GridPosition {
-  column: number;
-  row: number;
-}
-
 export interface ReadingCanvasCard {
   id: string;
   label: string;
@@ -58,11 +51,9 @@ export interface ReadingCanvasCard {
   isFaceUp: boolean;
   rotationDeg: number;
   freeform: FreeformPosition;
-  grid: GridPosition;
 }
 
 export interface ReadingCanvasState {
-  activeMode: CanvasMode;
   cards: ReadingCanvasCard[];
 }
 
@@ -102,7 +93,6 @@ export interface ReadingStudioDataSource {
       ReadingStudioAction,
       {
         type:
-          | "workspace.modeSwitched"
           | "workspace.cardMoved"
           | "workspace.cardRotated"
           | "workspace.cardFlipped";
@@ -119,13 +109,11 @@ export type ReadingStudioAction =
   | { type: "layout.panelToggled"; side: PanelSide }
   | { type: "layout.panelResized"; side: PanelSide; widthPx: number }
   | { type: "workspace.readingActivated"; readingId: string }
-  | { type: "workspace.modeSwitched"; mode: CanvasMode }
   | { type: "workspace.cardSelected"; cardId: string | null }
   | {
       type: "workspace.cardMoved";
       cardId: string;
-      freeform?: Pick<FreeformPosition, "xPx" | "yPx">;
-      grid?: GridPosition;
+      freeform: Pick<FreeformPosition, "xPx" | "yPx">;
     }
   | { type: "workspace.cardRotated"; cardId: string; deltaDeg: number }
   | { type: "workspace.cardFlipped"; cardId: string };

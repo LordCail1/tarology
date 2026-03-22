@@ -54,7 +54,6 @@ function createReadingDetail(
     deckId: "thoth",
     deckSpecVersion: "thoth-v1",
     cardCount: 2,
-    canvasMode: "freeform",
     status: "active",
     version: 1,
     createdAt: "2026-03-15T12:00:00.000Z",
@@ -77,7 +76,6 @@ function createReadingDetail(
       },
     ],
     canvas: {
-      activeMode: "freeform",
       cards: [
         {
           deckIndex: 0,
@@ -90,10 +88,6 @@ function createReadingDetail(
             yPx: 80,
             stackOrder: 1,
           },
-          grid: {
-            column: 0,
-            row: 0,
-          },
         },
         {
           deckIndex: 1,
@@ -105,10 +99,6 @@ function createReadingDetail(
             xPx: 200,
             yPx: 80,
             stackOrder: 2,
-          },
-          grid: {
-            column: 1,
-            row: 0,
           },
         },
       ],
@@ -124,7 +114,6 @@ function createReadingSummary(detail: GetReadingResponse): ListReadingsResponse[
     deckId: detail.deckId,
     deckSpecVersion: detail.deckSpecVersion,
     cardCount: detail.cardCount,
-    canvasMode: detail.canvasMode,
     status: detail.status,
     version: detail.version,
     createdAt: detail.createdAt,
@@ -195,7 +184,6 @@ describe("reading-studio-api-data-source", () => {
         rootQuestion: "What needs a clearer frame?",
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
       expect.any(String)
     );
@@ -206,14 +194,12 @@ describe("reading-studio-api-data-source", () => {
     );
   });
 
-  it("maps semantic workspace actions onto reading commands", async () => {
+  it("maps semantic workspace actions onto freeform reading commands", async () => {
     const detail = createReadingDetail({
       readingId: "rdg_003",
       rootQuestion: "Which motion matters?",
       version: 5,
-      canvasMode: "grid",
       canvas: {
-        activeMode: "grid",
         cards: [
           {
             deckIndex: 0,
@@ -226,10 +212,6 @@ describe("reading-studio-api-data-source", () => {
               yPx: 210,
               stackOrder: 10,
             },
-            grid: {
-              column: 7,
-              row: 5,
-            },
           },
           {
             deckIndex: 1,
@@ -241,10 +223,6 @@ describe("reading-studio-api-data-source", () => {
               xPx: 200,
               yPx: 80,
               stackOrder: 2,
-            },
-            grid: {
-              column: 1,
-              row: 0,
             },
           },
         ],
@@ -261,23 +239,19 @@ describe("reading-studio-api-data-source", () => {
     );
 
     await dataSource.applyWorkspaceAction("rdg_003", 4, {
-      type: "workspace.modeSwitched",
-      mode: "grid",
-    });
-    await dataSource.applyWorkspaceAction("rdg_003", 5, {
       type: "workspace.cardMoved",
       cardId: "The Magician",
-      grid: {
-        column: 7,
-        row: 5,
+      freeform: {
+        xPx: 420,
+        yPx: 210,
       },
     });
-    await dataSource.applyWorkspaceAction("rdg_003", 6, {
+    await dataSource.applyWorkspaceAction("rdg_003", 5, {
       type: "workspace.cardRotated",
       cardId: "The Magician",
       deltaDeg: 15,
     });
-    const workspace = await dataSource.applyWorkspaceAction("rdg_003", 7, {
+    const workspace = await dataSource.applyWorkspaceAction("rdg_003", 6, {
       type: "workspace.cardFlipped",
       cardId: "The Magician",
     });
@@ -287,9 +261,13 @@ describe("reading-studio-api-data-source", () => {
       "rdg_003",
       expect.objectContaining({
         expectedVersion: 4,
-        type: "switch_canvas_mode",
+        type: "move_card",
         payload: {
-          canvasMode: "grid",
+          cardId: "The Magician",
+          freeform: {
+            xPx: 420,
+            yPx: 210,
+          },
         },
       }),
       expect.any(String)
@@ -299,22 +277,6 @@ describe("reading-studio-api-data-source", () => {
       "rdg_003",
       expect.objectContaining({
         expectedVersion: 5,
-        type: "move_card",
-        payload: {
-          cardId: "The Magician",
-          grid: {
-            column: 7,
-            row: 5,
-          },
-        },
-      }),
-      expect.any(String)
-    );
-    expect(postReadingCommand).toHaveBeenNthCalledWith(
-      3,
-      "rdg_003",
-      expect.objectContaining({
-        expectedVersion: 6,
         type: "rotate_card",
         payload: {
           cardId: "The Magician",
@@ -324,10 +286,10 @@ describe("reading-studio-api-data-source", () => {
       expect.any(String)
     );
     expect(postReadingCommand).toHaveBeenNthCalledWith(
-      4,
+      3,
       "rdg_003",
       expect.objectContaining({
-        expectedVersion: 7,
+        expectedVersion: 6,
         type: "flip_card",
         payload: {
           cardId: "The Magician",
@@ -336,7 +298,7 @@ describe("reading-studio-api-data-source", () => {
       expect.any(String)
     );
     expect(workspace.reading.id).toBe("rdg_003");
-    expect(workspace.canvas.activeMode).toBe("grid");
+    expect(workspace.canvas.cards).toHaveLength(2);
   });
 
   it("falls back to RFC 4122 v4 ids when randomUUID is unavailable", async () => {

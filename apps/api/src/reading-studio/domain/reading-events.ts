@@ -1,6 +1,4 @@
 import type {
-  CanvasMode,
-  GridPositionDto,
   ReadingDetail,
   ReadingLifecycleStatus,
 } from "@tarology/shared";
@@ -33,7 +31,7 @@ export interface ReadingLifecycleEventPayload {
 }
 
 export interface ReadingCanvasModeSwitchedEventPayload {
-  canvasMode: CanvasMode;
+  canvasMode: "freeform" | "grid";
   version: number;
   updatedAt: string;
 }
@@ -47,7 +45,10 @@ export interface ReadingCardMovedEventPayload {
     yPx: number;
     stackOrder: number;
   };
-  grid?: GridPositionDto;
+  grid?: {
+    column: number;
+    row: number;
+  };
 }
 
 export interface ReadingCardRotatedEventPayload {
