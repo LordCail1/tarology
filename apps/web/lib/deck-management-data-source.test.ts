@@ -18,6 +18,11 @@ const thothSummary = {
   symbolCount: 8,
 };
 
+const ownedThothSummary = {
+  ...thothSummary,
+  id: "deck_owned_thoth_123",
+};
+
 describe("createLocalDeckManagementDataSource", () => {
   it("builds a substantial starter deck snapshot from the real deck summary list", async () => {
     const dataSource = createLocalDeckManagementDataSource(undefined, "usr_123");
@@ -26,6 +31,20 @@ describe("createLocalDeckManagementDataSource", () => {
 
     expect(snapshot.activeDeckId).toBe("thoth");
     expect(snapshot.decks).toHaveLength(1);
+    expect(snapshot.decks[0].cards).toHaveLength(78);
+    expect(snapshot.decks[0].symbols.length).toBeGreaterThan(0);
+    expect(snapshot.decks[0].cardInformationEntries.length).toBeGreaterThan(78);
+    expect(snapshot.decks[0].knowledgeSources).toHaveLength(2);
+  });
+
+  it("builds the starter deck snapshot for owned Thoth deck instances", async () => {
+    const dataSource = createLocalDeckManagementDataSource(undefined, "usr_123");
+
+    const snapshot = await dataSource.loadLibrary([ownedThothSummary], ownedThothSummary.id);
+
+    expect(snapshot.activeDeckId).toBe(ownedThothSummary.id);
+    expect(snapshot.decks).toHaveLength(1);
+    expect(snapshot.decks[0].id).toBe(ownedThothSummary.id);
     expect(snapshot.decks[0].cards).toHaveLength(78);
     expect(snapshot.decks[0].symbols.length).toBeGreaterThan(0);
     expect(snapshot.decks[0].cardInformationEntries.length).toBeGreaterThan(78);
