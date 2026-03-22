@@ -377,9 +377,9 @@ describe("ReadingsService", () => {
     const restored = await service.restoreReadingFromHistory(user.userId, "reading-1");
 
     expect(restored?.canvas.cards[0].freeform).toEqual({
-      xPx: 489,
-      yPx: 229,
-      stackOrder: 13,
+      xPx: 96,
+      yPx: 144,
+      stackOrder: 1,
     });
     expect((restored as Record<string, unknown>)?.canvasMode).toBe("grid");
     expect((restored?.canvas as Record<string, unknown>)?.activeMode).toBe("grid");
@@ -527,6 +527,56 @@ describe("ReadingsService", () => {
       stackOrder: 7,
     });
     expect((detail as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+  });
+
+  it("replays legacy canvas mode switch events during restore", async () => {
+    const service = new ReadingsService(
+      {
+        userPreference: {
+          findUnique: vi.fn(),
+        },
+      } as never,
+      decksService as never,
+      {
+        findOwnedById: vi.fn().mockResolvedValue({ id: "reading-1" }),
+      } as never,
+      {
+        listAfterVersion: vi.fn().mockResolvedValue([
+          {
+            eventType: "reading.canvas_mode_switched",
+            version: 2,
+            payload: {
+              canvasMode: "grid",
+              version: 2,
+              updatedAt: "2026-03-22T10:02:00.000Z",
+            },
+          },
+        ]),
+      } as never,
+      {
+        findLatest: vi.fn().mockResolvedValue({
+          version: 1,
+          projection: buildReadingDetail(),
+        }),
+      } as never,
+      {
+        findCreateReceipt: vi.fn(),
+        createCreateReceipt: vi.fn(),
+        findCommandReceiptByIdempotencyKey: vi.fn(),
+        findCommandReceiptByCommandId: vi.fn(),
+        createCommandReceipt: vi.fn(),
+      } as never
+    );
+
+    const restored = await service.restoreReadingFromHistory(user.userId, "reading-1");
+
+    expect((restored as Record<string, unknown>)?.canvasMode).toBe("grid");
+    expect((restored?.canvas as Record<string, unknown>)?.activeMode).toBe("grid");
+    expect(restored?.canvas.cards[0].freeform).toEqual({
+      xPx: 96,
+      yPx: 144,
+      stackOrder: 1,
+    });
   });
 
   it("clears legacy grid compatibility after a later freeform move", () => {

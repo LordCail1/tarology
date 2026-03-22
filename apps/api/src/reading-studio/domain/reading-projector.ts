@@ -1,12 +1,14 @@
 import type { ReadingDetail } from "@tarology/shared";
 import {
   READING_ARCHIVED_EVENT,
+  READING_CANVAS_MODE_SWITCHED_EVENT,
   READING_CARD_FLIPPED_EVENT,
   READING_CARD_MOVED_EVENT,
   READING_CARD_ROTATED_EVENT,
   READING_CREATED_EVENT,
   READING_DELETED_EVENT,
   READING_REOPENED_EVENT,
+  type ReadingCanvasModeSwitchedEventPayload,
   type ReadingCardFlippedEventPayload,
   type ReadingCardMovedEventPayload,
   type ReadingCardRotatedEventPayload,
@@ -46,6 +48,16 @@ function isCardMovedPayload(payload: unknown): payload is ReadingCardMovedEventP
     typeof payload === "object" &&
     payload !== null &&
     "cardId" in payload &&
+    "version" in payload &&
+    "updatedAt" in payload
+  );
+}
+
+function isCanvasModePayload(payload: unknown): payload is ReadingCanvasModeSwitchedEventPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "canvasMode" in payload &&
     "version" in payload &&
     "updatedAt" in payload
   );
@@ -142,6 +154,35 @@ export function applyReadingEvent(
         archivedAt: event.payload.archivedAt,
         deletedAt: event.payload.deletedAt,
       };
+    }
+
+    case READING_CANVAS_MODE_SWITCHED_EVENT: {
+      if (!current) {
+        throw new Error(`${event.eventType} requires an existing projection.`);
+      }
+
+      if (!isCanvasModePayload(event.payload)) {
+        throw new Error(`${event.eventType} payload is invalid.`);
+      }
+
+      if (event.payload.canvasMode === "freeform") {
+        return forceFreeformCanvasCompatibility({
+          ...current,
+          version: event.payload.version,
+          updatedAt: event.payload.updatedAt,
+        });
+      }
+
+      return {
+        ...current,
+        version: event.payload.version,
+        updatedAt: event.payload.updatedAt,
+        canvasMode: "grid",
+        canvas: {
+          ...current.canvas,
+          activeMode: "grid",
+        },
+      } as ReadingDetail;
     }
 
     case READING_CARD_MOVED_EVENT: {

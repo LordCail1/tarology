@@ -105,6 +105,7 @@ Execution sequencing:
   - the legacy mode-switch shim now preserves the reader's saved freeform coordinates while only toggling compatibility-facing `canvasMode` / `canvas.activeMode` fields for stale clients
 - rollout-only legacy grid compatibility is now marked internally in snapshots so restores can preserve newer freeform moves without exposing extra internal fields in API responses
 - real freeform moves now clear rollout-only `grid` mode compatibility, while legacy grid-origin moves still preserve stale-client behavior during the brief migration window
+- legacy snapshot normalization is now explicitly freeform-first for the modern client, while old `grid` fields and historical `reading.canvas_mode_switched` events remain replayable as rollout-only compatibility metadata
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 - Google auth baseline:

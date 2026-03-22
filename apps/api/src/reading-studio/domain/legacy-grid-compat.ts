@@ -109,12 +109,12 @@ function resolveCompatibleFreeformPosition(
   const grid = card.grid;
   const freeform = card.freeform;
 
-  if (preferLegacyGrid && isLegacyGridPosition(grid)) {
-    return resolveLegacyGridFreeformPosition(grid);
-  }
-
   if (isLegacyFreeformPosition(freeform)) {
     return freeform;
+  }
+
+  if (preferLegacyGrid && isLegacyGridPosition(grid)) {
+    return resolveLegacyGridFreeformPosition(grid);
   }
 
   if (isLegacyGridPosition(grid)) {
