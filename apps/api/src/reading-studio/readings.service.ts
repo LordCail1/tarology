@@ -48,6 +48,7 @@ import {
   normalizeRotation,
 } from "./domain/reading-canvas.js";
 import { buildDeterministicCardAssignment } from "./domain/deterministic-shuffle.js";
+import { normalizeLegacyReadingDetail } from "./domain/legacy-grid-compat.js";
 import { CreateReadingDto } from "./dto/create-reading.dto.js";
 import { ReadingCommandDto } from "./dto/reading-command.dto.js";
 import { ReadingEventsRepository } from "./repositories/reading-events.repository.js";
@@ -76,27 +77,11 @@ function toReadingDetailFromJson(value: Prisma.JsonValue): ReadingDetail {
 }
 
 function toCreateReadingResponseFromJson(value: Prisma.JsonValue): CreateReadingResponse {
-  return normalizeReadingDetail(value as unknown as CreateReadingResponse);
+  return normalizeLegacyReadingDetail(value as unknown as CreateReadingResponse);
 }
 
 function normalizeReadingDetail<T extends ReadingDetail | CreateReadingResponse>(value: T): T {
-  return {
-    ...value,
-    canvas: {
-      cards: value.canvas.cards.map((card) => ({
-        deckIndex: card.deckIndex,
-        cardId: card.cardId,
-        assignedReversal: card.assignedReversal,
-        isFaceUp: card.isFaceUp,
-        rotationDeg: card.rotationDeg,
-        freeform: {
-          xPx: card.freeform.xPx,
-          yPx: card.freeform.yPx,
-          stackOrder: card.freeform.stackOrder,
-        },
-      })),
-    },
-  };
+  return normalizeLegacyReadingDetail(value);
 }
 
 function stableStringify(value: unknown): string {

@@ -96,6 +96,9 @@ Execution sequencing:
   - zoom, fit, and reset controls are available in the canvas toolbar
   - selected or recently touched cards are allowed to move off-screen; `Fit Spread` is the explicit reframe tool
   - web regression coverage now includes background drag, wheel pan, zoom, fit-spread, and center-point stabilization across layout changes
+- Grid-removal compatibility hardening:
+  - legacy grid-mode snapshots are now normalized to their migrated freeform positions during restore
+  - legacy grid-only `reading.card_moved` events now replay safely by translating their stored grid coordinates into freeform placement
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 - Google auth baseline:

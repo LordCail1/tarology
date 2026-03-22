@@ -1,7 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { AuthenticatedUser } from "@tarology/shared";
+import type { AuthenticatedUser, ReadingDetail } from "@tarology/shared";
 import { ReadingsService } from "../src/reading-studio/readings.service.js";
 import { THOTH_DECK_SPEC } from "../src/reading-studio/domain/thoth-deck-spec.js";
 
@@ -98,6 +98,49 @@ function createService(defaultDeckId: string | null) {
     readingSnapshotsRepository,
     readingIdempotencyRepository,
     service,
+  };
+}
+
+function buildReadingDetail(overrides: Partial<ReadingDetail> = {}): ReadingDetail {
+  return {
+    readingId: "reading-1",
+    rootQuestion: "What should I focus on next?",
+    deckId: "deck_thoth_owned",
+    deckSpecVersion: "thoth-v1",
+    cardCount: 1,
+    status: "active",
+    version: 1,
+    shuffleAlgorithmVersion: "tarology-shuffle-v1",
+    seedCommitment: "seed-commitment",
+    orderHash: "order-hash",
+    assignments: [
+      {
+        deckIndex: 0,
+        cardId: "card-1",
+        assignedReversal: false,
+      },
+    ],
+    canvas: {
+      cards: [
+        {
+          deckIndex: 0,
+          cardId: "card-1",
+          assignedReversal: false,
+          isFaceUp: false,
+          rotationDeg: 0,
+          freeform: {
+            xPx: 96,
+            yPx: 144,
+            stackOrder: 1,
+          },
+        },
+      ],
+    },
+    createdAt: "2026-03-22T10:00:00.000Z",
+    updatedAt: "2026-03-22T10:00:00.000Z",
+    archivedAt: null,
+    deletedAt: null,
+    ...overrides,
   };
 }
 
@@ -254,5 +297,128 @@ describe("ReadingsService", () => {
     expect(result).toEqual(replayResponse);
     expect(readingsRepository.findCurrentVersion).not.toHaveBeenCalled();
     expect(readingIdempotencyRepository.findCommandReceiptByIdempotencyKey).toHaveBeenCalledTimes(2);
+  });
+
+  it("normalizes legacy grid snapshots during restore without leaking removed fields", async () => {
+    const legacySnapshot = {
+      ...buildReadingDetail({
+        version: 4,
+        updatedAt: "2026-03-22T10:04:00.000Z",
+      }),
+      canvasMode: "grid",
+      canvas: {
+        activeMode: "grid",
+        cards: [
+          {
+            deckIndex: 0,
+            cardId: "card-1",
+            assignedReversal: false,
+            isFaceUp: true,
+            rotationDeg: 15,
+            freeform: {
+              xPx: 96,
+              yPx: 144,
+              stackOrder: 1,
+            },
+            grid: {
+              column: 2,
+              row: 1,
+            },
+          },
+        ],
+      },
+    };
+
+    const service = new ReadingsService(
+      {
+        userPreference: {
+          findUnique: vi.fn(),
+        },
+      } as never,
+      decksService as never,
+      {
+        findOwnedById: vi.fn().mockResolvedValue({ id: "reading-1" }),
+      } as never,
+      {
+        listAfterVersion: vi.fn().mockResolvedValue([]),
+      } as never,
+      {
+        findLatest: vi.fn().mockResolvedValue({
+          version: 4,
+          projection: legacySnapshot,
+        }),
+      } as never,
+      {
+        findCreateReceipt: vi.fn(),
+        createCreateReceipt: vi.fn(),
+        findCommandReceiptByIdempotencyKey: vi.fn(),
+        findCommandReceiptByCommandId: vi.fn(),
+        createCommandReceipt: vi.fn(),
+      } as never
+    );
+
+    const restored = await service.restoreReadingFromHistory(user.userId, "reading-1");
+
+    expect(restored?.canvas.cards[0].freeform).toEqual({
+      xPx: 489,
+      yPx: 229,
+      stackOrder: 13,
+    });
+    expect(restored).not.toHaveProperty("canvasMode");
+    expect(restored?.canvas).not.toHaveProperty("activeMode");
+  });
+
+  it("replays legacy grid-only move events during restore", async () => {
+    const service = new ReadingsService(
+      {
+        userPreference: {
+          findUnique: vi.fn(),
+        },
+      } as never,
+      decksService as never,
+      {
+        findOwnedById: vi.fn().mockResolvedValue({ id: "reading-1" }),
+      } as never,
+      {
+        listAfterVersion: vi.fn().mockResolvedValue([
+          {
+            eventType: "reading.card_moved",
+            version: 2,
+            payload: {
+              cardId: "card-1",
+              version: 2,
+              updatedAt: "2026-03-22T10:02:00.000Z",
+              grid: {
+                column: 3,
+                row: 2,
+              },
+            },
+          },
+        ]),
+      } as never,
+      {
+        findLatest: vi.fn().mockResolvedValue({
+          version: 1,
+          projection: buildReadingDetail(),
+        }),
+      } as never,
+      {
+        findCreateReceipt: vi.fn(),
+        createCreateReceipt: vi.fn(),
+        findCommandReceiptByIdempotencyKey: vi.fn(),
+        findCommandReceiptByCommandId: vi.fn(),
+        createCommandReceipt: vi.fn(),
+      } as never
+    );
+
+    const restored = await service.restoreReadingFromHistory(user.userId, "reading-1");
+
+    expect(restored?.version).toBe(2);
+    expect(restored?.updatedAt).toBe("2026-03-22T10:02:00.000Z");
+    expect(restored?.canvas.cards[0].freeform).toEqual({
+      xPx: 720,
+      yPx: 429,
+      stackOrder: 24,
+    });
   });
 });

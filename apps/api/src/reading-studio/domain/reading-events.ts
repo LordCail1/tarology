@@ -32,10 +32,14 @@ export interface ReadingCardMovedEventPayload {
   cardId: string;
   version: number;
   updatedAt: string;
-  freeform: {
+  freeform?: {
     xPx: number;
     yPx: number;
     stackOrder: number;
+  };
+  grid?: {
+    column: number;
+    row: number;
   };
 }
 

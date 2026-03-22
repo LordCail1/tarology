@@ -13,6 +13,10 @@ import {
   type ReadingLifecycleEventPayload,
   type ReadingStoredEvent,
 } from "./reading-events.js";
+import {
+  normalizeLegacyReadingDetail,
+  resolveLegacyGridFreeformPosition,
+} from "./legacy-grid-compat.js";
 import { normalizeRotation } from "./reading-canvas.js";
 
 function isReadingDetail(payload: unknown): payload is ReadingDetail {
@@ -41,6 +45,44 @@ function isCardMovedPayload(payload: unknown): payload is ReadingCardMovedEventP
     "cardId" in payload &&
     "version" in payload &&
     "updatedAt" in payload
+  );
+}
+
+function hasFreeformPayload(
+  payload: ReadingCardMovedEventPayload
+): payload is ReadingCardMovedEventPayload & {
+  freeform: {
+    xPx: number;
+    yPx: number;
+    stackOrder: number;
+  };
+} {
+  return (
+    typeof payload.freeform === "object" &&
+    payload.freeform !== null &&
+    typeof payload.freeform.xPx === "number" &&
+    typeof payload.freeform.yPx === "number" &&
+    typeof payload.freeform.stackOrder === "number"
+  );
+}
+
+function hasLegacyGridPayload(
+  payload: ReadingCardMovedEventPayload
+): payload is ReadingCardMovedEventPayload & {
+  grid: {
+    column: number;
+    row: number;
+  };
+} {
+  const candidate = payload as ReadingCardMovedEventPayload & {
+    grid?: { column?: unknown; row?: unknown };
+  };
+
+  return (
+    typeof candidate.grid === "object" &&
+    candidate.grid !== null &&
+    typeof candidate.grid.column === "number" &&
+    typeof candidate.grid.row === "number"
   );
 }
 
@@ -75,7 +117,7 @@ export function applyReadingEvent(
       if (!isReadingDetail(event.payload)) {
         throw new Error("reading.created payload is invalid.");
       }
-      return event.payload;
+      return normalizeLegacyReadingDetail(event.payload);
     }
 
     case READING_ARCHIVED_EVENT:
@@ -109,6 +151,15 @@ export function applyReadingEvent(
       }
 
       const payload = event.payload;
+      const nextFreeform = hasFreeformPayload(payload)
+        ? payload.freeform
+        : hasLegacyGridPayload(payload)
+          ? resolveLegacyGridFreeformPosition(payload.grid)
+          : null;
+
+      if (!nextFreeform) {
+        throw new Error(`${event.eventType} payload is invalid.`);
+      }
 
       return {
         ...current,
@@ -121,9 +172,9 @@ export function applyReadingEvent(
               ? {
                   ...card,
                   freeform: {
-                    xPx: payload.freeform.xPx,
-                    yPx: payload.freeform.yPx,
-                    stackOrder: payload.freeform.stackOrder,
+                    xPx: nextFreeform.xPx,
+                    yPx: nextFreeform.yPx,
+                    stackOrder: nextFreeform.stackOrder,
                   },
                 }
               : card
