@@ -502,6 +502,8 @@ describe("Reading durability and history API", () => {
         row: 1,
       },
     });
+    expect(moved.body.reading.canvasMode).toBe("grid");
+    expect(moved.body.reading.canvas.activeMode).toBe("grid");
 
     await closeTrackedApp(app);
   });
@@ -560,6 +562,8 @@ describe("Reading durability and history API", () => {
         yPx: 241,
       },
     });
+    expect(moved.body.reading.canvasMode).toBe("freeform");
+    expect(moved.body.reading.canvas.activeMode).toBe("freeform");
     expect((moved.body.reading as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
 
     const detail = await request(app.getHttpServer())
@@ -575,6 +579,8 @@ describe("Reading durability and history API", () => {
         yPx: 241,
       },
     });
+    expect(detail.body.canvasMode).toBe("freeform");
+    expect(detail.body.canvas.activeMode).toBe("freeform");
     expect((detail.body as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
 
     await closeTrackedApp(app);

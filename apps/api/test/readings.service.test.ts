@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser, ReadingDetail } from "@tarology/shared";
 import { ReadingsService } from "../src/reading-studio/readings.service.js";
+import { applyReadingEvent } from "../src/reading-studio/domain/reading-projector.js";
 import { THOTH_DECK_SPEC } from "../src/reading-studio/domain/thoth-deck-spec.js";
 
 const user: AuthenticatedUser = {
@@ -526,6 +527,62 @@ describe("ReadingsService", () => {
       stackOrder: 7,
     });
     expect((detail as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+  });
+
+  it("clears legacy grid compatibility after a later freeform move", () => {
+    const current = {
+      ...buildReadingDetail({
+        version: 2,
+        updatedAt: "2026-03-22T10:02:00.000Z",
+      }),
+      canvasMode: "grid",
+      canvas: {
+        activeMode: "grid",
+        cards: [
+          {
+            deckIndex: 0,
+            cardId: "card-1",
+            assignedReversal: false,
+            isFaceUp: false,
+            rotationDeg: 0,
+            freeform: {
+              xPx: 377,
+              yPx: 241,
+              stackOrder: 7,
+            },
+            grid: {
+              column: 2,
+              row: 1,
+            },
+          },
+        ],
+      },
+      __legacyCanvasModeShim: "preserve_freeform",
+    } as unknown as ReadingDetail;
+
+    const moved = applyReadingEvent(current, {
+      eventType: "reading.card_moved",
+      version: 3,
+      payload: {
+        cardId: "card-1",
+        version: 3,
+        updatedAt: "2026-03-22T10:03:00.000Z",
+        freeform: {
+          xPx: 450,
+          yPx: 300,
+          stackOrder: 8,
+        },
+      },
+    });
+
+    expect((moved as Record<string, unknown>).canvasMode).toBe("freeform");
+    expect((moved.canvas as Record<string, unknown>).activeMode).toBe("freeform");
+    expect((moved as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+    expect(moved.canvas.cards[0].freeform).toEqual({
+      xPx: 450,
+      yPx: 300,
+      stackOrder: 8,
+    });
   });
 
   it("replays legacy grid-only move events during restore", async () => {

@@ -14,9 +14,11 @@ import {
   type ReadingStoredEvent,
 } from "./reading-events.js";
 import {
+  forceFreeformCanvasCompatibility,
   normalizeLegacyReadingDetail,
   resolveLegacyGridPositionFromFreeform,
   resolveLegacyGridFreeformPosition,
+  usesLegacyCanvasModeCompat,
 } from "./legacy-grid-compat.js";
 import { normalizeRotation } from "./reading-canvas.js";
 
@@ -167,7 +169,7 @@ export function applyReadingEvent(
         throw new Error(`${event.eventType} payload is invalid.`);
       }
 
-      return {
+      const movedProjection = {
         ...current,
         version: payload.version,
         updatedAt: payload.updatedAt,
@@ -188,6 +190,12 @@ export function applyReadingEvent(
           ),
         },
       };
+
+      if (hasFreeformPayload(payload) && !hasLegacyGridPayload(payload) && usesLegacyCanvasModeCompat(current)) {
+        return forceFreeformCanvasCompatibility(movedProjection);
+      }
+
+      return movedProjection;
     }
 
     case READING_CARD_ROTATED_EVENT: {

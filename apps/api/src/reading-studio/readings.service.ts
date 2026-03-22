@@ -79,6 +79,13 @@ interface LegacySwitchCanvasModeCommandRequest {
   payload: LegacySwitchCanvasModePayload;
 }
 
+interface NormalizedMoveCardPayload extends MoveCardPayload {
+  legacyGrid?: {
+    column: number;
+    row: number;
+  };
+}
+
 type NormalizedReadingCommand = ReadingCommandRequest | LegacySwitchCanvasModeCommandRequest;
 
 class VersionConflictError extends Error {}
@@ -842,7 +849,7 @@ export class ReadingsService {
 
   private createCardMovedEvent(
     currentDetail: ReadingDetail,
-    payload: MoveCardPayload,
+    payload: NormalizedMoveCardPayload,
     version: number,
     updatedAt: string
   ): ReadingStoredEvent {
@@ -855,6 +862,7 @@ export class ReadingsService {
         yPx: payload.freeform.yPx,
         stackOrder: getHighestStackOrder(currentDetail.canvas.cards) + 1,
       },
+      ...(payload.legacyGrid ? { grid: payload.legacyGrid } : {}),
     };
 
     return {
@@ -1055,7 +1063,7 @@ export class ReadingsService {
     return { canvasMode };
   }
 
-  private parseMoveCardPayload(payload: unknown): MoveCardPayload {
+  private parseMoveCardPayload(payload: unknown): NormalizedMoveCardPayload {
     if (!payload || Array.isArray(payload) || typeof payload !== "object") {
       throw new BadRequestException("move_card payload must be an object.");
     }
@@ -1070,6 +1078,18 @@ export class ReadingsService {
       throw new BadRequestException("move_card payload requires a cardId.");
     }
 
+    const normalizedGrid =
+      grid &&
+      typeof grid.column === "number" &&
+      Number.isFinite(grid.column) &&
+      typeof grid.row === "number" &&
+      Number.isFinite(grid.row)
+        ? {
+            column: Math.round(grid.column),
+            row: Math.round(grid.row),
+          }
+        : undefined;
+
     const normalizedFreeform =
       freeform &&
       typeof freeform.xPx === "number" &&
@@ -1080,15 +1100,8 @@ export class ReadingsService {
             xPx: Math.round(freeform.xPx),
             yPx: Math.round(freeform.yPx),
           }
-        : grid &&
-            typeof grid.column === "number" &&
-            Number.isFinite(grid.column) &&
-            typeof grid.row === "number" &&
-            Number.isFinite(grid.row)
-          ? resolveLegacyGridFreeformPosition({
-              column: Math.round(grid.column),
-              row: Math.round(grid.row),
-            })
+        : normalizedGrid
+          ? resolveLegacyGridFreeformPosition(normalizedGrid)
           : undefined;
 
     if (!normalizedFreeform) {
@@ -1101,6 +1114,7 @@ export class ReadingsService {
         xPx: normalizedFreeform.xPx,
         yPx: normalizedFreeform.yPx,
       },
+      ...(normalizedGrid ? { legacyGrid: normalizedGrid } : {}),
     };
   }
 

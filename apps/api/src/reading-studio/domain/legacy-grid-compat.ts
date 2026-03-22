@@ -74,6 +74,12 @@ function preservesFreeformUnderLegacyGrid(
   );
 }
 
+export function usesLegacyCanvasModeCompat(
+  value: ReadingDetail | CreateReadingResponse
+): boolean {
+  return usesLegacyGridLayout(value);
+}
+
 export function resolveLegacyGridFreeformPosition(
   position: LegacyGridPosition
 ): LegacyFreeformPosition {
@@ -201,6 +207,26 @@ export function stripLegacyCanvasModeInternalFields<
   const { [LEGACY_CANVAS_MODE_SHIM_KEY]: _omitted, ...rest } = record;
 
   return rest as unknown as T;
+}
+
+export function forceFreeformCanvasCompatibility<
+  T extends ReadingDetail | CreateReadingResponse,
+>(value: T): T {
+  const stripped = stripLegacyCanvasModeInternalFields(value) as unknown as Record<string, unknown>;
+  const canvas = isRecord(stripped.canvas) ? stripped.canvas : null;
+
+  return {
+    ...stripped,
+    canvasMode: "freeform",
+    ...(canvas
+      ? {
+          canvas: {
+            ...canvas,
+            activeMode: "freeform",
+          },
+        }
+      : {}),
+  } as unknown as T;
 }
 
 export function withLegacyReadingSummaryFields<T extends ReadingSummary>(
