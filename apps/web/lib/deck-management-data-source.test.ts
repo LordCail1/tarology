@@ -51,6 +51,47 @@ describe("createLocalDeckManagementDataSource", () => {
     expect(snapshot.decks[0].knowledgeSources).toHaveLength(2);
   });
 
+  it("repairs previously persisted empty owned starter deck snapshots", async () => {
+    const storage = window.localStorage;
+    storage.setItem(
+      buildDeckLibraryStorageKey("usr_123"),
+      JSON.stringify({
+        activeDeckId: ownedThothSummary.id,
+        decks: [
+          {
+            ...ownedThothSummary,
+            knowledgeVersion: 0,
+            initializationMode: "empty_template",
+            initializerKey: null,
+            originExportDigest: null,
+            symbolCount: 0,
+            cards: [],
+            symbols: [],
+            cardSymbols: [],
+            knowledgeSources: [],
+            cardInformationEntries: [],
+            symbolInformationEntries: [],
+          },
+        ],
+      })
+    );
+
+    const dataSource = createLocalDeckManagementDataSource(storage, "usr_123");
+    const snapshot = await dataSource.loadLibrary([ownedThothSummary], ownedThothSummary.id);
+    const persistedSnapshot = JSON.parse(
+      storage.getItem(buildDeckLibraryStorageKey("usr_123")) ?? "null"
+    ) as { decks: Array<{ cards: unknown[]; symbols: unknown[] }> } | null;
+
+    expect(snapshot.activeDeckId).toBe(ownedThothSummary.id);
+    expect(snapshot.decks[0].id).toBe(ownedThothSummary.id);
+    expect(snapshot.decks[0].cards).toHaveLength(78);
+    expect(snapshot.decks[0].symbols.length).toBeGreaterThan(0);
+    expect(snapshot.decks[0].knowledgeSources).toHaveLength(2);
+    expect(persistedSnapshot?.decks[0]?.cards).toHaveLength(78);
+    expect(persistedSnapshot?.decks[0]?.symbols.length).toBeGreaterThan(0);
+    storage.clear();
+  });
+
   it("restores a persisted snapshot when local storage already has one", async () => {
     const storage = window.localStorage;
     storage.setItem(

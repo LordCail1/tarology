@@ -25,6 +25,61 @@ function cloneSnapshot(snapshot: DeckLibrarySnapshot): DeckLibrarySnapshot {
   };
 }
 
+function isEmptyPersistedDeckShell(deck: DeckLibrarySnapshot["decks"][number]): boolean {
+  return (
+    deck.cards.length === 0 &&
+    deck.symbols.length === 0 &&
+    deck.cardSymbols.length === 0 &&
+    deck.knowledgeSources.length === 0 &&
+    deck.cardInformationEntries.length === 0 &&
+    deck.symbolInformationEntries.length === 0
+  );
+}
+
+function repairPersistedSnapshot(
+  snapshot: DeckLibrarySnapshot,
+  deckSummaries: DeckSummary[]
+): { snapshot: DeckLibrarySnapshot; changed: boolean } {
+  const summaryById = new Map(deckSummaries.map((summary) => [summary.id, summary]));
+  let changed = false;
+
+  const repairedDecks = snapshot.decks.map((deck) => {
+    const summary = summaryById.get(deck.id);
+    if (!summary) {
+      return deck;
+    }
+
+    const seededDeck = createDeckFromSummary(summary);
+    if (!isEmptyPersistedDeckShell(deck) || seededDeck.cards.length === 0) {
+      return deck;
+    }
+
+    changed = true;
+    return seededDeck;
+  });
+
+  const normalizedSnapshot = normalizeSnapshot({
+    activeDeckId: snapshot.activeDeckId,
+    decks: repairedDecks,
+  });
+
+  if (
+    !changed &&
+    normalizedSnapshot.activeDeckId === snapshot.activeDeckId &&
+    normalizedSnapshot.decks.every((deck, index) => deck === snapshot.decks[index])
+  ) {
+    return {
+      snapshot,
+      changed: false,
+    };
+  }
+
+  return {
+    snapshot: normalizedSnapshot,
+    changed: true,
+  };
+}
+
 function isValidDeckArray(value: unknown): value is unknown[] {
   return Array.isArray(value);
 }
@@ -110,12 +165,19 @@ export function createLocalDeckManagementDataSource(
           return fallback;
         }
 
-        return cloneSnapshot(
-          normalizeSnapshot({
+        const repaired = repairPersistedSnapshot(
+          {
             activeDeckId: parsed.activeDeckId,
             decks: parsed.decks,
-          })
+          },
+          deckSummaries
         );
+
+        if (repaired.changed) {
+          storage.setItem(storageKey, JSON.stringify(repaired.snapshot));
+        }
+
+        return cloneSnapshot(repaired.snapshot);
       } catch {
         return fallback;
       }
