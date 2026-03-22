@@ -105,6 +105,8 @@ const THOTH_SYMBOL_LIBRARY = [
 
 const STARTER_SOURCE_ID = "starter:thoth-bundle";
 const READER_SOURCE_ID = "reader:field-notes";
+const THOTH_SPEC_VERSION = "thoth-v1";
+const THOTH_STARTER_INITIALIZER_KEY = "thoth";
 
 function toSentenceCase(value: string): string {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -320,11 +322,7 @@ export function createThothStarterDeck(summary: DeckSummary): DeckLibraryDeck {
 
   return {
     ...summary,
-    knowledgeVersion: 1,
-    initializationMode: "starter_content",
-    initializerKey: "starter:thoth",
     originExportDigest: null,
-    symbolCount: symbols.length,
     cards,
     symbols,
     cardSymbols,
@@ -360,7 +358,11 @@ export function createThothEmptyDeck(
 }
 
 export function createDeckFromSummary(summary: DeckSummary): DeckLibraryDeck {
-  if (summary.id === "thoth") {
+  if (
+    summary.initializationMode === "starter_content" &&
+    summary.specVersion === THOTH_SPEC_VERSION &&
+    summary.initializerKey === THOTH_STARTER_INITIALIZER_KEY
+  ) {
     return createThothStarterDeck(summary);
   }
 
