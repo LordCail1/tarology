@@ -174,7 +174,11 @@ export function createLocalDeckManagementDataSource(
         );
 
         if (repaired.changed) {
-          storage.setItem(storageKey, JSON.stringify(repaired.snapshot));
+          try {
+            storage.setItem(storageKey, JSON.stringify(repaired.snapshot));
+          } catch {
+            // Ignore repair write failures and keep the loaded snapshot in memory.
+          }
         }
 
         return cloneSnapshot(repaired.snapshot);
