@@ -114,8 +114,18 @@ describe("Reading durability and history API", () => {
       archivedAt: null,
       deletedAt: null,
     });
-    expect(createResponse.body).not.toHaveProperty("canvasMode");
-    expect(detailResponse.body).not.toHaveProperty("canvasMode");
+    expect(createResponse.body.canvasMode).toBe("freeform");
+    expect(detailResponse.body.canvasMode).toBe("freeform");
+    expect(createResponse.body.canvas.activeMode).toBe("freeform");
+    expect(detailResponse.body.canvas.activeMode).toBe("freeform");
+    expect(createResponse.body.canvas.cards[0].grid).toMatchObject({
+      column: expect.any(Number),
+      row: expect.any(Number),
+    });
+    expect(detailResponse.body.canvas.cards[0].grid).toMatchObject({
+      column: expect.any(Number),
+      row: expect.any(Number),
+    });
     expect(detailResponse.body.assignments).toHaveLength(78);
     expect(detailResponse.body.assignments).toEqual(createResponse.body.assignments);
 
@@ -208,6 +218,18 @@ describe("Reading durability and history API", () => {
       second.body.readingId,
       first.body.readingId,
     ]);
+    expect(listResponse.body.readings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          readingId: first.body.readingId,
+          canvasMode: "freeform",
+        }),
+        expect.objectContaining({
+          readingId: second.body.readingId,
+          canvasMode: "freeform",
+        }),
+      ])
+    );
 
     await closeTrackedApp(listApp);
   });

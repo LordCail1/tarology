@@ -6,6 +6,10 @@ import type {
   ReadingLifecycleStatus,
   ReadingSummary,
 } from "@tarology/shared";
+import {
+  normalizeLegacyReadingDetail,
+  withLegacyReadingSummaryFields,
+} from "./domain/legacy-grid-compat.js";
 
 type ReadingWithCards = Reading & {
   cards: ReadingCard[];
@@ -40,7 +44,7 @@ function toCanvasCards(cards: ReadingCard[]): ReadingCanvasCardState[] {
 }
 
 function toSummaryBase(reading: ReadingWithCount): ReadingSummary {
-  return {
+  return withLegacyReadingSummaryFields({
     readingId: reading.id,
     rootQuestion: reading.rootQuestion,
     deckId: reading.deckId,
@@ -52,7 +56,7 @@ function toSummaryBase(reading: ReadingWithCount): ReadingSummary {
     updatedAt: reading.updatedAt.toISOString(),
     archivedAt: toIsoString(reading.archivedAt),
     deletedAt: toIsoString(reading.deletedAt),
-  };
+  });
 }
 
 export function toReadingSummary(reading: ReadingWithCount): ReadingSummary {
@@ -62,7 +66,7 @@ export function toReadingSummary(reading: ReadingWithCount): ReadingSummary {
 export function toReadingDetail(reading: ReadingWithCards): ReadingDetail {
   const canvasCards = toCanvasCards(reading.cards);
 
-  return {
+  return normalizeLegacyReadingDetail({
     ...toSummaryBase({
       ...reading,
       _count: {
@@ -79,11 +83,11 @@ export function toReadingDetail(reading: ReadingWithCards): ReadingDetail {
         deckIndex: card.deckIndex,
         cardId: card.cardId,
         assignedReversal: card.assignedReversal,
-      })),
+    })),
     canvas: {
       cards: canvasCards,
     },
-  };
+  });
 }
 
 export function toCreateReadingResponse(reading: ReadingWithCards): CreateReadingResponse {

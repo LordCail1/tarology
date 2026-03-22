@@ -299,7 +299,7 @@ describe("ReadingsService", () => {
     expect(readingIdempotencyRepository.findCommandReceiptByIdempotencyKey).toHaveBeenCalledTimes(2);
   });
 
-  it("normalizes legacy grid snapshots during restore without leaking removed fields", async () => {
+  it("normalizes legacy grid snapshots during restore while preserving rollout compatibility fields", async () => {
     const legacySnapshot = {
       ...buildReadingDetail({
         version: 4,
@@ -364,8 +364,12 @@ describe("ReadingsService", () => {
       yPx: 229,
       stackOrder: 13,
     });
-    expect(restored).not.toHaveProperty("canvasMode");
-    expect(restored?.canvas).not.toHaveProperty("activeMode");
+    expect((restored as Record<string, unknown>)?.canvasMode).toBe("grid");
+    expect((restored?.canvas as Record<string, unknown>)?.activeMode).toBe("grid");
+    expect((restored?.canvas.cards[0] as Record<string, unknown>)?.grid).toEqual({
+      column: 2,
+      row: 1,
+    });
   });
 
   it("replays legacy grid-only move events during restore", async () => {
@@ -415,6 +419,8 @@ describe("ReadingsService", () => {
 
     expect(restored?.version).toBe(2);
     expect(restored?.updatedAt).toBe("2026-03-22T10:02:00.000Z");
+    expect((restored as Record<string, unknown>)?.canvasMode).toBe("freeform");
+    expect((restored?.canvas as Record<string, unknown>)?.activeMode).toBe("freeform");
     expect(restored?.canvas.cards[0].freeform).toEqual({
       xPx: 720,
       yPx: 429,

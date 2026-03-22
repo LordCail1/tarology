@@ -190,7 +190,7 @@ export class ReadingsService {
     const readingId = randomUUID();
     const createdAt = new Date();
 
-    const response: CreateReadingResponse = {
+    const response: CreateReadingResponse = normalizeLegacyReadingDetail({
       readingId,
       rootQuestion: normalizedRequest.rootQuestion,
       deckId: deck.summary.id,
@@ -209,7 +209,7 @@ export class ReadingsService {
       updatedAt: createdAt.toISOString(),
       archivedAt: null,
       deletedAt: null,
-    };
+    });
 
     try {
       await this.prisma.$transaction(async (tx) => {

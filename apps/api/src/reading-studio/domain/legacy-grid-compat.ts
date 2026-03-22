@@ -1,12 +1,14 @@
 import type {
   CreateReadingResponse,
-  ReadingCanvasCardState,
   ReadingDetail,
+  ReadingSummary,
 } from "@tarology/shared";
 
 const LEGACY_GRID_X_STEP_PX = 230.5;
 const LEGACY_GRID_Y_STEP_PX = 200.6666666667;
 const LEGACY_GRID_PADDING_PX = 28;
+const LEGACY_GRID_MAX_COLUMN = 3;
+const LEGACY_GRID_MAX_ROW = 2;
 
 interface LegacyGridPosition {
   column: number;
@@ -35,6 +37,13 @@ function isLegacyGridPosition(value: unknown): value is LegacyGridPosition {
   );
 }
 
+function clampLegacyGridPosition(position: LegacyGridPosition): LegacyGridPosition {
+  return {
+    column: Math.max(0, Math.min(position.column, LEGACY_GRID_MAX_COLUMN)),
+    row: Math.max(0, Math.min(position.row, LEGACY_GRID_MAX_ROW)),
+  };
+}
+
 function isLegacyFreeformPosition(value: unknown): value is LegacyFreeformPosition {
   return (
     isRecord(value) &&
@@ -57,11 +66,22 @@ function usesLegacyGridLayout(
 export function resolveLegacyGridFreeformPosition(
   position: LegacyGridPosition
 ): LegacyFreeformPosition {
+  const snapped = clampLegacyGridPosition(position);
+
   return {
-    xPx: Math.round(LEGACY_GRID_PADDING_PX + position.column * LEGACY_GRID_X_STEP_PX),
-    yPx: Math.round(LEGACY_GRID_PADDING_PX + position.row * LEGACY_GRID_Y_STEP_PX),
-    stackOrder: position.row * 10 + position.column + 1,
+    xPx: Math.round(LEGACY_GRID_PADDING_PX + snapped.column * LEGACY_GRID_X_STEP_PX),
+    yPx: Math.round(LEGACY_GRID_PADDING_PX + snapped.row * LEGACY_GRID_Y_STEP_PX),
+    stackOrder: snapped.row * 10 + snapped.column + 1,
   };
+}
+
+function resolveLegacyGridPositionFromFreeform(
+  position: LegacyFreeformPosition
+): LegacyGridPosition {
+  return clampLegacyGridPosition({
+    column: Math.round((position.xPx - LEGACY_GRID_PADDING_PX) / LEGACY_GRID_X_STEP_PX),
+    row: Math.round((position.yPx - LEGACY_GRID_PADDING_PX) / LEGACY_GRID_Y_STEP_PX),
+  });
 }
 
 function resolveCompatibleFreeformPosition(
@@ -95,6 +115,27 @@ export function normalizeLegacyReadingDetail<
   T extends ReadingDetail | CreateReadingResponse,
 >(value: T): T {
   const preferLegacyGrid = usesLegacyGridLayout(value);
+  const canvasCards = value.canvas.cards.map((card) => {
+    const record = card as unknown as Record<string, unknown>;
+    const freeform = resolveCompatibleFreeformPosition(
+      record,
+      preferLegacyGrid,
+      card.deckIndex + 1
+    );
+    const grid = isLegacyGridPosition(record.grid)
+      ? clampLegacyGridPosition(record.grid)
+      : resolveLegacyGridPositionFromFreeform(freeform);
+
+    return {
+      deckIndex: card.deckIndex,
+      cardId: card.cardId,
+      assignedReversal: card.assignedReversal,
+      isFaceUp: card.isFaceUp,
+      rotationDeg: card.rotationDeg,
+      freeform,
+      grid,
+    };
+  });
 
   return {
     readingId: value.readingId,
@@ -102,6 +143,7 @@ export function normalizeLegacyReadingDetail<
     deckId: value.deckId,
     deckSpecVersion: value.deckSpecVersion,
     cardCount: value.cardCount,
+    canvasMode: preferLegacyGrid ? "grid" : "freeform",
     status: value.status,
     version: value.version,
     shuffleAlgorithmVersion: value.shuffleAlgorithmVersion,
@@ -113,29 +155,21 @@ export function normalizeLegacyReadingDetail<
       assignedReversal: assignment.assignedReversal,
     })),
     canvas: {
-      cards: value.canvas.cards.map((card) => {
-        const record = card as unknown as Record<string, unknown>;
-        const freeform = resolveCompatibleFreeformPosition(
-          record,
-          preferLegacyGrid,
-          card.deckIndex + 1
-        );
-
-        const normalizedCard: ReadingCanvasCardState = {
-          deckIndex: card.deckIndex,
-          cardId: card.cardId,
-          assignedReversal: card.assignedReversal,
-          isFaceUp: card.isFaceUp,
-          rotationDeg: card.rotationDeg,
-          freeform,
-        };
-
-        return normalizedCard;
-      }),
+      activeMode: preferLegacyGrid ? "grid" : "freeform",
+      cards: canvasCards,
     },
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     archivedAt: value.archivedAt,
     deletedAt: value.deletedAt,
+  } as unknown as T;
+}
+
+export function withLegacyReadingSummaryFields<T extends ReadingSummary>(
+  value: T
+): T {
+  return {
+    ...value,
+    canvasMode: "freeform",
   } as T;
 }
