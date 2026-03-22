@@ -435,6 +435,9 @@ describe("Reading durability and history API", () => {
       .expect(201);
 
     const targetCardId = created.body.canvas.cards[0].cardId as string;
+    const targetCardBeforeSwitch = created.body.canvas.cards.find(
+      (card: { cardId: string }) => card.cardId === targetCardId
+    );
 
     const switched = await request(app.getHttpServer())
       .post(`/v1/readings/${created.body.readingId}/commands`)
@@ -452,6 +455,12 @@ describe("Reading durability and history API", () => {
     expect(switched.body.reading.version).toBe(2);
     expect(switched.body.reading.canvasMode).toBe("grid");
     expect(switched.body.reading.canvas.activeMode).toBe("grid");
+    expect(
+      switched.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: targetCardBeforeSwitch?.freeform,
+    });
 
     const switchedDetail = await request(app.getHttpServer())
       .get(`/v1/readings/${created.body.readingId}`)

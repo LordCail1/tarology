@@ -561,20 +561,21 @@ export class ReadingsService {
     command: LegacySwitchCanvasModeCommandRequest;
     currentDetail: ReadingDetail;
   }): Promise<ReadingCommandResponse> {
+    const baseReading = normalizeLegacyReadingDetail(input.currentDetail);
     const commandTimestamp = new Date();
-    const compatibilityReading = normalizeLegacyReadingDetail({
-      ...input.currentDetail,
+    const compatibilityReading = {
+      ...baseReading,
       version: input.currentDetail.version + 1,
       updatedAt: commandTimestamp.toISOString(),
       canvasMode: input.command.payload.canvasMode,
       canvas: {
-        ...input.currentDetail.canvas,
+        ...baseReading.canvas,
         activeMode: input.command.payload.canvasMode,
       },
     } as ReadingDetail & {
       canvasMode: LegacyCanvasMode;
       canvas: ReadingDetail["canvas"] & { activeMode: LegacyCanvasMode };
-    });
+    };
     const response = {
       reading: compatibilityReading,
     } satisfies ReadingCommandResponse;
