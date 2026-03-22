@@ -455,6 +455,79 @@ describe("ReadingsService", () => {
     });
   });
 
+  it("preserves freeform coordinates after a shimmed legacy grid toggle", async () => {
+    const service = new ReadingsService(
+      {
+        userPreference: {
+          findUnique: vi.fn(),
+        },
+      } as never,
+      decksService as never,
+      {
+        findOwnedById: vi.fn().mockResolvedValue({ id: "reading-1", deletedAt: null }),
+      } as never,
+      {
+        listAfterVersion: vi.fn().mockResolvedValue([]),
+      } as never,
+      {
+        findLatest: vi.fn().mockResolvedValue({
+          version: 3,
+          projection: {
+            ...buildReadingDetail({
+              version: 3,
+              updatedAt: "2026-03-22T10:03:00.000Z",
+            }),
+            canvasMode: "grid",
+            canvas: {
+              activeMode: "grid",
+              cards: [
+                {
+                  deckIndex: 0,
+                  cardId: "card-1",
+                  assignedReversal: false,
+                  isFaceUp: false,
+                  rotationDeg: 0,
+                  freeform: {
+                    xPx: 377,
+                    yPx: 241,
+                    stackOrder: 7,
+                  },
+                  grid: {
+                    column: 2,
+                    row: 1,
+                  },
+                },
+              ],
+            },
+            __legacyCanvasModeShim: "preserve_freeform",
+          },
+        }),
+      } as never,
+      {
+        findCreateReceipt: vi.fn(),
+        createCreateReceipt: vi.fn(),
+        findCommandReceiptByIdempotencyKey: vi.fn(),
+        findCommandReceiptByCommandId: vi.fn(),
+        createCommandReceipt: vi.fn(),
+      } as never
+    );
+
+    const restored = await service.restoreReadingFromHistory(user.userId, "reading-1");
+    const detail = await service.getReading(user, "reading-1");
+
+    expect(restored?.canvas.cards[0].freeform).toEqual({
+      xPx: 377,
+      yPx: 241,
+      stackOrder: 7,
+    });
+    expect(detail.canvas.cards[0].freeform).toEqual({
+      xPx: 377,
+      yPx: 241,
+      stackOrder: 7,
+    });
+    expect((detail as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+  });
+
   it("replays legacy grid-only move events during restore", async () => {
     const service = new ReadingsService(
       {

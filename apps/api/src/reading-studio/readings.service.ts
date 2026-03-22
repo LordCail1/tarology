@@ -49,8 +49,10 @@ import {
 } from "./domain/reading-canvas.js";
 import { buildDeterministicCardAssignment } from "./domain/deterministic-shuffle.js";
 import {
+  markLegacyCanvasModeShim,
   normalizeLegacyReadingDetail,
   resolveLegacyGridFreeformPosition,
+  stripLegacyCanvasModeInternalFields,
 } from "./domain/legacy-grid-compat.js";
 import { CreateReadingDto } from "./dto/create-reading.dto.js";
 import { ReadingCommandDto } from "./dto/reading-command.dto.js";
@@ -100,6 +102,10 @@ function toCreateReadingResponseFromJson(value: Prisma.JsonValue): CreateReading
 
 function normalizeReadingDetail<T extends ReadingDetail | CreateReadingResponse>(value: T): T {
   return normalizeLegacyReadingDetail(value);
+}
+
+function sanitizeReadingForResponse<T extends ReadingDetail | CreateReadingResponse>(value: T): T {
+  return stripLegacyCanvasModeInternalFields(value);
 }
 
 function stableStringify(value: unknown): string {
@@ -341,7 +347,7 @@ export class ReadingsService {
       throw new NotFoundException("Reading not found.");
     }
 
-    return reading;
+    return sanitizeReadingForResponse(reading);
   }
 
   async applyCommand(
@@ -454,7 +460,7 @@ export class ReadingsService {
           idempotencyKey,
           requestHash,
           resultingVersion: nextProjection.version,
-          responseJson: toJson({ reading: nextProjection }),
+          responseJson: toJson({ reading: sanitizeReadingForResponse(nextProjection) }),
           createdAt: commandTimestamp,
         });
       });
@@ -500,7 +506,7 @@ export class ReadingsService {
     }
 
     return {
-      reading: nextProjection,
+      reading: sanitizeReadingForResponse(nextProjection),
     };
   }
 
@@ -563,7 +569,7 @@ export class ReadingsService {
   }): Promise<ReadingCommandResponse> {
     const baseReading = normalizeLegacyReadingDetail(input.currentDetail);
     const commandTimestamp = new Date();
-    const compatibilityReading = {
+    const compatibilityReading = markLegacyCanvasModeShim({
       ...baseReading,
       version: input.currentDetail.version + 1,
       updatedAt: commandTimestamp.toISOString(),
@@ -575,9 +581,9 @@ export class ReadingsService {
     } as ReadingDetail & {
       canvasMode: LegacyCanvasMode;
       canvas: ReadingDetail["canvas"] & { activeMode: LegacyCanvasMode };
-    };
+    });
     const response = {
-      reading: compatibilityReading,
+      reading: sanitizeReadingForResponse(compatibilityReading),
     } satisfies ReadingCommandResponse;
 
     try {

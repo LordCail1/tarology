@@ -506,6 +506,80 @@ describe("Reading durability and history API", () => {
     await closeTrackedApp(app);
   });
 
+  it("keeps freeform moves after a legacy grid toggle during rollout", async () => {
+    const app = await createAuthorizedApp(TEST_USER);
+
+    const created = await request(app.getHttpServer())
+      .post("/v1/readings")
+      .set("Idempotency-Key", "legacy-grid-toggle-freeform-create")
+      .send({
+        rootQuestion: "Does the freeform layout survive after a stale toggle?",
+        deckId: testUserDeckId,
+        deckSpecVersion: "thoth-v1",
+      })
+      .expect(201);
+
+    const targetCardId = created.body.canvas.cards[0].cardId as string;
+
+    await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "legacy-grid-toggle")
+      .send({
+        commandId: "4a804c37-4de3-4ad5-9d3b-80a6a689c650",
+        expectedVersion: 1,
+        type: "switch_canvas_mode",
+        payload: {
+          canvasMode: "grid",
+        },
+      })
+      .expect(200);
+
+    const moved = await request(app.getHttpServer())
+      .post(`/v1/readings/${created.body.readingId}/commands`)
+      .set("Idempotency-Key", "modern-freeform-move-after-legacy-toggle")
+      .send({
+        commandId: "f3c46a7d-c4b3-436a-b5fb-ebef6f4aa7ab",
+        expectedVersion: 2,
+        type: "move_card",
+        payload: {
+          cardId: targetCardId,
+          freeform: {
+            xPx: 377,
+            yPx: 241,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(
+      moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 377,
+        yPx: 241,
+      },
+    });
+    expect((moved.body.reading as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(
+      detail.body.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
+    ).toMatchObject({
+      cardId: targetCardId,
+      freeform: {
+        xPx: 377,
+        yPx: 241,
+      },
+    });
+    expect((detail.body as Record<string, unknown>).__legacyCanvasModeShim).toBeUndefined();
+
+    await closeTrackedApp(app);
+  });
+
   it("returns 404 when a canvas command targets a card outside the reading", async () => {
     const app = await createAuthorizedApp(TEST_USER);
 

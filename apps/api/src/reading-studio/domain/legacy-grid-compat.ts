@@ -4,6 +4,8 @@ import type {
   ReadingSummary,
 } from "@tarology/shared";
 
+const LEGACY_CANVAS_MODE_SHIM_KEY = "__legacyCanvasModeShim";
+const LEGACY_CANVAS_MODE_SHIM_VALUE = "preserve_freeform";
 const LEGACY_GRID_X_STEP_PX = 230.5;
 const LEGACY_GRID_Y_STEP_PX = 200.6666666667;
 const LEGACY_GRID_PADDING_PX = 28;
@@ -63,6 +65,15 @@ function usesLegacyGridLayout(
   return isRecord(value) && value.canvasMode === "grid";
 }
 
+function preservesFreeformUnderLegacyGrid(
+  value: ReadingDetail | CreateReadingResponse
+): boolean {
+  return (
+    isRecord(value) &&
+    value[LEGACY_CANVAS_MODE_SHIM_KEY] === LEGACY_CANVAS_MODE_SHIM_VALUE
+  );
+}
+
 export function resolveLegacyGridFreeformPosition(
   position: LegacyGridPosition
 ): LegacyFreeformPosition {
@@ -114,7 +125,9 @@ function resolveCompatibleFreeformPosition(
 export function normalizeLegacyReadingDetail<
   T extends ReadingDetail | CreateReadingResponse,
 >(value: T): T {
-  const preferLegacyGrid = usesLegacyGridLayout(value);
+  const preserveFreeform = preservesFreeformUnderLegacyGrid(value);
+  const usesLegacyGrid = usesLegacyGridLayout(value);
+  const preferLegacyGrid = usesLegacyGrid && !preserveFreeform;
   const canvasCards = value.canvas.cards.map((card) => {
     const record = card as unknown as Record<string, unknown>;
     const freeform = resolveCompatibleFreeformPosition(
@@ -143,7 +156,7 @@ export function normalizeLegacyReadingDetail<
     deckId: value.deckId,
     deckSpecVersion: value.deckSpecVersion,
     cardCount: value.cardCount,
-    canvasMode: preferLegacyGrid ? "grid" : "freeform",
+    canvasMode: usesLegacyGrid ? "grid" : "freeform",
     status: value.status,
     version: value.version,
     shuffleAlgorithmVersion: value.shuffleAlgorithmVersion,
@@ -155,14 +168,39 @@ export function normalizeLegacyReadingDetail<
       assignedReversal: assignment.assignedReversal,
     })),
     canvas: {
-      activeMode: preferLegacyGrid ? "grid" : "freeform",
+      activeMode: usesLegacyGrid ? "grid" : "freeform",
       cards: canvasCards,
     },
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     archivedAt: value.archivedAt,
     deletedAt: value.deletedAt,
+    ...(preserveFreeform
+      ? { [LEGACY_CANVAS_MODE_SHIM_KEY]: LEGACY_CANVAS_MODE_SHIM_VALUE }
+      : {}),
   } as unknown as T;
+}
+
+export function markLegacyCanvasModeShim<
+  T extends ReadingDetail | CreateReadingResponse,
+>(value: T): T {
+  return {
+    ...value,
+    [LEGACY_CANVAS_MODE_SHIM_KEY]: LEGACY_CANVAS_MODE_SHIM_VALUE,
+  } as T;
+}
+
+export function stripLegacyCanvasModeInternalFields<
+  T extends ReadingDetail | CreateReadingResponse,
+>(value: T): T {
+  if (!preservesFreeformUnderLegacyGrid(value)) {
+    return value;
+  }
+
+  const record = value as unknown as Record<string, unknown>;
+  const { [LEGACY_CANVAS_MODE_SHIM_KEY]: _omitted, ...rest } = record;
+
+  return rest as unknown as T;
 }
 
 export function withLegacyReadingSummaryFields<T extends ReadingSummary>(
