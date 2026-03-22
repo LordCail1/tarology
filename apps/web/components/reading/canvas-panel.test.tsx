@@ -2,7 +2,6 @@ import React, { useLayoutEffect, useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyWorkspaceAction } from "../../lib/reading-studio-actions";
-import { resolveGridPixelPosition } from "../../lib/reading-studio-canvas";
 import {
   readPersistedFreeformViewState,
   writePersistedFreeformViewState,
@@ -76,14 +75,6 @@ function CanvasPanelHarness(props?: {
       onOpenLeftPanel={() => undefined}
       onOpenRightPanel={() => undefined}
       onSelectCard={setSelectedCardId}
-      onModeChange={(mode) =>
-        setWorkspace((current) =>
-          applyWorkspaceAction(current, {
-            type: "workspace.modeSwitched",
-            mode,
-          })
-        )
-      }
       onMoveCard={(cardId, payload) =>
         setWorkspace((current) =>
           applyWorkspaceAction(current, {
@@ -182,7 +173,6 @@ function ReadingSwitchHarness() {
         onOpenLeftPanel={() => undefined}
         onOpenRightPanel={() => undefined}
         onSelectCard={setSelectedCardId}
-        onModeChange={() => undefined}
         onMoveCard={() => undefined}
         onRotateCard={() => undefined}
         onFlipCard={() => undefined}
@@ -217,7 +207,6 @@ function ReadingSwitchUnmountHarness() {
           onOpenLeftPanel={() => undefined}
           onOpenRightPanel={() => undefined}
           onSelectCard={setSelectedCardId}
-          onModeChange={() => undefined}
           onMoveCard={() => undefined}
           onRotateCard={() => undefined}
           onFlipCard={() => undefined}
@@ -430,27 +419,6 @@ describe("CanvasPanel", () => {
 
     await waitFor(() => expect(screen.getByText("Hidden card")).toBeInTheDocument());
     expect(screen.getByText("The Star")).toBeInTheDocument();
-  });
-
-  it("snaps cards to the nearest grid cell in grid mode", async () => {
-    render(<CanvasPanelHarness />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
-
-    const magicianCard = screen.getByRole("button", { name: "The Magician card" });
-    dispatchMouseDrag(
-      magicianCard,
-      { clientX: 50, clientY: 80 },
-      { clientX: 440, clientY: 180 }
-    );
-    await waitFor(() => expect(magicianCard).toHaveAttribute("aria-pressed", "true"));
-
-    const snappedPosition = resolveGridPixelPosition({ column: 2, row: 1 }, undefined);
-
-    await waitFor(() => {
-      expect(Number.parseFloat(magicianCard.style.left)).toBeCloseTo(snappedPosition.xPx, 4);
-      expect(Number.parseFloat(magicianCard.style.top)).toBeCloseTo(snappedPosition.yPx, 4);
-    });
   });
 
   it("pans freeform by dragging the background", async () => {
@@ -814,29 +782,6 @@ describe("CanvasPanel", () => {
       expect(viewport).toHaveAttribute("data-pan-ready", "false");
     });
     expect(document.activeElement).toBe(fitSpreadButton);
-  });
-
-  it("does not arm Space panning or prevent default in grid mode", async () => {
-    render(<CanvasPanelHarness />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
-
-    const viewport = screen.getByLabelText("Reading canvas viewport");
-    const keyDownEvent = new KeyboardEvent("keydown", {
-      key: " ",
-      code: "Space",
-      bubbles: true,
-      cancelable: true,
-    });
-
-    act(() => {
-      window.dispatchEvent(keyDownEvent);
-    });
-
-    await waitFor(() => {
-      expect(viewport).toHaveAttribute("data-pan-ready", "false");
-    });
-    expect(keyDownEvent.defaultPrevented).toBe(false);
   });
 
   it("pans freeform immediately on wheel input", async () => {

@@ -121,7 +121,6 @@ export function createApiReadingStudioDataSource(
           rootQuestion,
           deckId: defaultDeckId,
           deckSpecVersion: defaultDeckSpecVersion,
-          canvasMode: "freeform",
         },
         createIdempotencyKey()
       );
@@ -133,11 +132,10 @@ export function createApiReadingStudioDataSource(
     async applyWorkspaceAction(
       readingId: string,
       currentVersion: number,
-      action: Extract<
+        action: Extract<
         ReadingStudioAction,
         {
           type:
-            | "workspace.modeSwitched"
             | "workspace.cardMoved"
             | "workspace.cardRotated"
             | "workspace.cardFlipped";
@@ -145,24 +143,14 @@ export function createApiReadingStudioDataSource(
       >
     ): Promise<ReadingStudioWorkspace> {
       const command =
-        action.type === "workspace.modeSwitched"
-          ? {
-              commandId: createIdempotencyKey(),
-              expectedVersion: currentVersion,
-              type: "switch_canvas_mode" as const,
-              payload: {
-                canvasMode: action.mode,
-              },
-            }
-          : action.type === "workspace.cardMoved"
+        action.type === "workspace.cardMoved"
             ? {
                 commandId: createIdempotencyKey(),
                 expectedVersion: currentVersion,
                 type: "move_card" as const,
                 payload: {
                   cardId: action.cardId,
-                  ...(action.freeform ? { freeform: action.freeform } : {}),
-                  ...(action.grid ? { grid: action.grid } : {}),
+                  freeform: action.freeform,
                 },
               }
             : action.type === "workspace.cardRotated"

@@ -560,28 +560,6 @@ h4 {
   will-change: transform;
 }
 
-.reading-canvas-world[data-mode="grid"] {
-  position: relative;
-  inset: auto;
-  overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(20, 22, 25, 0.95), rgba(12, 13, 15, 0.98)),
-    repeating-linear-gradient(
-      to right,
-      transparent,
-      transparent 140px,
-      rgba(255, 255, 255, 0.04) 140px,
-      rgba(255, 255, 255, 0.04) 142px
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      transparent,
-      transparent 200px,
-      rgba(255, 255, 255, 0.04) 200px,
-      rgba(255, 255, 255, 0.04) 202px
-    );
-}
-
 .reading-canvas-watermark {
   position: absolute;
   inset: 0;

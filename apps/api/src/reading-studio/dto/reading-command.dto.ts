@@ -11,7 +11,6 @@ const READING_COMMAND_TYPES = [
   "archive_reading",
   "reopen_reading",
   "delete_reading",
-  "switch_canvas_mode",
   "move_card",
   "rotate_card",
   "flip_card",

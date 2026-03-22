@@ -1,13 +1,10 @@
 import {
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
 } from "class-validator";
 import type { CreateReadingRequest } from "@tarology/shared";
-
-const CANVAS_MODES = ["freeform", "grid"] as const;
 
 export class CreateReadingDto implements CreateReadingRequest {
   @IsString()
@@ -24,8 +21,4 @@ export class CreateReadingDto implements CreateReadingRequest {
   @IsNotEmpty()
   @MaxLength(64)
   deckSpecVersion!: string;
-
-  @IsOptional()
-  @IsIn(CANVAS_MODES)
-  canvasMode?: CreateReadingRequest["canvasMode"];
 }

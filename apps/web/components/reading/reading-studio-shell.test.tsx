@@ -16,7 +16,6 @@ type PersistedWorkspaceAction = Extract<
   ReadingStudioAction,
   {
     type:
-      | "workspace.modeSwitched"
       | "workspace.cardMoved"
       | "workspace.cardRotated"
       | "workspace.cardFlipped";
@@ -239,7 +238,7 @@ describe("ReadingStudioShell", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Collapse history panel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand analysis panel" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Freeform" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fit Spread" })).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("Ask a question or start a new reading...")
     ).toBeInTheDocument();

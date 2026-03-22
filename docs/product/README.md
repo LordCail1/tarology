@@ -38,7 +38,7 @@ Symbolic expansion modules are staged after reliability gates to protect trust a
 
 Gate sequence:
 1. Gate -1: Auth + profile + preferences baseline (Google sign-in, profile shell, deck preference capture).
-2. Gate 0: Core reading reliability (durable state, restore, command envelope, high-card warning/cancel, canvas mode baseline).
+2. Gate 0: Core reading reliability (durable state, restore, command envelope, high-card warning/cancel, freeform canvas baseline).
 3. Release A (V1.5): Visual Storytelling.
 4. Release B (V1.6): Fusion Lab.
 5. Release C (V1.7): Dialogue Mode.

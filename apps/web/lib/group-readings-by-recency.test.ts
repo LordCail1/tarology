@@ -23,7 +23,6 @@ describe("groupReadingsByRecency", () => {
         version: 1,
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
       {
         id: "reading_yesterday",
@@ -36,7 +35,6 @@ describe("groupReadingsByRecency", () => {
         version: 2,
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
       {
         id: "reading_prev_1",
@@ -49,7 +47,6 @@ describe("groupReadingsByRecency", () => {
         version: 3,
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
       {
         id: "reading_prev_2",
@@ -62,7 +59,6 @@ describe("groupReadingsByRecency", () => {
         version: 4,
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
       {
         id: "reading_older",
@@ -75,7 +71,6 @@ describe("groupReadingsByRecency", () => {
         version: 5,
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
     ];
 
@@ -111,7 +106,6 @@ describe("groupReadingsByRecency", () => {
         version: 1,
         deckId: "thoth",
         deckSpecVersion: "thoth-v1",
-        canvasMode: "freeform",
       },
     ];
 

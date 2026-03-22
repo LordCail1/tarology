@@ -296,7 +296,6 @@ model Reading {
   shuffleAlgorithmVersion String                  @map("shuffle_algorithm_version")
   seedCommitment          String                  @map("seed_commitment")
   orderHash               String                  @map("order_hash")
-  canvasMode              String                  @default("freeform") @map("canvas_mode")
   version                 Int                     @default(1)
   createdAt               DateTime                @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime                @map("updated_at") @db.Timestamptz(6)
@@ -322,8 +321,6 @@ model ReadingCard {
   freeformXPx       Int      @default(0) @map("freeform_x_px")
   freeformYPx       Int      @default(0) @map("freeform_y_px")
   freeformStackOrder Int     @default(0) @map("freeform_stack_order")
-  gridColumn        Int      @default(0) @map("grid_column")
-  gridRow           Int      @default(0) @map("grid_row")
   createdAt         DateTime @map("created_at") @db.Timestamptz(6)
   reading           Reading  @relation(fields: [readingId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 

@@ -9,7 +9,6 @@ import type {
 
 export type {
   AnalysisTab,
-  CanvasMode,
   InterpretationHistoryItem,
   InterpretationStatus,
   PanelSide,
@@ -36,7 +35,6 @@ const readingHistorySeed: ReadingHistoryItem[] = [
     version: 1,
     deckId: "thoth",
     deckSpecVersion: "thoth-v1",
-    canvasMode: "freeform",
   },
   {
     id: "rdg_002",
@@ -49,7 +47,6 @@ const readingHistorySeed: ReadingHistoryItem[] = [
     version: 2,
     deckId: "thoth",
     deckSpecVersion: "thoth-v1",
-    canvasMode: "freeform",
   },
   {
     id: "rdg_003",
@@ -62,7 +59,6 @@ const readingHistorySeed: ReadingHistoryItem[] = [
     version: 3,
     deckId: "thoth",
     deckSpecVersion: "thoth-v1",
-    canvasMode: "freeform",
   },
   {
     id: "rdg_004",
@@ -75,7 +71,6 @@ const readingHistorySeed: ReadingHistoryItem[] = [
     version: 4,
     deckId: "thoth",
     deckSpecVersion: "thoth-v1",
-    canvasMode: "freeform",
   },
   {
     id: "rdg_005",
@@ -88,7 +83,6 @@ const readingHistorySeed: ReadingHistoryItem[] = [
     version: 5,
     deckId: "thoth",
     deckSpecVersion: "thoth-v1",
-    canvasMode: "freeform",
   },
 ];
 
@@ -114,10 +108,6 @@ function createCards(readingId: string, readingIndex: number): ReadingCanvasCard
       xPx: 40 + cardIndex * 148 + xOffset,
       yPx: 72 + ((cardIndex + readingIndex) % 2) * 38 + yOffset,
       stackOrder: cardIndex + 1,
-    },
-    grid: {
-      column: cardIndex % 4,
-      row: Math.floor(cardIndex / 4),
     },
   }));
 }
@@ -204,7 +194,6 @@ function createWorkspace(
     threads,
     interpretations,
     canvas: {
-      activeMode: "freeform",
       cards: createCards(reading.id, readingIndex),
     },
   };

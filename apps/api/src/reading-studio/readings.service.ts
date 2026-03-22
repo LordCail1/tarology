@@ -10,7 +10,6 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   ApiConflictResponse,
   AuthenticatedUser,
-  CanvasMode,
   CreateReadingResponse,
   FlipCardPayload,
   GetReadingResponse,
@@ -22,7 +21,6 @@ import type {
   ReadingLifecycleStatus,
   ReadingListStatusFilter,
   RotateCardPayload,
-  SwitchCanvasModePayload,
 } from "@tarology/shared";
 import { PrismaService } from "../database/prisma.service.js";
 import { DecksService } from "../knowledge/decks.service.js";
@@ -30,14 +28,12 @@ import { toCreateReadingResponse, toReadingDetail, toReadingSummary } from "./re
 import { applyReadingEvent } from "./domain/reading-projector.js";
 import {
   READING_ARCHIVED_EVENT,
-  READING_CANVAS_MODE_SWITCHED_EVENT,
   READING_CARD_FLIPPED_EVENT,
   READING_CARD_MOVED_EVENT,
   READING_CARD_ROTATED_EVENT,
   READING_CREATED_EVENT,
   READING_DELETED_EVENT,
   READING_REOPENED_EVENT,
-  type ReadingCanvasModeSwitchedEventPayload,
   type ReadingCardFlippedEventPayload,
   type ReadingCardMovedEventPayload,
   type ReadingCardRotatedEventPayload,
@@ -67,10 +63,6 @@ interface CreateReadingResult {
 class VersionConflictError extends Error {}
 class MissingCardError extends Error {}
 
-function normalizeCanvasMode(value: CanvasMode | undefined): CanvasMode {
-  return value ?? "freeform";
-}
-
 function toOptionalDate(value: string | null): Date | null {
   return value ? new Date(value) : null;
 }
@@ -80,11 +72,31 @@ function toJson<T>(value: T): Prisma.InputJsonValue {
 }
 
 function toReadingDetailFromJson(value: Prisma.JsonValue): ReadingDetail {
-  return value as unknown as ReadingDetail;
+  return normalizeReadingDetail(value as unknown as ReadingDetail);
 }
 
 function toCreateReadingResponseFromJson(value: Prisma.JsonValue): CreateReadingResponse {
-  return value as unknown as CreateReadingResponse;
+  return normalizeReadingDetail(value as unknown as CreateReadingResponse);
+}
+
+function normalizeReadingDetail<T extends ReadingDetail | CreateReadingResponse>(value: T): T {
+  return {
+    ...value,
+    canvas: {
+      cards: value.canvas.cards.map((card) => ({
+        deckIndex: card.deckIndex,
+        cardId: card.cardId,
+        assignedReversal: card.assignedReversal,
+        isFaceUp: card.isFaceUp,
+        rotationDeg: card.rotationDeg,
+        freeform: {
+          xPx: card.freeform.xPx,
+          yPx: card.freeform.yPx,
+          stackOrder: card.freeform.stackOrder,
+        },
+      })),
+    },
+  };
 }
 
 function stableStringify(value: unknown): string {
@@ -155,7 +167,6 @@ export class ReadingsService {
       rootQuestion: payload.rootQuestion,
       deckId: payload.deckId ?? null,
       deckSpecVersion: payload.deckSpecVersion,
-      canvasMode: normalizeCanvasMode(payload.canvasMode),
     };
 
     const requestHash = hashRequest({
@@ -200,7 +211,6 @@ export class ReadingsService {
       deckId: deck.summary.id,
       deckSpecVersion: deck.summary.specVersion,
       cardCount: builtAssignment.assignments.length,
-      canvasMode: normalizedRequest.canvasMode,
       status: "active",
       version: 1,
       shuffleAlgorithmVersion: builtAssignment.shuffleAlgorithmVersion,
@@ -208,7 +218,6 @@ export class ReadingsService {
       orderHash: builtAssignment.orderHash,
       assignments: builtAssignment.assignments,
       canvas: {
-        activeMode: normalizedRequest.canvasMode,
         cards: canvasCards,
       },
       createdAt: createdAt.toISOString(),
@@ -228,7 +237,6 @@ export class ReadingsService {
           shuffleAlgorithmVersion: response.shuffleAlgorithmVersion,
           seedCommitment: response.seedCommitment,
           orderHash: response.orderHash,
-          canvasMode: response.canvasMode,
           version: response.version,
           createdAt,
           updatedAt: createdAt,
@@ -243,8 +251,6 @@ export class ReadingsService {
             freeformXPx: card.freeform.xPx,
             freeformYPx: card.freeform.yPx,
             freeformStackOrder: card.freeform.stackOrder,
-            gridColumn: card.grid.column,
-            gridRow: card.grid.row,
             createdAt,
           })),
         });
@@ -629,16 +635,6 @@ export class ReadingsService {
         );
       }
 
-      case "switch_canvas_mode": {
-        const payload = command.payload as SwitchCanvasModePayload;
-
-        return this.createCanvasModeEvent(
-          payload.canvasMode,
-          currentDetail.version + 1,
-          timestamp
-        );
-      }
-
       case "move_card": {
         const payload = command.payload as MoveCardPayload;
         const targetCard = currentDetail.canvas.cards.find((card) => card.cardId === payload.cardId);
@@ -712,44 +708,21 @@ export class ReadingsService {
     };
   }
 
-  private createCanvasModeEvent(
-    canvasMode: CanvasMode,
-    version: number,
-    updatedAt: string
-  ): ReadingStoredEvent {
-    const payload: ReadingCanvasModeSwitchedEventPayload = {
-      canvasMode,
-      version,
-      updatedAt,
-    };
-
-    return {
-      eventType: READING_CANVAS_MODE_SWITCHED_EVENT,
-      version,
-      payload,
-    };
-  }
-
   private createCardMovedEvent(
     currentDetail: ReadingDetail,
     payload: MoveCardPayload,
     version: number,
     updatedAt: string
   ): ReadingStoredEvent {
-    const nextFreeform = payload.freeform
-      ? {
-          xPx: payload.freeform.xPx,
-          yPx: payload.freeform.yPx,
-          stackOrder: getHighestStackOrder(currentDetail.canvas.cards) + 1,
-        }
-      : undefined;
-
     const eventPayload: ReadingCardMovedEventPayload = {
       cardId: payload.cardId,
       version,
       updatedAt,
-      ...(nextFreeform ? { freeform: nextFreeform } : {}),
-      ...(payload.grid ? { grid: payload.grid } : {}),
+      freeform: {
+        xPx: payload.freeform.xPx,
+        yPx: payload.freeform.yPx,
+        stackOrder: getHighestStackOrder(currentDetail.canvas.cards) + 1,
+      },
     };
 
     return {
@@ -826,24 +799,13 @@ export class ReadingsService {
           deletedAt: toOptionalDate(input.nextProjection.deletedAt),
         });
 
-      case READING_CANVAS_MODE_SWITCHED_EVENT:
-        return this.readingsRepository.updateCanvasMode(tx, {
-          readingId: input.readingId,
-          ownerUserId: input.ownerUserId,
-          expectedVersion: input.currentDetail.version,
-          canvasMode: input.nextProjection.canvasMode,
-          version: input.nextProjection.version,
-          updatedAt: input.commandTimestamp,
-        });
-
       case READING_CARD_MOVED_EVENT:
       case READING_CARD_ROTATED_EVENT:
       case READING_CARD_FLIPPED_EVENT: {
-        const readingUpdated = await this.readingsRepository.updateCanvasMode(tx, {
+        const readingUpdated = await this.readingsRepository.updateVersion(tx, {
           readingId: input.readingId,
           ownerUserId: input.ownerUserId,
           expectedVersion: input.currentDetail.version,
-          canvasMode: input.nextProjection.canvasMode,
           version: input.nextProjection.version,
           updatedAt: input.commandTimestamp,
         });
@@ -874,8 +836,6 @@ export class ReadingsService {
             freeformXPx: targetCard.freeform.xPx,
             freeformYPx: targetCard.freeform.yPx,
             freeformStackOrder: targetCard.freeform.stackOrder,
-            gridColumn: targetCard.grid.column,
-            gridRow: targetCard.grid.row,
           },
         });
 
@@ -902,12 +862,6 @@ export class ReadingsService {
 
         return payload;
 
-      case "switch_canvas_mode":
-        return {
-          ...payload,
-          payload: this.parseCanvasModePayload(payload.payload),
-        };
-
       case "move_card":
         return {
           ...payload,
@@ -931,33 +885,14 @@ export class ReadingsService {
     }
   }
 
-  private parseCanvasModePayload(payload: unknown): SwitchCanvasModePayload {
-    if (
-      !payload ||
-      Array.isArray(payload) ||
-      typeof payload !== "object" ||
-      !("canvasMode" in payload)
-    ) {
-      throw new BadRequestException("switch_canvas_mode payload requires a canvasMode.");
-    }
-
-    const { canvasMode } = payload as { canvasMode?: unknown };
-    if (canvasMode !== "freeform" && canvasMode !== "grid") {
-      throw new BadRequestException("switch_canvas_mode canvasMode must be freeform or grid.");
-    }
-
-    return { canvasMode };
-  }
-
   private parseMoveCardPayload(payload: unknown): MoveCardPayload {
     if (!payload || Array.isArray(payload) || typeof payload !== "object") {
       throw new BadRequestException("move_card payload must be an object.");
     }
 
-    const { cardId, freeform, grid } = payload as {
+    const { cardId, freeform } = payload as {
       cardId?: unknown;
       freeform?: { xPx?: unknown; yPx?: unknown };
-      grid?: { column?: unknown; row?: unknown };
     };
 
     if (typeof cardId !== "string" || cardId.trim().length === 0) {
@@ -976,28 +911,13 @@ export class ReadingsService {
           }
         : undefined;
 
-    const normalizedGrid =
-      grid &&
-      typeof grid.column === "number" &&
-      Number.isInteger(grid.column) &&
-      typeof grid.row === "number" &&
-      Number.isInteger(grid.row)
-        ? {
-            column: grid.column,
-            row: grid.row,
-          }
-        : undefined;
-
-    if (!normalizedFreeform && !normalizedGrid) {
-      throw new BadRequestException(
-        "move_card payload requires either freeform coordinates or a grid position."
-      );
+    if (!normalizedFreeform) {
+      throw new BadRequestException("move_card payload requires freeform coordinates.");
     }
 
     return {
       cardId,
-      ...(normalizedFreeform ? { freeform: normalizedFreeform } : {}),
-      ...(normalizedGrid ? { grid: normalizedGrid } : {}),
+      freeform: normalizedFreeform,
     };
   }
 

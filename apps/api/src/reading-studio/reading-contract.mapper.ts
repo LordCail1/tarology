@@ -1,6 +1,5 @@
 import type { Reading, ReadingCard } from "@prisma/client";
 import type {
-  CanvasMode,
   CreateReadingResponse,
   ReadingCanvasCardState,
   ReadingDetail,
@@ -37,10 +36,6 @@ function toCanvasCards(cards: ReadingCard[]): ReadingCanvasCardState[] {
         yPx: card.freeformYPx,
         stackOrder: card.freeformStackOrder,
       },
-      grid: {
-        column: card.gridColumn,
-        row: card.gridRow,
-      },
     }));
 }
 
@@ -51,7 +46,6 @@ function toSummaryBase(reading: ReadingWithCount): ReadingSummary {
     deckId: reading.deckId,
     deckSpecVersion: reading.deckSpecVersion,
     cardCount: reading._count?.cards ?? 0,
-    canvasMode: reading.canvasMode as CanvasMode,
     status: reading.status as ReadingLifecycleStatus,
     version: reading.version,
     createdAt: reading.createdAt.toISOString(),
@@ -87,7 +81,6 @@ export function toReadingDetail(reading: ReadingWithCards): ReadingDetail {
         assignedReversal: card.assignedReversal,
       })),
     canvas: {
-      activeMode: reading.canvasMode as CanvasMode,
       cards: canvasCards,
     },
   };

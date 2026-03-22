@@ -70,7 +70,6 @@ export function toReadingHistoryItem(
     version: reading.version,
     deckId: reading.deckId,
     deckSpecVersion: reading.deckSpecVersion,
-    canvasMode: reading.canvasMode,
   };
 }
 
@@ -95,12 +94,10 @@ export function toReadingWorkspace(reading: GetReadingResponse): ReadingStudioWo
       version: reading.version,
       deckId: reading.deckId,
       deckSpecVersion: reading.deckSpecVersion,
-      canvasMode: reading.canvasMode,
     },
     threads: createPlaceholderThreads(),
     interpretations: createPlaceholderInterpretations(),
     canvas: {
-      activeMode: reading.canvas.activeMode,
       cards: reading.canvas.cards.map((card) => ({
         id: card.cardId,
         label: humanizeCardId(card.cardId),
@@ -111,10 +108,6 @@ export function toReadingWorkspace(reading: GetReadingResponse): ReadingStudioWo
           xPx: card.freeform.xPx,
           yPx: card.freeform.yPx,
           stackOrder: card.freeform.stackOrder,
-        },
-        grid: {
-          column: card.grid.column,
-          row: card.grid.row,
         },
       })),
     },

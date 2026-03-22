@@ -122,7 +122,6 @@ describe("ReadingsService", () => {
     expect(new Set(result.response.assignments.map((assignment) => assignment.cardId)).size).toBe(
       78
     );
-    expect(result.response.canvasMode).toBe("freeform");
     expect(result.response.status).toBe("active");
     expect(result.response.version).toBe(1);
     expect(readingsRepository.create).toHaveBeenCalledOnce();
@@ -179,7 +178,6 @@ describe("ReadingsService", () => {
       shuffleAlgorithmVersion: "tarology-shuffle-v1",
       seedCommitment: "seed-commitment",
       orderHash: "order-hash",
-      canvasMode: "freeform",
       status: "active",
       version: 1,
       createdAt: new Date("2026-03-13T00:00:00.000Z"),
@@ -197,7 +195,6 @@ describe("ReadingsService", () => {
         shuffleAlgorithmVersion: readingRecord.shuffleAlgorithmVersion,
         seedCommitment: readingRecord.seedCommitment,
         orderHash: readingRecord.orderHash,
-        canvasMode: "freeform" as const,
         status: "archived" as const,
         version: 2,
         createdAt: readingRecord.createdAt.toISOString(),

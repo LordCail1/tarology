@@ -1,14 +1,12 @@
 import type { ReadingDetail } from "@tarology/shared";
 import {
   READING_ARCHIVED_EVENT,
-  READING_CANVAS_MODE_SWITCHED_EVENT,
   READING_CARD_FLIPPED_EVENT,
   READING_CARD_MOVED_EVENT,
   READING_CARD_ROTATED_EVENT,
   READING_CREATED_EVENT,
   READING_DELETED_EVENT,
   READING_REOPENED_EVENT,
-  type ReadingCanvasModeSwitchedEventPayload,
   type ReadingCardFlippedEventPayload,
   type ReadingCardMovedEventPayload,
   type ReadingCardRotatedEventPayload,
@@ -31,16 +29,6 @@ function isLifecyclePayload(payload: unknown): payload is ReadingLifecycleEventP
     typeof payload === "object" &&
     payload !== null &&
     "status" in payload &&
-    "version" in payload &&
-    "updatedAt" in payload
-  );
-}
-
-function isCanvasModePayload(payload: unknown): payload is ReadingCanvasModeSwitchedEventPayload {
-  return (
-    typeof payload === "object" &&
-    payload !== null &&
-    "canvasMode" in payload &&
     "version" in payload &&
     "updatedAt" in payload
   );
@@ -111,27 +99,6 @@ export function applyReadingEvent(
       };
     }
 
-    case READING_CANVAS_MODE_SWITCHED_EVENT: {
-      if (!current) {
-        throw new Error(`${event.eventType} requires an existing projection.`);
-      }
-
-      if (!isCanvasModePayload(event.payload)) {
-        throw new Error(`${event.eventType} payload is invalid.`);
-      }
-
-      return {
-        ...current,
-        canvasMode: event.payload.canvasMode,
-        version: event.payload.version,
-        updatedAt: event.payload.updatedAt,
-        canvas: {
-          ...current.canvas,
-          activeMode: event.payload.canvasMode,
-        },
-      };
-    }
-
     case READING_CARD_MOVED_EVENT: {
       if (!current) {
         throw new Error(`${event.eventType} requires an existing projection.`);
@@ -153,19 +120,11 @@ export function applyReadingEvent(
             card.cardId === payload.cardId
               ? {
                   ...card,
-                  freeform: payload.freeform
-                    ? {
-                        xPx: payload.freeform.xPx,
-                        yPx: payload.freeform.yPx,
-                        stackOrder: payload.freeform.stackOrder,
-                      }
-                    : card.freeform,
-                  grid: payload.grid
-                    ? {
-                        column: payload.grid.column,
-                        row: payload.grid.row,
-                      }
-                    : card.grid,
+                  freeform: {
+                    xPx: payload.freeform.xPx,
+                    yPx: payload.freeform.yPx,
+                    stackOrder: payload.freeform.stackOrder,
+                  },
                 }
               : card
           ),

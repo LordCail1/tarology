@@ -5,14 +5,11 @@ import {
   clampInteractiveCanvasZoom,
   clampFreeformPosition,
   getHighestStackOrder,
-  getGridCellSize,
   resolveFreeformContentBounds,
   resolveFreeformFitViewState,
   resolveFreeformViewportPoint,
-  resolveGridPixelPosition,
   resolveViewportCenteredFreeformViewState,
   resolveZoomedFreeformViewState,
-  snapGridPosition,
 } from "./reading-studio-canvas";
 
 describe("reading-studio-canvas", () => {
@@ -196,38 +193,6 @@ describe("reading-studio-canvas", () => {
     });
   });
 
-  it("snaps grid positions into the valid row and column range", () => {
-    expect(snapGridPosition({ column: -1, row: 9 }, undefined)).toEqual({
-      column: 0,
-      row: 2,
-    });
-  });
-
-  it("resolves grid cells into pixel positions", () => {
-    const position = resolveGridPixelPosition(
-      {
-        column: 2,
-        row: 1,
-      },
-      undefined
-    );
-
-    expect(position.xPx).toBeCloseTo(489, 4);
-    expect(position.yPx).toBeCloseTo(228.6666666667, 4);
-  });
-
-  it("keeps the current grid cell size behavior", () => {
-    expect(
-      getGridCellSize({
-        widthPx: 960,
-        heightPx: 640,
-      })
-    ).toEqual({
-      cellWidthPx: 212.5,
-      cellHeightPx: 182.66666666666666,
-    });
-  });
-
   it("finds the highest freeform stack order", () => {
     expect(
       getHighestStackOrder([
@@ -242,10 +207,6 @@ describe("reading-studio-canvas", () => {
             yPx: 20,
             stackOrder: 2,
           },
-          grid: {
-            column: 0,
-            row: 0,
-          },
         },
         {
           id: "card_2",
@@ -257,10 +218,6 @@ describe("reading-studio-canvas", () => {
             xPx: 60,
             yPx: 90,
             stackOrder: 8,
-          },
-          grid: {
-            column: 1,
-            row: 0,
           },
         },
       ])

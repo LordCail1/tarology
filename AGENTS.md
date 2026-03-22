@@ -19,7 +19,7 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Cards and symbols own extensible deck knowledge; live web research is optional future enrichment, not the V1 baseline.
 - Reading state must be durable and restorable.
 - Reading Studio side panels must support smooth expand/collapse animation and desktop drag-resize, with persisted user width preferences.
-- Reading canvas must be mode-capable with `freeform` and `grid` modes under one shared state/command model.
+- Reading canvas is freeform-first, with stable world coordinates and durable semantic move/rotate/flip persistence.
 - Users must be able to initialize decks from starter content or empty templates, and the default deck must be captured at first-run onboarding for new readings with per-reading override.
 - Choosing the built-in starter deck should create a user-owned editable deck instance; starter-content decks should feel substantial even when V1 relies on mock knowledge and image references.
 - Symbols are first-class deck entities, independently viewable, and linkable to cards.
@@ -53,12 +53,12 @@ This file is the session bootstrap for any new Codex agent working in this repo.
 - Reading creation is deterministic-at-creation and DB-backed, not in-memory.
 - UI now has a production-shaped Reading Studio shell with:
   - collapsible and desktop-resizable sidebars,
-  - `freeform` / `grid` canvas modes,
+  - a freeform canvas with infinite-camera pan/zoom behavior,
   - durable API-backed reading history/create/restore flows,
-  - durable semantic canvas mutation persistence for mode switch, move, rotate, and flip,
+  - durable semantic canvas mutation persistence for move, rotate, and flip,
   - local layout width + active-reading preference persistence,
   - auth gating and onboarding gating.
-- Important current limitation: the deck-management surface described in the product docs is not implemented yet; current deck handling is limited to the default-deck onboarding/catalog baseline.
+- Important current limitation: the deck-management surface exists, but interpretation workflows do not yet consume that deck knowledge in the Reading Studio.
 - Important current limitation: the analysis sidebar is still placeholder-only; question threads, saved card groups, and interpretation workflows are not implemented yet.
 - Product docs now include strategic post-core PRDs (`prd-11` through `prd-15`) and updated API/safety/roadmap guidance.
 - GitHub repository, branch protection, and Vercel deployment pipeline are already configured and validated.

@@ -5,8 +5,6 @@ const INITIAL_FREEFORM_STEP_X_PX = 24;
 const INITIAL_FREEFORM_STEP_Y_PX = 18;
 const INITIAL_FREEFORM_START_X_PX = 40;
 const INITIAL_FREEFORM_START_Y_PX = 56;
-const INITIAL_GRID_COLUMNS = 10;
-
 export function normalizeRotation(nextRotationDeg: number): number {
   const normalized = nextRotationDeg % 360;
   return normalized < 0 ? normalized + 360 : normalized;
@@ -27,10 +25,6 @@ export function buildInitialCanvasCards(
         xPx: INITIAL_FREEFORM_START_X_PX + freeformColumn * INITIAL_FREEFORM_STEP_X_PX,
         yPx: INITIAL_FREEFORM_START_Y_PX + freeformRow * INITIAL_FREEFORM_STEP_Y_PX,
         stackOrder: assignment.deckIndex + 1,
-      },
-      grid: {
-        column: assignment.deckIndex % INITIAL_GRID_COLUMNS,
-        row: Math.floor(assignment.deckIndex / INITIAL_GRID_COLUMNS),
       },
     };
   });

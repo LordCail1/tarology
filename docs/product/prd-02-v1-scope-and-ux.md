@@ -23,15 +23,12 @@ Coverage: sections 4 and 5
   - deck/card images are viewable in V1 but not yet user-editable.
 - ChatGPT-like shell:
   - left: reading history (collapsible, animated, desktop-resizable),
-  - center: card fan + canvas with mode selection,
+  - center: card fan + freeform canvas,
   - right: question threads + interpretation history (collapsible, animated, desktop-resizable).
 - First-run preference capture for default tarot deck.
 - New reading creation with deterministic deck order and reversal assignment.
 - New reading preflight supports deck override before shuffle/assignment.
-- Card interactions: draw, flip, drag, rotate, select, group, rename group, and grid-snap placement in grid mode.
-- Canvas modes:
-  - `freeform` mode for unconstrained positioning.
-  - `grid` mode for snap-to-cell placement.
+- Card interactions: draw, flip, drag, rotate, select, group, and rename group on the freeform canvas.
 - Question tree:
   - 1 root question,
   - unlimited child questions.
@@ -80,7 +77,7 @@ V1 support policy:
 - Main Workspace:
   - reading title + status bar,
   - fan of face-down cards,
-  - mode-aware card canvas (`freeform` / `grid`).
+  - freeform card canvas.
 - Right Panel:
   - question thread tree,
   - card groups,
@@ -112,7 +109,7 @@ V1 support policy:
 4. User starts a new reading, can override deck selection, and writes root question.
 5. Backend creates deterministic deck assignment for the selected deck and persists commitment metadata.
 6. User draws cards; each draw reveals the pre-assigned card.
-7. User arranges cards on canvas (freeform drag/rotate or grid-snap mode), groups selected cards, asks sub-questions.
+7. User arranges cards on the freeform canvas, groups selected cards, and asks sub-questions.
 8. User requests interpretation for selected group under selected thread.
 9. If selected-card count exceeds configured threshold, UI shows a high-cost warning with estimated token/time usage and requires explicit continue.
 10. User can stop/cancel interpretation at any time from a visible control.
@@ -121,4 +118,4 @@ V1 support policy:
   - “why” layer with card/symbol/deck-knowledge evidence,
   - optional deep layer with attached knowledge references.
 12. All meaningful actions persist continuously.
-13. User returns later and sees exact reading state restored, including chosen deck and canvas mode.
+13. User returns later and sees exact reading state restored, including chosen deck and freeform card layout.

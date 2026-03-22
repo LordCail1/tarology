@@ -24,11 +24,9 @@ function cloneSnapshot(snapshot: ReadingStudioSnapshot): ReadingStudioSnapshot {
             ...interpretation,
           })),
           canvas: {
-            activeMode: workspace.canvas.activeMode,
             cards: workspace.canvas.cards.map((card) => ({
               ...card,
               freeform: { ...card.freeform },
-              grid: { ...card.grid },
             })),
           },
         },
@@ -130,7 +128,6 @@ export function createLocalReadingStudioDataSource(
         ReadingStudioAction,
         {
           type:
-            | "workspace.modeSwitched"
             | "workspace.cardMoved"
             | "workspace.cardRotated"
             | "workspace.cardFlipped";
@@ -148,7 +145,6 @@ export function createLocalReadingStudioDataSource(
       }
 
       const nextWorkspace =
-        action.type === "workspace.modeSwitched" ||
         action.type === "workspace.cardMoved" ||
         action.type === "workspace.cardRotated" ||
         action.type === "workspace.cardFlipped"

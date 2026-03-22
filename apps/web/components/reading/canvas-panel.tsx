@@ -9,23 +9,16 @@ import {
 } from "react";
 import {
   CANVAS_ZOOM_STEP,
-  CARD_HEIGHT_PX,
-  CARD_WIDTH_PX,
   DEFAULT_CANVAS_ZOOM,
-  GRID_GAP_PX,
-  GRID_PADDING_PX,
   clampInteractiveCanvasZoom,
   clampFreeformPosition,
   getDefaultFreeformViewState,
-  getGridCellSize,
   resolveCanvasMetrics,
   resolveFreeformContentBounds,
   resolveFreeformFitViewState,
   resolveFreeformViewportPoint,
-  resolveGridPixelPosition,
   resolveViewportCenteredFreeformViewState,
   resolveZoomedFreeformViewState,
-  snapGridPosition,
   type CanvasMetrics,
   type FreeformViewState,
 } from "../../lib/reading-studio-canvas";
@@ -33,11 +26,7 @@ import {
   readPersistedFreeformViewState,
   writePersistedFreeformViewState,
 } from "../../lib/reading-studio-freeform-view";
-import type {
-  CanvasMode,
-  ReadingCanvasCard,
-  ReadingStudioWorkspace,
-} from "../../lib/reading-studio-types";
+import type { ReadingCanvasCard, ReadingStudioWorkspace } from "../../lib/reading-studio-types";
 
 interface CanvasPanelProps {
   workspace: ReadingStudioWorkspace;
@@ -47,17 +36,12 @@ interface CanvasPanelProps {
   onOpenLeftPanel: () => void;
   onOpenRightPanel: () => void;
   onSelectCard: (cardId: string | null) => void;
-  onModeChange: (mode: CanvasMode) => void;
   onMoveCard: (
     cardId: string,
     payload: {
-      freeform?: {
+      freeform: {
         xPx: number;
         yPx: number;
-      };
-      grid?: {
-        column: number;
-        row: number;
       };
     }
   ) => void;
@@ -67,21 +51,15 @@ interface CanvasPanelProps {
 
 interface DragState {
   cardId: string;
-  mode: CanvasMode;
   moveEventName: "mousemove" | "pointermove";
   upEventName: "mouseup" | "pointerup";
   pointerId: number | null;
   pointerOffsetXPx: number;
   pointerOffsetYPx: number;
-  gridMetrics: CanvasMetrics | null;
   freeform: {
     xPx: number;
     yPx: number;
-  } | null;
-  grid: {
-    column: number;
-    row: number;
-  } | null;
+  };
 }
 
 interface PanState {
@@ -145,7 +123,6 @@ function resolveReactNativeEvent(event: DragStartEvent | PanStartEvent): Event |
 function resolveViewportPoint(options: {
   event: Pick<DragStartEvent | DragMoveEvent, "clientX" | "clientY">;
   viewportElement: HTMLDivElement | null;
-  mode: CanvasMode;
   freeformViewState: FreeformViewState;
 }): { xPx: number; yPx: number } | null {
   const clientXPx = resolveClientCoordinate(options.event.clientX);
@@ -157,30 +134,15 @@ function resolveViewportPoint(options: {
 
   const viewportRect = options.viewportElement.getBoundingClientRect();
 
-  if (options.mode === "freeform") {
-    return resolveFreeformViewportPoint({
-      clientXPx,
-      clientYPx,
-      viewportRect,
-      viewState: options.freeformViewState,
-    });
-  }
-
-  return {
-    xPx: clientXPx - viewportRect.left,
-    yPx: clientYPx - viewportRect.top,
-  };
+  return resolveFreeformViewportPoint({
+    clientXPx,
+    clientYPx,
+    viewportRect,
+    viewState: options.freeformViewState,
+  });
 }
 
-function resolveCardPosition(
-  card: ReadingCanvasCard,
-  mode: CanvasMode,
-  metrics: CanvasMetrics
-): { xPx: number; yPx: number } {
-  if (mode === "grid") {
-    return resolveGridPixelPosition(card.grid, metrics);
-  }
-
+function resolveCardPosition(card: ReadingCanvasCard): { xPx: number; yPx: number } {
   return {
     xPx: card.freeform.xPx,
     yPx: card.freeform.yPx,
@@ -244,7 +206,6 @@ export function CanvasPanel({
   onOpenLeftPanel,
   onOpenRightPanel,
   onSelectCard,
-  onModeChange,
   onMoveCard,
   onRotateCard,
   onFlipCard,
@@ -253,10 +214,7 @@ export function CanvasPanel({
   const hasMeasuredViewportRef = useRef(false);
   const previousMeasuredViewportRef = useRef<CanvasMetrics | null>(null);
   const hydratedReadingIdRef = useRef<string | null>(null);
-  const previousPersistenceContextRef = useRef<{
-    readingId: string;
-    isFreeformMode: boolean;
-  } | null>(null);
+  const previousPersistenceContextRef = useRef<{ readingId: string } | null>(null);
   const latestPersistableViewRef = useRef<PersistableFreeformViewSnapshot | null>(null);
   const pendingViewWriteRef = useRef<PendingViewWrite | null>(null);
   const storageRef = useRef<Storage | undefined>(
@@ -278,22 +236,17 @@ export function CanvasPanel({
 
   freeformViewStateRef.current = freeformViewState;
 
-  const activeMode = workspace.canvas.activeMode;
-  const isFreeformMode = activeMode === "freeform";
   const renderedCards = useMemo(
     () =>
       workspace.canvas.cards.map((card) =>
         dragState?.cardId === card.id
           ? {
               ...card,
-              freeform: dragState.freeform
-                ? {
-                    ...card.freeform,
-                    xPx: dragState.freeform.xPx,
-                    yPx: dragState.freeform.yPx,
-                  }
-                : card.freeform,
-              grid: dragState.grid ?? card.grid,
+              freeform: {
+                ...card.freeform,
+                xPx: dragState.freeform.xPx,
+                yPx: dragState.freeform.yPx,
+              },
             }
           : card
       ),
@@ -301,16 +254,11 @@ export function CanvasPanel({
   );
   const selectedCard =
     renderedCards.find((card) => card.id === selectedCardId) ?? null;
-  const gridMetrics = useMemo(
-    () => resolveCanvasMetrics(viewportMetrics),
-    [viewportMetrics]
-  );
   const freeformBounds = useMemo(
     () => resolveFreeformContentBounds(renderedCards),
     [renderedCards]
   );
   const canPersistCurrentFreeformView =
-    isFreeformMode &&
     hasMeasuredViewportRef.current &&
     (hydratedReadingIdRef.current === null ||
       hydratedReadingIdRef.current === workspace.reading.id);
@@ -381,10 +329,6 @@ export function CanvasPanel({
   }, [workspace.reading.id]);
 
   useLayoutEffect(() => {
-    if (!isFreeformMode) {
-      return;
-    }
-
     if (hydratedReadingIdRef.current === workspace.reading.id) {
       return;
     }
@@ -418,28 +362,18 @@ export function CanvasPanel({
     setFreeformViewState(persistedViewState);
     previousMeasuredViewportRef.current = resolvedViewportMetrics;
     hydratedReadingIdRef.current = workspace.reading.id;
-  }, [
-    isFreeformMode,
-    viewportMetrics.heightPx,
-    viewportMetrics.widthPx,
-    workspace.reading.id,
-  ]);
+  }, [viewportMetrics.heightPx, viewportMetrics.widthPx, workspace.reading.id]);
 
   useEffect(() => {
     const previousContext = previousPersistenceContextRef.current;
-    if (
-      previousContext &&
-      (previousContext.readingId !== workspace.reading.id ||
-        previousContext.isFreeformMode !== isFreeformMode)
-    ) {
+    if (previousContext && previousContext.readingId !== workspace.reading.id) {
       flushPendingFreeformViewWrite(previousContext.readingId);
     }
 
     previousPersistenceContextRef.current = {
       readingId: workspace.reading.id,
-      isFreeformMode,
     };
-  }, [isFreeformMode, workspace.reading.id]);
+  }, [workspace.reading.id]);
 
   useEffect(() => {
     return () => {
@@ -448,11 +382,7 @@ export function CanvasPanel({
   }, []);
 
   useEffect(() => {
-    if (
-      !isFreeformMode ||
-      !hasMeasuredViewportRef.current ||
-      hydratedReadingIdRef.current !== workspace.reading.id
-    ) {
+    if (!hasMeasuredViewportRef.current || hydratedReadingIdRef.current !== workspace.reading.id) {
       return;
     }
 
@@ -499,7 +429,6 @@ export function CanvasPanel({
     pendingWrite.timeoutHandle = timeoutHandle;
     pendingViewWriteRef.current = pendingWrite;
   }, [
-    isFreeformMode,
     freeformViewState.panXPx,
     freeformViewState.panYPx,
     freeformViewState.zoomLevel,
@@ -510,7 +439,7 @@ export function CanvasPanel({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (!isFreeformMode || event.key !== " " || event.repeat) {
+      if (event.key !== " " || event.repeat) {
         return;
       }
 
@@ -545,7 +474,7 @@ export function CanvasPanel({
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [isFreeformMode]);
+  }, []);
 
   useLayoutEffect(() => {
     const viewportElement = viewportRef.current;
@@ -581,7 +510,7 @@ export function CanvasPanel({
   useEffect(() => {
     const previousViewportMetrics = previousMeasuredViewportRef.current;
 
-    if (!isFreeformMode || !hasMeasuredViewportRef.current || !previousViewportMetrics) {
+    if (!hasMeasuredViewportRef.current || !previousViewportMetrics) {
       return;
     }
 
@@ -600,13 +529,9 @@ export function CanvasPanel({
       })
     );
     previousMeasuredViewportRef.current = viewportMetrics;
-  }, [isFreeformMode, viewportMetrics.heightPx, viewportMetrics.widthPx]);
+  }, [viewportMetrics.heightPx, viewportMetrics.widthPx]);
 
   function ensureCurrentFreeformPersistenceContext() {
-    if (!isFreeformMode) {
-      return;
-    }
-
     const viewportElement = viewportRef.current;
     if (viewportElement && !hasMeasuredViewportRef.current) {
       const measuredViewportMetrics = readViewportMetrics(viewportElement);
@@ -621,10 +546,6 @@ export function CanvasPanel({
   }
 
   function scheduleZoom(nextZoomLevel: number) {
-    if (!isFreeformMode) {
-      return;
-    }
-
     ensureCurrentFreeformPersistenceContext();
     const viewportElement = viewportRef.current;
     const anchorPointPx = viewportElement
@@ -650,10 +571,6 @@ export function CanvasPanel({
   }
 
   function handleFitSpread() {
-    if (!isFreeformMode) {
-      return;
-    }
-
     ensureCurrentFreeformPersistenceContext();
     setFreeformViewState(
       resolveFreeformFitViewState({
@@ -664,10 +581,6 @@ export function CanvasPanel({
   }
 
   function handleResetView() {
-    if (!isFreeformMode) {
-      return;
-    }
-
     ensureCurrentFreeformPersistenceContext();
     setFreeformViewState(getDefaultFreeformViewState());
   }
@@ -684,7 +597,7 @@ export function CanvasPanel({
   }) {
     const viewportElement = viewportRef.current;
 
-    if (!viewportElement || !isFreeformMode || (!event.deltaX && !event.deltaY)) {
+    if (!viewportElement || (!event.deltaX && !event.deltaY)) {
       return;
     }
 
@@ -742,7 +655,7 @@ export function CanvasPanel({
 
     viewportElement.addEventListener("wheel", handleWheel, { passive: false });
     return () => viewportElement.removeEventListener("wheel", handleWheel);
-  }, [freeformViewState.zoomLevel, isFreeformMode]);
+  }, [freeformViewState.zoomLevel]);
 
   function beginViewportPan(
     event: PanStartEvent,
@@ -750,10 +663,6 @@ export function CanvasPanel({
       allowPrimaryButton?: boolean;
     }
   ): boolean {
-    if (!isFreeformMode) {
-      return false;
-    }
-
     const shouldStartPan =
       event.button === 1 ||
       (event.button === 0 && (spacePanArmed || options?.allowPrimaryButton));
@@ -858,7 +767,6 @@ export function CanvasPanel({
     const pointer = resolveViewportPoint({
       event,
       viewportElement: viewportRef.current,
-      mode: activeMode,
       freeformViewState,
     });
 
@@ -866,14 +774,13 @@ export function CanvasPanel({
       return;
     }
 
-    const currentPosition = resolveCardPosition(card, activeMode, gridMetrics);
+    const currentPosition = resolveCardPosition(card);
     const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
     const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
     const cancelEventName = event.type === "pointerdown" ? "pointercancel" : null;
 
     const initialDragState: DragState = {
       cardId: card.id,
-      mode: activeMode,
       moveEventName,
       upEventName,
       pointerId:
@@ -882,30 +789,13 @@ export function CanvasPanel({
           : null,
       pointerOffsetXPx: pointer.xPx - currentPosition.xPx,
       pointerOffsetYPx: pointer.yPx - currentPosition.yPx,
-      gridMetrics:
-        activeMode === "grid"
-          ? {
-              ...gridMetrics,
-            }
-          : null,
-      freeform:
-        activeMode === "freeform"
-          ? {
-              xPx: card.freeform.xPx,
-              yPx: card.freeform.yPx,
-            }
-          : null,
-      grid:
-        activeMode === "grid"
-          ? {
-              column: card.grid.column,
-              row: card.grid.row,
-            }
-          : null,
+      freeform: {
+        xPx: card.freeform.xPx,
+        yPx: card.freeform.yPx,
+      },
     };
 
     let currentFreeform = initialDragState.freeform;
-    let currentGrid = initialDragState.grid;
 
     function handlePointerMove(nextEvent: DragMoveEvent) {
       if (
@@ -918,73 +808,31 @@ export function CanvasPanel({
       const nextPoint = resolveViewportPoint({
         event: nextEvent,
         viewportElement: viewportRef.current,
-        mode: initialDragState.mode,
-        freeformViewState:
-          initialDragState.mode === "freeform"
-            ? freeformViewStateRef.current
-            : getDefaultFreeformViewState(),
+        freeformViewState: freeformViewStateRef.current,
       });
 
       if (!nextPoint) {
         return;
       }
 
-      if (initialDragState.mode === "freeform") {
-        currentFreeform = clampFreeformPosition(
-          {
-            xPx: nextPoint.xPx - initialDragState.pointerOffsetXPx,
-            yPx: nextPoint.yPx - initialDragState.pointerOffsetYPx,
-          },
-          undefined
-        );
-
-        setDragState({
-          ...initialDragState,
-          freeform: currentFreeform,
-          grid: currentGrid,
-        });
-        return;
-      }
-
-      const { cellWidthPx, cellHeightPx } = getGridCellSize(
-        initialDragState.gridMetrics ?? gridMetrics
-      );
-      const relativeXPx =
-        nextPoint.xPx -
-        initialDragState.pointerOffsetXPx +
-        CARD_WIDTH_PX / 2 -
-        GRID_PADDING_PX;
-      const relativeYPx =
-        nextPoint.yPx -
-        initialDragState.pointerOffsetYPx +
-        CARD_HEIGHT_PX / 2 -
-        GRID_PADDING_PX;
-
-      currentGrid = snapGridPosition(
+      currentFreeform = clampFreeformPosition(
         {
-          column: Math.round(relativeXPx / (cellWidthPx + GRID_GAP_PX)),
-          row: Math.round(relativeYPx / (cellHeightPx + GRID_GAP_PX)),
+          xPx: nextPoint.xPx - initialDragState.pointerOffsetXPx,
+          yPx: nextPoint.yPx - initialDragState.pointerOffsetYPx,
         },
-        initialDragState.gridMetrics ?? gridMetrics
+        undefined
       );
 
       setDragState({
         ...initialDragState,
         freeform: currentFreeform,
-        grid: currentGrid,
       });
     }
 
     function endCardDrag(commitMove: boolean) {
-      if (commitMove && initialDragState.mode === "freeform" && currentFreeform) {
+      if (commitMove) {
         onMoveCard(initialDragState.cardId, {
           freeform: currentFreeform,
-        });
-      }
-
-      if (commitMove && initialDragState.mode === "grid" && currentGrid) {
-        onMoveCard(initialDragState.cardId, {
-          grid: currentGrid,
         });
       }
 
@@ -1029,22 +877,17 @@ export function CanvasPanel({
   }
 
   function resolveCardStyle(card: ReadingCanvasCard) {
-    const position = resolveCardPosition(card, activeMode, gridMetrics);
+    const position = resolveCardPosition(card);
 
     return {
       left: `${position.xPx}px`,
       top: `${position.yPx}px`,
-      zIndex:
-        activeMode === "freeform"
-          ? dragState?.cardId === card.id
-            ? 999
-            : card.freeform.stackOrder
-          : card.grid.row * 10 + card.grid.column + 1,
+      zIndex: dragState?.cardId === card.id ? 999 : card.freeform.stackOrder,
       transform: `rotate(${card.rotationDeg}deg)`,
     };
   }
 
-  const viewControlsDisabled = !isFreeformMode;
+  const viewControlsDisabled = false;
   const freeformWorldTransform = `translate3d(${freeformViewState.panXPx}px, ${freeformViewState.panYPx}px, 0) scale(${freeformViewState.zoomLevel})`;
 
   return (
@@ -1074,24 +917,6 @@ export function CanvasPanel({
 
       <div className="reading-canvas-toolbar" role="toolbar" aria-label="Canvas controls">
         <div className="reading-canvas-toolbar-group">
-          <div className="reading-canvas-mode-switch" role="group" aria-label="Canvas mode">
-            <button
-              type="button"
-              className="reading-canvas-mode-button"
-              data-active={activeMode === "freeform" ? "true" : "false"}
-              onClick={() => onModeChange("freeform")}
-            >
-              Freeform
-            </button>
-            <button
-              type="button"
-              className="reading-canvas-mode-button"
-              data-active={activeMode === "grid" ? "true" : "false"}
-              onClick={() => onModeChange("grid")}
-            >
-              Grid
-            </button>
-          </div>
           <div className="reading-canvas-view-controls" role="group" aria-label="Canvas view">
             <button
               type="button"
@@ -1172,9 +997,7 @@ export function CanvasPanel({
             </button>
           </div>
           <p className="reading-canvas-view-hint">
-            {isFreeformMode
-              ? "Drag the background to pan. Wheel pans. Ctrl/Cmd + wheel zooms."
-              : "Grid stays bounded. Switch to freeform for infinite pan and zoom."}
+            Drag the background to pan. Wheel pans. Ctrl/Cmd + wheel zooms.
           </p>
         </div>
       </div>
@@ -1183,29 +1006,25 @@ export function CanvasPanel({
         ref={viewportRef}
         className="reading-canvas-surface"
         aria-label="Reading canvas viewport"
-        data-mode={activeMode}
-        data-pan-ready={isFreeformMode && spacePanArmed ? "true" : "false"}
+        data-mode="freeform"
+        data-pan-ready={spacePanArmed ? "true" : "false"}
         data-panning={isPanning ? "true" : "false"}
         data-view-pan-x={Math.round(freeformViewState.panXPx)}
         data-view-pan-y={Math.round(freeformViewState.panYPx)}
         data-view-zoom={freeformViewState.zoomLevel.toFixed(3)}
         style={{
-          touchAction: isFreeformMode ? "none" : "auto",
+          touchAction: "none",
         }}
         onMouseDownCapture={(event) => beginViewportPan(event)}
         onPointerDown={(event) => {
-          if (isFreeformMode && !isCardElement(event.target)) {
+          if (!isCardElement(event.target)) {
             if (beginViewportPan(event, { allowPrimaryButton: true })) {
               onSelectCard(null);
             }
           }
         }}
         onMouseDown={(event) => {
-          if (
-            isFreeformMode &&
-            !supportsPointerEvents &&
-            !isCardElement(event.target)
-          ) {
+          if (!supportsPointerEvents && !isCardElement(event.target)) {
             if (beginViewportPan(event, { allowPrimaryButton: true })) {
               onSelectCard(null);
             }
@@ -1217,7 +1036,7 @@ export function CanvasPanel({
           }
         }}
       >
-        {isFreeformMode ? <div className="reading-canvas-backdrop" aria-hidden="true" /> : null}
+        <div className="reading-canvas-backdrop" aria-hidden="true" />
 
         <div className="reading-canvas-watermark" aria-hidden="true">
           <img
@@ -1230,126 +1049,55 @@ export function CanvasPanel({
           </p>
         </div>
 
-        {isFreeformMode ? (
-          <div
-            className="reading-canvas-world"
-            data-mode="freeform"
-            style={{
-              transform: freeformWorldTransform,
-            }}
-          >
-            {renderedCards.map((card) => {
-              const isSelected = card.id === selectedCardId;
+        <div
+          className="reading-canvas-world"
+          data-mode="freeform"
+          style={{
+            transform: freeformWorldTransform,
+          }}
+        >
+          {renderedCards.map((card) => {
+            const isSelected = card.id === selectedCardId;
 
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  aria-label={`${card.label} card`}
-                  aria-pressed={isSelected}
-                  className="reading-canvas-card"
-                  data-face={card.isFaceUp ? "up" : "down"}
-                  data-selected={isSelected ? "true" : "false"}
-                  style={resolveCardStyle(card)}
-                  onPointerDown={
-                    supportsPointerEvents ? (event) => beginCardDrag(card, event) : undefined
-                  }
-                  onMouseDown={
-                    supportsPointerEvents ? undefined : (event) => beginCardDrag(card, event)
-                  }
-                >
-                  {card.isFaceUp ? (
-                    <>
-                      <span className="reading-canvas-card-suit">Drawn Card</span>
-                      <strong className="reading-canvas-card-label">{card.label}</strong>
-                      <span className="reading-canvas-card-meta">
-                        Rotation {card.rotationDeg}°
-                      </span>
-                      {card.assignedReversal ? (
-                        <span className="reading-canvas-card-badge">Reversed</span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <span className="reading-canvas-card-suit">Face-down</span>
-                      <strong className="reading-canvas-card-label">Hidden card</strong>
-                      <span className="reading-canvas-card-meta">Tap Flip to reveal</span>
-                    </>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div
-            className="reading-canvas-stage"
-            style={{
-              width: `${gridMetrics.widthPx}px`,
-              height: `${gridMetrics.heightPx}px`,
-            }}
-          >
-            <div
-              className="reading-canvas-world"
-              data-mode="grid"
-              style={{
-                width: `${gridMetrics.widthPx}px`,
-                height: `${gridMetrics.heightPx}px`,
-              }}
-              onPointerDown={(event) => {
-                if (event.target === event.currentTarget) {
-                  onSelectCard(null);
+            return (
+              <button
+                key={card.id}
+                type="button"
+                aria-label={`${card.label} card`}
+                aria-pressed={isSelected}
+                className="reading-canvas-card"
+                data-face={card.isFaceUp ? "up" : "down"}
+                data-selected={isSelected ? "true" : "false"}
+                style={resolveCardStyle(card)}
+                onPointerDown={
+                  supportsPointerEvents ? (event) => beginCardDrag(card, event) : undefined
                 }
-              }}
-              onMouseDown={(event) => {
-                if (!supportsPointerEvents && event.target === event.currentTarget) {
-                  onSelectCard(null);
+                onMouseDown={
+                  supportsPointerEvents ? undefined : (event) => beginCardDrag(card, event)
                 }
-              }}
-            >
-              {renderedCards.map((card) => {
-                const isSelected = card.id === selectedCardId;
-
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    aria-label={`${card.label} card`}
-                    aria-pressed={isSelected}
-                    className="reading-canvas-card"
-                    data-face={card.isFaceUp ? "up" : "down"}
-                    data-selected={isSelected ? "true" : "false"}
-                    style={resolveCardStyle(card)}
-                    onPointerDown={
-                      supportsPointerEvents ? (event) => beginCardDrag(card, event) : undefined
-                    }
-                    onMouseDown={
-                      supportsPointerEvents ? undefined : (event) => beginCardDrag(card, event)
-                    }
-                  >
-                    {card.isFaceUp ? (
-                      <>
-                        <span className="reading-canvas-card-suit">Drawn Card</span>
-                        <strong className="reading-canvas-card-label">{card.label}</strong>
-                        <span className="reading-canvas-card-meta">
-                          Rotation {card.rotationDeg}°
-                        </span>
-                        {card.assignedReversal ? (
-                          <span className="reading-canvas-card-badge">Reversed</span>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <span className="reading-canvas-card-suit">Face-down</span>
-                        <strong className="reading-canvas-card-label">Hidden card</strong>
-                        <span className="reading-canvas-card-meta">Tap Flip to reveal</span>
-                      </>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+              >
+                {card.isFaceUp ? (
+                  <>
+                    <span className="reading-canvas-card-suit">Drawn Card</span>
+                    <strong className="reading-canvas-card-label">{card.label}</strong>
+                    <span className="reading-canvas-card-meta">
+                      Rotation {card.rotationDeg}°
+                    </span>
+                    {card.assignedReversal ? (
+                      <span className="reading-canvas-card-badge">Reversed</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <span className="reading-canvas-card-suit">Face-down</span>
+                    <strong className="reading-canvas-card-label">Hidden card</strong>
+                    <span className="reading-canvas-card-meta">Tap Flip to reveal</span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <form className="reading-canvas-composer" aria-label="Reading composer">
