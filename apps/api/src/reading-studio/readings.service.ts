@@ -336,12 +336,12 @@ export class ReadingsService {
     user: AuthenticatedUser,
     readingId: string
   ): Promise<GetReadingResponse> {
-    const reading = await this.readingsRepository.findOwnedById(user.userId, readingId);
-    if (!reading) {
+    const reading = await this.restoreReadingFromHistory(user.userId, readingId);
+    if (!reading || reading.deletedAt !== null) {
       throw new NotFoundException("Reading not found.");
     }
 
-    return toReadingDetail(reading);
+    return reading;
   }
 
   async applyCommand(
@@ -380,7 +380,9 @@ export class ReadingsService {
       throw new NotFoundException("Reading not found.");
     }
 
-    const currentDetail = toReadingDetail(currentRecord);
+    const currentDetail =
+      (await this.restoreReadingFromHistory(user.userId, readingId)) ??
+      toReadingDetail(currentRecord);
     if (currentDetail.version !== command.expectedVersion) {
       throw buildConflict(
         "version_conflict",
@@ -559,8 +561,11 @@ export class ReadingsService {
     command: LegacySwitchCanvasModeCommandRequest;
     currentDetail: ReadingDetail;
   }): Promise<ReadingCommandResponse> {
+    const commandTimestamp = new Date();
     const compatibilityReading = normalizeLegacyReadingDetail({
       ...input.currentDetail,
+      version: input.currentDetail.version + 1,
+      updatedAt: commandTimestamp.toISOString(),
       canvasMode: input.command.payload.canvasMode,
       canvas: {
         ...input.currentDetail.canvas,
@@ -576,6 +581,26 @@ export class ReadingsService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        const updatedCount = await this.readingsRepository.updateVersion(tx, {
+          readingId: input.readingId,
+          ownerUserId: input.user.userId,
+          expectedVersion: input.currentDetail.version,
+          version: compatibilityReading.version,
+          updatedAt: commandTimestamp,
+        });
+
+        if (updatedCount !== 1) {
+          throw new VersionConflictError();
+        }
+
+        await this.readingSnapshotsRepository.create(tx, {
+          id: randomUUID(),
+          readingId: input.readingId,
+          version: compatibilityReading.version,
+          projection: toJson(compatibilityReading),
+          createdAt: commandTimestamp,
+        });
+
         await this.readingIdempotencyRepository.createCommandReceipt(tx, {
           id: randomUUID(),
           readingId: input.readingId,
@@ -583,12 +608,36 @@ export class ReadingsService {
           commandId: input.command.commandId,
           idempotencyKey: input.idempotencyKey,
           requestHash: input.requestHash,
-          resultingVersion: input.currentDetail.version,
+          resultingVersion: compatibilityReading.version,
           responseJson: toJson(response),
-          createdAt: new Date(input.currentDetail.updatedAt),
+          createdAt: commandTimestamp,
         });
       });
     } catch (error) {
+      if (error instanceof VersionConflictError) {
+        const duplicateReplay = await this.getCommandReplay(
+          input.readingId,
+          input.command,
+          input.idempotencyKey,
+          input.requestHash
+        );
+        if (duplicateReplay) {
+          return duplicateReplay;
+        }
+
+        const latest = await this.readingsRepository.findCurrentVersion(
+          input.user.userId,
+          input.readingId
+        );
+        const currentVersion = latest?.version ?? input.command.expectedVersion;
+
+        throw buildConflict(
+          "version_conflict",
+          `Expected reading version ${input.command.expectedVersion}, received ${currentVersion}.`,
+          currentVersion
+        );
+      }
+
       if (this.isUniqueConstraintError(error)) {
         const duplicateReplay = await this.getCommandReplay(
           input.readingId,

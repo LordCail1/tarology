@@ -100,6 +100,8 @@ Execution sequencing:
   - legacy grid-mode snapshots are now normalized to their migrated freeform positions during restore
   - legacy grid-only `reading.card_moved` events now replay safely by translating their stored grid coordinates into freeform placement
   - stale cached web bundles are temporarily tolerated during rollout by accepting legacy `switch_canvas_mode` as a no-op compatibility command and translating grid-only `move_card` payloads into freeform placement
+  - legacy `switch_canvas_mode` compatibility commands now advance reading version plus snapshot state so stale optimistic clients do not trip the next command on a false 409
+  - detail and command reads now hydrate from restored snapshots during the rollout shim so legacy `card.grid` metadata survives even though the live persistence model is freeform-only
 - Documentation modularization into PRD set with `docs/product/README.md` index.
 - Strategic expansion documentation pass completed (storytelling -> fusion -> dialogue -> deck creation -> sharing/monetization).
 - Google auth baseline:

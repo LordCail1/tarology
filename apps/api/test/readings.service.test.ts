@@ -280,9 +280,25 @@ describe("ReadingsService", () => {
       readingsRepository as never,
       {
         append: vi.fn(),
+        listAfterVersion: vi.fn().mockResolvedValue([]),
       } as never,
       {
         create: vi.fn(),
+        findLatest: vi.fn().mockResolvedValue({
+          version: 1,
+          projection: buildReadingDetail({
+            readingId: readingRecord.id,
+            rootQuestion: readingRecord.rootQuestion,
+            deckId: readingRecord.deckId,
+            deckSpecVersion: readingRecord.deckSpecVersion,
+            shuffleAlgorithmVersion: readingRecord.shuffleAlgorithmVersion,
+            seedCommitment: readingRecord.seedCommitment,
+            orderHash: readingRecord.orderHash,
+            version: 1,
+            createdAt: readingRecord.createdAt.toISOString(),
+            updatedAt: readingRecord.updatedAt.toISOString(),
+          }),
+        }),
       } as never,
       readingIdempotencyRepository as never
     );
@@ -369,6 +385,73 @@ describe("ReadingsService", () => {
     expect((restored?.canvas.cards[0] as Record<string, unknown>)?.grid).toEqual({
       column: 2,
       row: 1,
+    });
+  });
+
+  it("serves legacy grid metadata from restored detail reads", async () => {
+    const service = new ReadingsService(
+      {
+        userPreference: {
+          findUnique: vi.fn(),
+        },
+      } as never,
+      decksService as never,
+      {
+        findOwnedById: vi.fn().mockResolvedValue({ id: "reading-1", deletedAt: null }),
+      } as never,
+      {
+        listAfterVersion: vi.fn().mockResolvedValue([]),
+      } as never,
+      {
+        findLatest: vi.fn().mockResolvedValue({
+          version: 3,
+          projection: {
+            ...buildReadingDetail({
+              version: 3,
+              updatedAt: "2026-03-22T10:03:00.000Z",
+            }),
+            canvasMode: "freeform",
+            canvas: {
+              activeMode: "freeform",
+              cards: [
+                {
+                  deckIndex: 0,
+                  cardId: "card-1",
+                  assignedReversal: false,
+                  isFaceUp: false,
+                  rotationDeg: 0,
+                  freeform: {
+                    xPx: 96,
+                    yPx: 144,
+                    stackOrder: 1,
+                  },
+                  grid: {
+                    column: 3,
+                    row: 2,
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      } as never,
+      {
+        findCreateReceipt: vi.fn(),
+        createCreateReceipt: vi.fn(),
+        findCommandReceiptByIdempotencyKey: vi.fn(),
+        findCommandReceiptByCommandId: vi.fn(),
+        createCommandReceipt: vi.fn(),
+      } as never
+    );
+
+    const detail = await service.getReading(user, "reading-1");
+
+    expect(detail.version).toBe(3);
+    expect((detail as Record<string, unknown>).canvasMode).toBe("freeform");
+    expect((detail.canvas as Record<string, unknown>).activeMode).toBe("freeform");
+    expect((detail.canvas.cards[0] as Record<string, unknown>).grid).toEqual({
+      column: 3,
+      row: 2,
     });
   });
 

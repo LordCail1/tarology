@@ -449,16 +449,25 @@ describe("Reading durability and history API", () => {
       })
       .expect(200);
 
-    expect(switched.body.reading.version).toBe(1);
+    expect(switched.body.reading.version).toBe(2);
     expect(switched.body.reading.canvasMode).toBe("grid");
     expect(switched.body.reading.canvas.activeMode).toBe("grid");
+
+    const switchedDetail = await request(app.getHttpServer())
+      .get(`/v1/readings/${created.body.readingId}`)
+      .expect(200);
+
+    expect(switchedDetail.body.readingId).toBe(created.body.readingId);
+    expect(switchedDetail.body.version).toBe(2);
+    expect(switchedDetail.body.canvasMode).toBe("grid");
+    expect(switchedDetail.body.canvas.activeMode).toBe("grid");
 
     const moved = await request(app.getHttpServer())
       .post(`/v1/readings/${created.body.readingId}/commands`)
       .set("Idempotency-Key", "legacy-grid-move")
       .send({
         commandId: "160295eb-3cf9-492f-a12b-3d783f11a2c1",
-        expectedVersion: 1,
+        expectedVersion: 2,
         type: "move_card",
         payload: {
           cardId: targetCardId,
@@ -470,7 +479,7 @@ describe("Reading durability and history API", () => {
       })
       .expect(200);
 
-    expect(moved.body.reading.version).toBe(2);
+    expect(moved.body.reading.version).toBe(3);
     expect(
       moved.body.reading.canvas.cards.find((card: { cardId: string }) => card.cardId === targetCardId)
     ).toMatchObject({
