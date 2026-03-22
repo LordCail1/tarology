@@ -92,6 +92,7 @@ describe("Reading durability and history API", () => {
         rootQuestion: "What continues after a reset?",
         deckId: testUserDeckId,
         deckSpecVersion: "thoth-v1",
+        canvasMode: "grid",
       })
       .expect(201);
 
@@ -113,6 +114,8 @@ describe("Reading durability and history API", () => {
       archivedAt: null,
       deletedAt: null,
     });
+    expect(createResponse.body).not.toHaveProperty("canvasMode");
+    expect(detailResponse.body).not.toHaveProperty("canvasMode");
     expect(detailResponse.body.assignments).toHaveLength(78);
     expect(detailResponse.body.assignments).toEqual(createResponse.body.assignments);
 
